@@ -1,0 +1,78 @@
+name: veterinary-clinic-system
+
+services:
+  veterinary-clinic-postgres:
+    image: postgres:16-alpine
+    container_name: veterinary-clinic-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-vetclinic}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-vetclinic}
+      POSTGRES_DB: ${DB_DATABASE:-veterinary_clinic}
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    volumes:
+      - veterinary-clinic-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-vetclinic}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  veterinary-clinic-redis:
+    image: redis:7-alpine
+    container_name: veterinary-clinic-redis
+    restart: unless-stopped
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - veterinary-clinic-redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Optional: containerized backend. During thesis development it's usually faster to
+  # run `npm run start:dev` on the host and only docker-compose up the two services
+  # above; this service is provided so the whole stack can also run with a single
+  # `docker compose --profile full up`.
+  veterinary-clinic-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: veterinary-clinic-backend
+    restart: unless-stopped
+    profiles: ['full']
+    env_file:
+      - .env
+    environment:
+      DB_HOST: veterinary-clinic-postgres
+      REDIS_HOST: veterinary-clinic-redis
+      AI_SERVICE_BASE_URL: http://veterinary-clinic-ai:8000
+    ports:
+      - '${PORT:-3000}:3000'
+    depends_on:
+      veterinary-clinic-postgres:
+        condition: service_healthy
+      veterinary-clinic-redis:
+        condition: service_healthy
+    volumes:
+      - veterinary-clinic-uploads:/app/uploads
+
+  veterinary-clinic-ai:
+    build:
+      context: ../veterinary-clinic-ai
+      dockerfile: Dockerfile
+    container_name: veterinary-clinic-ai
+    restart: unless-stopped
+    profiles: ['full']
+    env_file:
+      - ../veterinary-clinic-ai/.env
+    ports:
+      - '8000:8000'
+
+volumes:
+  veterinary-clinic-postgres-data:
+  veterinary-clinic-redis-data:
+  veterinary-clinic-uploads:
