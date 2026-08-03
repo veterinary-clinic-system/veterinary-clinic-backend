@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2021",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "strictBindCallApply": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  // TypeORM CLI (migration:run / seed) chay qua ts-node, khong qua nest build - nen no
+  // can duoc bao rieng cach giai alias "@/..." o tren.
+  "ts-node": {
+    "require": ["tsconfig-paths/register"]
+  }
+}
