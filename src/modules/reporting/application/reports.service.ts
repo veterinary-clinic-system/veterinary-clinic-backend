@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { endOfDay, startOfDay } from 'date-fns';
 import { InvoiceItem } from '@/modules/billing/domain/entities/invoice-item.entity';
-import { Examination } from '@/modules/clinical/domain/entities/examination.entity';
+import { Diagnosis } from '@/modules/clinical/domain/entities/diagnosis.entity';
 import { PreScreeningResult } from '@/modules/triage/domain/entities/pre-screening-result.entity';
 import { ItemType } from '@/shared/common/enums/item-type.enum';
 import { PRIORITY_COLOR_SEVERITY, PriorityColor } from '@/shared/common/enums/priority-color.enum';
@@ -21,14 +21,14 @@ import {
 
 /**
  * Read-only aggregation queries over entities other modules own (Invoice/InvoiceItem,
- * Examination, PreScreeningResult/Appointment). Backs the ADMIN/RECEPTIONIST reporting
- * dashboard - nothing here writes to the database.
+ * Diagnosis/MedicalRecord, PreScreeningResult/Appointment). Backs the ADMIN/RECEPTIONIST
+ * reporting dashboard - nothing here writes to the database.
  */
 @Injectable()
 export class ReportsService {
   constructor(
     @InjectRepository(InvoiceItem) private readonly invoiceItemRepository: Repository<InvoiceItem>,
-    @InjectRepository(Examination) private readonly examinationRepository: Repository<Examination>,
+    @InjectRepository(Diagnosis) private readonly diagnosisRepository: Repository<Diagnosis>,
     @InjectRepository(PreScreeningResult)
     private readonly preScreeningResultRepository: Repository<PreScreeningResult>,
   ) {}
@@ -168,37 +168,52 @@ export class ReportsService {
   }
 
   /**
-   * `GET /reports/exam-volume-by-disease-group` - `Examination.diseaseGroups` is a text
-   * array (a doctor can tag one exam with several groups), so counting "occurrences per
-   * group" needs `unnest()` to expand it into one row per group before grouping.
+   * `GET /reports/exam-volume-by-disease-group`.
+   *
+   * Tu P4-T8, doc tu bang `diagnoses` thay vi `unnest(examinations.disease_groups)`.
+   * Con so KHONG DOI voi du lieu cu: migration `Diagnoses1790000001000` sinh dung mot
+   * hang `diagnoses` cho moi phan tu cua `disease_groups`, nen `COUNT(*)` tren bang moi
+   * bang so lan `unnest` truoc day.
+   *
+   * MOT KHAC BIET CO Y: nhung phieu kham chi co `diagnosis_text` tu do (khong chon
+   * nhom benh nao) truoc day KHONG xuat hien trong bao cao - gio chung thanh mot nhom
+   * mang chinh chuoi mo ta do. Do la du lieu that von bi bo qua, khong phai hang bia
+   * them.
+   *
+   * Gom nhom theo TEN BENH trong danh muc khi chan doan co noi sang `diseases`, con
+   * khong thi theo chinh `diagnosis_text` - hai chan doan cung tro ve mot benh nhung go
+   * khac chu phai rot vao cung mot nhom.
    */
   async getExamVolumeByDiseaseGroup(query: DateRangeQueryDto): Promise<ExamVolumeByDiseaseGroup[]> {
     const fromDate = query.from ? startOfDay(new Date(query.from)) : undefined;
     const toDate = query.to ? endOfDay(new Date(query.to)) : undefined;
     this.assertValidRange(fromDate, toDate);
 
-    const qb = this.examinationRepository
-      .createQueryBuilder('examination')
-      // Raw column name, same reasoning as the `TO_CHAR` expression above - `unnest(...)`
-      // is a function call, so the `examination.property` auto-rewrite wouldn't apply to
-      // whatever's inside it anyway; spelling out the real (snake_case) column sidesteps
-      // any doubt.
-      .select('unnest(examination.disease_groups)', 'diseaseGroup')
+    const qb = this.diagnosisRepository
+      .createQueryBuilder('diagnosis')
+      .innerJoin('diagnosis.medicalRecord', 'medicalRecord')
+      // `leftJoin`: ho so co chan doan nhung chua ghi sinh hieu van phai duoc dem.
+      .leftJoin('medicalRecord.examination', 'examination')
+      .leftJoin('diagnosis.disease', 'disease')
+      .select('COALESCE(disease.disease_name, diagnosis.diagnosis_text)', 'diseaseGroup')
       .addSelect('COUNT(*)', 'count');
 
     if (query.branchId) {
-      qb.innerJoin('examination.appointment', 'appointment').andWhere(
+      qb.innerJoin('medicalRecord.appointment', 'appointment').andWhere(
         'appointment.branchId = :branchId',
         {
           branchId: query.branchId,
         },
       );
     }
+    // Moc thoi gian van la NGAY KHAM de doi chieu duoc voi bao cao cu; ho so chua ghi
+    // sinh hieu thi lay ngay mo ho so.
+    const examinedAtExpr = 'COALESCE(examination.examined_at, medicalRecord.created_at)';
     if (fromDate) {
-      qb.andWhere('examination.examinedAt >= :from', { from: fromDate });
+      qb.andWhere(`${examinedAtExpr} >= :from`, { from: fromDate });
     }
     if (toDate) {
-      qb.andWhere('examination.examinedAt <= :to', { to: toDate });
+      qb.andWhere(`${examinedAtExpr} <= :to`, { to: toDate });
     }
 
     // Quoted so it matches TypeORM's quoted `AS "diseaseGroup"` / `AS "count"` output

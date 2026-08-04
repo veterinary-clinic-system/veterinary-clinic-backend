@@ -5,7 +5,11 @@ import * as bcrypt from 'bcrypt';
 import { User } from '@/modules/identity/domain/entities/user.entity';
 import { Pet } from '@/modules/pets/domain/entities/pet.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
-import { Examination } from '@/modules/clinical/domain/entities/examination.entity';
+import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
+import {
+  DiagnosisSeverity,
+  MedicalRecordStatus,
+} from '@/shared/common/enums/medical-record-status.enum';
 import { Invoice } from '@/modules/billing/domain/entities/invoice.entity';
 import { AppointmentStatus } from '@/shared/common/enums/appointment-status.enum';
 import { PaymentMethod } from '@/shared/common/enums/payment-method.enum';
@@ -64,20 +68,30 @@ export interface CustomerAppointmentRow {
 }
 
 /**
- * Mot dong trong tab "Lich su kham" - moi phieu kham bac si da ghi cho thu cung cua
+ * Mot dong trong tab "Lich su kham" - moi ho so benh an bac si da mo cho thu cung cua
  * khach. Khac tab "Lich hen" o cho: lich hen la KE HOACH (co ca lich bi huy, khach
- * khong den), phieu kham la thu that su da dien ra trong phong kham.
+ * khong den), ho so benh an la thu that su da dien ra trong phong kham.
  */
 export interface CustomerMedicalHistoryRow {
-  examinationId: string;
+  medicalRecordId: string;
   appointmentId: string;
+  status: MedicalRecordStatus;
   examinedAt: Date;
   petId: string;
   petName: string;
   doctorName: string | null;
   branchName: string | null;
-  diagnosisText: string | null;
-  diseaseGroups: string[];
+  visitReason: string | null;
+  diagnoses: CustomerMedicalHistoryDiagnosis[];
+}
+
+/** Chan doan rut gon nhung trong mot dong benh su. */
+export interface CustomerMedicalHistoryDiagnosis {
+  id: string;
+  diagnosisText: string;
+  severity: DiagnosisSeverity;
+  isPrimary: boolean;
+  diseaseName: string | null;
 }
 
 /** Mot dong trong lich su giao dich cua khach (mot hoa don = mot lan kham da lap hoa don). */
@@ -108,7 +122,8 @@ export class CustomersService {
     // PetsModule/SchedulingModule dang lam.
     @InjectRepository(Pet) private readonly petsRepository: Repository<Pet>,
     @InjectRepository(Appointment) private readonly appointmentsRepository: Repository<Appointment>,
-    @InjectRepository(Examination) private readonly examinationsRepository: Repository<Examination>,
+    @InjectRepository(MedicalRecord)
+    private readonly medicalRecordsRepository: Repository<MedicalRecord>,
     @InjectRepository(Invoice) private readonly invoicesRepository: Repository<Invoice>,
   ) {}
 
@@ -358,44 +373,48 @@ export class CustomersService {
   }
 
   /**
-   * Tab "Lich su kham" (FR-03-04): cac phieu kham bac si da ghi cho thu cung cua khach.
+   * Tab "Lich su kham" (FR-03-04): cac ho so benh an bac si da mo cho thu cung cua khach.
    *
-   * Doc thang bang `examinations` qua `appointments` thay vi qua module clinical - cung
-   * quy uoc doc-only da dung cho Pet/Appointment/Invoice o dau file. Sau Phase 4, khi
-   * `MedicalRecord` ra doi, day la cho duy nhat can doi de tro sang no.
+   * Doc thang bang `medical_records` thay vi qua module clinical - cung quy uoc doc-only
+   * da dung cho Pet/Appointment/Invoice o dau file. Tu P4-T8, chan doan lay tu bang
+   * `diagnoses` chu khong con tu `examinations.disease_groups`.
    */
   async findMedicalHistory(id: string): Promise<CustomerMedicalHistoryRow[]> {
     await this.findCustomerEntity(id);
 
-    const rows = await this.examinationsRepository
-      .createQueryBuilder('examination')
-      .innerJoin('examination.appointment', 'appointment')
-      .innerJoin('appointment.pet', 'pet')
-      .leftJoin('examination.doctor', 'doctor')
+    const rows = await this.medicalRecordsRepository
+      .createQueryBuilder('medicalRecord')
+      .innerJoin('medicalRecord.appointment', 'appointment')
+      .innerJoin('medicalRecord.pet', 'pet')
+      .leftJoin('medicalRecord.doctor', 'doctor')
+      // `leftJoin`: ho so chua ghi sinh hieu van phai hien trong benh su.
+      .leftJoin('medicalRecord.examination', 'examination')
       .leftJoin('appointment.branch', 'branch')
-      .select('examination.id', 'examination_id')
+      .select('medicalRecord.id', 'medical_record_id')
       .addSelect('appointment.id', 'appointment_id')
-      .addSelect('examination.examined_at', 'examined_at')
-      .addSelect('examination.diagnosis_text', 'diagnosis_text')
-      .addSelect('examination.disease_groups', 'disease_groups')
+      .addSelect('medicalRecord.status', 'status')
+      .addSelect('COALESCE(examination.examined_at, medicalRecord.created_at)', 'examined_at')
+      .addSelect('medicalRecord.visit_reason', 'visit_reason')
       .addSelect('pet.id', 'pet_id')
       .addSelect('pet.name', 'pet_name')
       .addSelect('doctor.full_name', 'doctor_name')
       .addSelect('branch.branch_name', 'branch_name')
+      .addSelect(CUSTOMER_DIAGNOSES_JSON_SUBQUERY, 'diagnoses')
       .where('pet.ownerId = :ownerId', { ownerId: id })
-      .orderBy('examination.examined_at', 'DESC')
+      .orderBy('COALESCE(examination.examined_at, medicalRecord.created_at)', 'DESC')
       .getRawMany<RawCustomerMedicalHistoryRow>();
 
     return rows.map((row) => ({
-      examinationId: row.examination_id,
+      medicalRecordId: row.medical_record_id,
       appointmentId: row.appointment_id,
+      status: row.status,
       examinedAt: new Date(row.examined_at),
       petId: row.pet_id,
       petName: row.pet_name,
       doctorName: row.doctor_name,
       branchName: row.branch_name,
-      diagnosisText: row.diagnosis_text,
-      diseaseGroups: row.disease_groups ?? [],
+      visitReason: row.visit_reason,
+      diagnoses: row.diagnoses ?? [],
     }));
   }
 
@@ -611,16 +630,43 @@ interface RawCustomerAppointmentRow {
 }
 
 interface RawCustomerMedicalHistoryRow {
-  examination_id: string;
+  medical_record_id: string;
   appointment_id: string;
+  status: MedicalRecordStatus;
   examined_at: string;
-  diagnosis_text: string | null;
-  disease_groups: string[] | null;
+  visit_reason: string | null;
+  diagnoses: CustomerMedicalHistoryDiagnosis[] | null;
   pet_id: string;
   pet_name: string;
   doctor_name: string | null;
   branch_name: string | null;
 }
+
+/**
+ * Cac chan doan cua mot ho so, gom san thanh mang JSON trong CSDL - tranh N+1 khi
+ * khach co hang chuc lan kham. Ban sao cua truy van cung ten trong
+ * `pets/application/pet-profile.service.ts`: hai read-model doc lap nhau, gop lai
+ * thanh mot hang SQL dung chung se buoc hai module phai doi cung nhau.
+ */
+const CUSTOMER_DIAGNOSES_JSON_SUBQUERY = `(
+  SELECT COALESCE(
+           json_agg(
+             json_build_object(
+               'id',            diag."id",
+               'diagnosisText', diag."diagnosis_text",
+               'severity',      diag."severity",
+               'isPrimary',     diag."is_primary",
+               'diseaseName',   dis."disease_name"
+             )
+             ORDER BY diag."is_primary" DESC, diag."created_at" ASC
+           ),
+           '[]'::json
+         )
+    FROM "diagnoses" diag
+    LEFT JOIN "diseases" dis ON dis."id" = diag."disease_id"
+   WHERE diag."medical_record_id" = "medicalRecord"."id"
+     AND diag."deleted_at" IS NULL
+)`;
 
 interface RawTransactionRow {
   invoice_id: string;

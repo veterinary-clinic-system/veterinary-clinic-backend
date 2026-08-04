@@ -179,16 +179,28 @@ export class PetsService {
   }
 
   /**
-   * Section 4.1.4 "timeline view of examination history": this pet's appointments,
-   * most recent first, each with its linked Examination (diagnosis/vitals/attachments)
-   * when one exists.
+   * Section 4.1.4 "timeline view of examination history": this pet's appointments, most
+   * recent first, each with its linked Examination (vitals) and MedicalRecord when one
+   * exists.
+   *
+   * Tu P4-T8, chan doan doc tu `medicalRecord.diagnoses` chu khong con tu
+   * `examination.diseaseGroups`. Van tra ve `Appointment[]` chu khong phai
+   * `MedicalRecord[]`: day la route CHU THU CUNG tu xem (`GET /pets/:id/timeline`), noi
+   * mot lich hen chua kham xong van phai hien ra - `MedicalRecordsService.getTimelineForPet`
+   * moi la benh su cua nhan vien, va no chi thay nhung lan da mo ho so.
    */
   async getTimeline(id: string, actor: AuthenticatedUser): Promise<Appointment[]> {
     await this.findOneForActor(id, actor); // 404s / 403s before touching the appointments table
 
     return this.appointmentsRepository.find({
       where: { petId: id },
-      relations: ['doctor', 'examination'],
+      relations: [
+        'doctor',
+        'examination',
+        'medicalRecord',
+        'medicalRecord.diagnoses',
+        'medicalRecord.treatments',
+      ],
       order: { startAt: 'DESC' },
     });
   }

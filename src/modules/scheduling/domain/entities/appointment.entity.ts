@@ -10,6 +10,7 @@ import { CommonSymptom } from '@/shared/common/enums/common-symptom.enum';
 import { AppointmentStatus } from '@/shared/common/enums/appointment-status.enum';
 import { PreScreeningResult } from '@/modules/triage/domain/entities/pre-screening-result.entity';
 import { Examination } from '@/modules/clinical/domain/entities/examination.entity';
+import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
 import { Invoice } from '@/modules/billing/domain/entities/invoice.entity';
 
 /**
@@ -138,6 +139,14 @@ export class Appointment extends BaseEntity {
 
   @OneToOne(() => Examination, (examination) => examination.appointment)
   examination?: Examination;
+
+  /**
+   * Ho so benh an cua lan kham nay (P4). Chieu nguoc lai duoc khai bao o day de cac
+   * truy van bat dau tu `Appointment` - benh su cua thu cung chang han - nap thang
+   * duoc ho so va cac chan doan cua no, khong phai truy van rieng mot vong nua.
+   */
+  @OneToOne(() => MedicalRecord, (record) => record.appointment)
+  medicalRecord?: MedicalRecord;
 
   @OneToOne(() => Invoice, (invoice) => invoice.appointment)
   invoice?: Invoice;

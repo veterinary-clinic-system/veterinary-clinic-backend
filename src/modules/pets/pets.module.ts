@@ -5,7 +5,7 @@ import { Breed } from '@/modules/pets/domain/entities/breed.entity';
 import { Pet } from '@/modules/pets/domain/entities/pet.entity';
 import { Species } from '@/modules/pets/domain/entities/species.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
-import { Examination } from '@/modules/clinical/domain/entities/examination.entity';
+import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
 import { Prescription } from '@/modules/clinical/domain/entities/prescription.entity';
 import { LabTestOrder } from '@/modules/clinical/domain/entities/lab-test-order.entity';
 import { Invoice } from '@/modules/billing/domain/entities/invoice.entity';
@@ -21,12 +21,12 @@ import { SpeciesService } from '@/modules/pets/application/species.service';
       Pet,
       Species,
       Breed,
-      // Read-only reads into other modules' tables (owner lookups, examination-history
+      // Read-only reads into other modules' tables (owner lookups, medical-record
       // timeline, cac khoi cua trang ho so thu cung FR-04-03) - not calling into their
       // services, same pattern as SchedulingModule.
       User,
       Appointment,
-      Examination,
+      MedicalRecord,
       Prescription,
       LabTestOrder,
       Invoice,

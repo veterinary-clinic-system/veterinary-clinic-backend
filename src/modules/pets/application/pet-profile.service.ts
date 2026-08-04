@@ -3,11 +3,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Pet } from '@/modules/pets/domain/entities/pet.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
-import { Examination } from '@/modules/clinical/domain/entities/examination.entity';
+import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
 import { Prescription } from '@/modules/clinical/domain/entities/prescription.entity';
 import { LabTestOrder } from '@/modules/clinical/domain/entities/lab-test-order.entity';
 import { Invoice } from '@/modules/billing/domain/entities/invoice.entity';
 import { AppointmentStatus } from '@/shared/common/enums/appointment-status.enum';
+import {
+  DiagnosisSeverity,
+  MedicalRecordStatus,
+} from '@/shared/common/enums/medical-record-status.enum';
 import { LabTestStatus } from '@/shared/common/enums/lab-test-status.enum';
 import { PaymentMethod } from '@/shared/common/enums/payment-method.enum';
 import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
@@ -24,24 +28,61 @@ export interface PetAppointmentRow {
   serviceName: string | null;
 }
 
-/** Mot phieu kham - khoi "Medical History". */
+/** Mot chan doan rut gon, nhung trong benh su - xem `DIAGNOSES_JSON_SUBQUERY`. */
+export interface MedicalHistoryDiagnosis {
+  id: string;
+  diagnosisText: string;
+  severity: DiagnosisSeverity;
+  isPrimary: boolean;
+  diseaseName: string | null;
+}
+
+/** Mot ho so benh an - khoi "Medical History". */
 export interface PetMedicalHistoryRow {
-  examinationId: string;
+  medicalRecordId: string;
   appointmentId: string;
+  status: MedicalRecordStatus;
   examinedAt: Date;
   doctorName: string | null;
   branchName: string | null;
-  diagnosisText: string | null;
-  diseaseGroups: string[];
+  visitReason: string | null;
+  diagnoses: MedicalHistoryDiagnosis[];
   notes: string | null;
   temperatureCelsius: number | null;
   weightKg: number | null;
 }
 
+/**
+ * Cac chan doan cua mot ho so, gom san thanh mang JSON trong CSDL.
+ *
+ * `json_agg` tra ve `NULL` (khong phai `[]`) khi khong co hang nao - da boc
+ * `COALESCE` de tang goi luon nhan duoc mot mang. Sap xep theo `is_primary DESC` de
+ * chan doan chinh luon dung dau, giao dien khong phai tu tim.
+ */
+const DIAGNOSES_JSON_SUBQUERY = `(
+  SELECT COALESCE(
+           json_agg(
+             json_build_object(
+               'id',            diag."id",
+               'diagnosisText', diag."diagnosis_text",
+               'severity',      diag."severity",
+               'isPrimary',     diag."is_primary",
+               'diseaseName',   dis."disease_name"
+             )
+             ORDER BY diag."is_primary" DESC, diag."created_at" ASC
+           ),
+           '[]'::json
+         )
+    FROM "diagnoses" diag
+    LEFT JOIN "diseases" dis ON dis."id" = diag."disease_id"
+   WHERE diag."medical_record_id" = "medicalRecord"."id"
+     AND diag."deleted_at" IS NULL
+)`;
+
 /** Mot don thuoc kem cac dong thuoc - khoi "Prescription". */
 export interface PetPrescriptionRow {
   prescriptionId: string;
-  examinationId: string;
+  medicalRecordId: string;
   examinedAt: Date;
   doctorName: string | null;
   notes: string | null;
@@ -58,7 +99,7 @@ export interface PetPrescriptionRow {
 /** Mot chi dinh xet nghiem - khoi "Laboratory". */
 export interface PetLabTestRow {
   labTestId: string;
-  examinationId: string;
+  medicalRecordId: string;
   orderedAt: Date;
   testName: string;
   status: LabTestStatus;
@@ -95,7 +136,8 @@ export class PetProfileService {
   constructor(
     @InjectRepository(Pet) private readonly petsRepository: Repository<Pet>,
     @InjectRepository(Appointment) private readonly appointmentsRepository: Repository<Appointment>,
-    @InjectRepository(Examination) private readonly examinationsRepository: Repository<Examination>,
+    @InjectRepository(MedicalRecord)
+    private readonly medicalRecordsRepository: Repository<MedicalRecord>,
     @InjectRepository(Prescription)
     private readonly prescriptionsRepository: Repository<Prescription>,
     @InjectRepository(LabTestOrder) private readonly labTestsRepository: Repository<LabTestOrder>,
@@ -135,36 +177,48 @@ export class PetProfileService {
     }));
   }
 
+  /**
+   * Benh su cua thu cung. Tu P4-T8, moi dong la mot HO SO BENH AN (khong con la mot
+   * phieu kham), va chan doan doc tu bang `diagnoses` chu khong tu
+   * `examinations.disease_groups`.
+   *
+   * `diagnoses` duoc gom thanh mang JSON ngay trong SQL thay vi ban ra roi nap tung
+   * ho so: mot con vat kham lau nam co hang chuc ho so, moi ho so vai chan doan - lam
+   * theo kieu N+1 la vai chuc luot di ve CSDL cho mot lan mo tab.
+   */
   async findMedicalHistory(petId: string): Promise<PetMedicalHistoryRow[]> {
     await this.assertPetExists(petId);
 
-    const rows = await this.examinationsRepository
-      .createQueryBuilder('examination')
-      .innerJoin('examination.appointment', 'appointment')
-      .leftJoin('examination.doctor', 'doctor')
+    const rows = await this.medicalRecordsRepository
+      .createQueryBuilder('medicalRecord')
+      .innerJoin('medicalRecord.appointment', 'appointment')
+      .leftJoin('medicalRecord.doctor', 'doctor')
+      .leftJoin('medicalRecord.examination', 'examination')
       .leftJoin('appointment.branch', 'branch')
-      .select('examination.id', 'examination_id')
+      .select('medicalRecord.id', 'medical_record_id')
       .addSelect('appointment.id', 'appointment_id')
-      .addSelect('examination.examined_at', 'examined_at')
-      .addSelect('examination.diagnosis_text', 'diagnosis_text')
-      .addSelect('examination.disease_groups', 'disease_groups')
-      .addSelect('examination.notes', 'notes')
+      .addSelect('medicalRecord.status', 'status')
+      .addSelect('COALESCE(examination.examined_at, medicalRecord.created_at)', 'examined_at')
+      .addSelect('medicalRecord.visit_reason', 'visit_reason')
+      .addSelect('medicalRecord.notes', 'notes')
       .addSelect('examination.temperature_celsius', 'temperature_celsius')
       .addSelect('examination.weight_kg', 'weight_kg')
       .addSelect('doctor.full_name', 'doctor_name')
       .addSelect('branch.branch_name', 'branch_name')
-      .where('appointment.petId = :petId', { petId })
-      .orderBy('examination.examined_at', 'DESC')
+      .addSelect(DIAGNOSES_JSON_SUBQUERY, 'diagnoses')
+      .where('medicalRecord.pet_id = :petId', { petId })
+      .orderBy('COALESCE(examination.examined_at, medicalRecord.created_at)', 'DESC')
       .getRawMany<RawPetMedicalHistoryRow>();
 
     return rows.map((row) => ({
-      examinationId: row.examination_id,
+      medicalRecordId: row.medical_record_id,
       appointmentId: row.appointment_id,
+      status: row.status,
       examinedAt: new Date(row.examined_at),
       doctorName: row.doctor_name,
       branchName: row.branch_name,
-      diagnosisText: row.diagnosis_text,
-      diseaseGroups: row.disease_groups ?? [],
+      visitReason: row.visit_reason,
+      diagnoses: row.diagnoses ?? [],
       notes: row.notes,
       temperatureCelsius: row.temperature_celsius === null ? null : Number(row.temperature_celsius),
       weightKg: row.weight_kg === null ? null : Number(row.weight_kg),
@@ -174,26 +228,31 @@ export class PetProfileService {
   async findPrescriptions(petId: string): Promise<PetPrescriptionRow[]> {
     await this.assertPetExists(petId);
 
+    // Loc thang tren `medicalRecord.pet_id` (cot denormalise) thay vi join nguoc qua
+    // `appointments` - it hon mot bang trong ke hoach truy van.
     const prescriptions = await this.prescriptionsRepository
       .createQueryBuilder('prescription')
-      .innerJoinAndSelect('prescription.examination', 'examination')
-      .innerJoin('examination.appointment', 'appointment')
-      .leftJoinAndSelect('examination.doctor', 'doctor')
+      .innerJoinAndSelect('prescription.medicalRecord', 'medicalRecord')
+      .leftJoinAndSelect('medicalRecord.doctor', 'doctor')
+      // `leftJoin` chu khong `innerJoin`: mot ho so DRAFT co the da co don thuoc ma
+      // chua ghi sinh hieu - `innerJoin` se lam don thuoc do bien mat khoi ho so.
+      .leftJoinAndSelect('medicalRecord.examination', 'examination')
       .leftJoinAndSelect('prescription.items', 'item')
       // `PrescriptionItem.medication` va `Medication.item` khai bao `eager: true`, nhung
       // QueryBuilder KHONG tu nap quan he eager (chi `repository.find()` moi lam) - phai
       // join tay, neu khong ten thuoc se rong.
       .leftJoinAndSelect('item.medication', 'medication')
       .leftJoinAndSelect('medication.item', 'medicationItem')
-      .where('appointment.petId = :petId', { petId })
-      .orderBy('examination.examined_at', 'DESC')
+      .where('medicalRecord.pet_id = :petId', { petId })
+      .orderBy('medicalRecord.created_at', 'DESC')
       .getMany();
 
     return prescriptions.map((prescription) => ({
       prescriptionId: prescription.id,
-      examinationId: prescription.examinationId,
-      examinedAt: prescription.examination.examinedAt,
-      doctorName: prescription.examination.doctor?.fullName ?? null,
+      medicalRecordId: prescription.medicalRecordId,
+      // Ho so chua ghi sinh hieu thi chua co `examinedAt` - lay ngay mo ho so.
+      examinedAt: prescription.medicalRecord.examination?.examinedAt ?? prescription.createdAt,
+      doctorName: prescription.medicalRecord.doctor?.fullName ?? null,
       notes: prescription.notes,
       items: (prescription.items ?? []).map((item) => ({
         id: item.id,
@@ -212,15 +271,14 @@ export class PetProfileService {
 
     const orders = await this.labTestsRepository
       .createQueryBuilder('labTest')
-      .innerJoinAndSelect('labTest.examination', 'examination')
-      .innerJoin('examination.appointment', 'appointment')
-      .where('appointment.petId = :petId', { petId })
+      .innerJoin('labTest.medicalRecord', 'medicalRecord')
+      .where('medicalRecord.pet_id = :petId', { petId })
       .orderBy('labTest.created_at', 'DESC')
       .getMany();
 
     return orders.map((order) => ({
       labTestId: order.id,
-      examinationId: order.examinationId,
+      medicalRecordId: order.medicalRecordId,
       orderedAt: order.createdAt,
       testName: order.testName,
       status: order.status,
@@ -284,11 +342,12 @@ interface RawPetAppointmentRow {
 }
 
 interface RawPetMedicalHistoryRow {
-  examination_id: string;
+  medical_record_id: string;
   appointment_id: string;
+  status: MedicalRecordStatus;
   examined_at: string;
-  diagnosis_text: string | null;
-  disease_groups: string[] | null;
+  visit_reason: string | null;
+  diagnoses: MedicalHistoryDiagnosis[] | null;
   notes: string | null;
   temperature_celsius: string | null;
   weight_kg: string | null;
