@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { InventoryItem } from '@/modules/catalog/domain/entities/inventory-item.entity';
 import { Medication } from '@/modules/catalog/domain/entities/medication.entity';
 import { Examination } from '@/modules/clinical/domain/entities/examination.entity';
+import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
 import { LabTestOrder } from '@/modules/clinical/domain/entities/lab-test-order.entity';
 import { PrescriptionItem } from '@/modules/clinical/domain/entities/prescription-item.entity';
 import { Prescription } from '@/modules/clinical/domain/entities/prescription.entity';
@@ -14,6 +15,7 @@ import { ExaminationsService } from '@/modules/clinical/application/examinations
 @Module({
   imports: [
     TypeOrmModule.forFeature([
+      MedicalRecord,
       Examination,
       Prescription,
       PrescriptionItem,

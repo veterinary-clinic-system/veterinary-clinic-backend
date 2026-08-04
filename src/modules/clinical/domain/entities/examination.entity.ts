@@ -4,6 +4,7 @@ import { Appointment } from '@/modules/scheduling/domain/entities/appointment.en
 import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
 import { Prescription } from './prescription.entity';
 import { LabTestOrder } from './lab-test-order.entity';
+import { MedicalRecord } from './medical-record.entity';
 
 /**
  * Implements diagram.jpg's `DoctorResult` box (Appointment 1:1, `diseaseGroups: string[]`,
@@ -21,6 +22,20 @@ export class Examination extends BaseEntity {
 
   @Column({ name: 'appointment_id' })
   appointmentId: string;
+
+  /**
+   * Ho so benh an boc ngoai (P4). `Examination` tro thanh "phan sinh hieu" cua ho so
+   * do - xem ghi chu chien luoc Hybrid trong `medical-record.entity.ts`.
+   *
+   * Nullable o tang CSDL vi du lieu cu duoc backfill sau khi cot da ton tai; tren
+   * thuc te moi phieu kham deu co ho so (chi muc unique dam bao 1:1).
+   */
+  @OneToOne(() => MedicalRecord, (record) => record.examination, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'medical_record_id' })
+  medicalRecord: MedicalRecord | null;
+
+  @Column({ name: 'medical_record_id', type: 'varchar', nullable: true })
+  medicalRecordId: string | null;
 
   @ManyToOne(() => Doctor, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'doctor_id' })
