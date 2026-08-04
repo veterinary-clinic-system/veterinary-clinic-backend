@@ -28,9 +28,12 @@ export * from '@/modules/pets/domain/entities/species.entity';
 export * from '@/modules/pets/domain/entities/breed.entity';
 export * from '@/modules/pets/domain/entities/pet.entity';
 
+export * from '@/modules/catalog/domain/entities/category.entity';
 export * from '@/modules/catalog/domain/entities/item.entity';
 export * from '@/modules/catalog/domain/entities/service.entity';
 export * from '@/modules/catalog/domain/entities/medication.entity';
+export * from '@/modules/catalog/domain/entities/product.entity';
+export * from '@/modules/catalog/domain/entities/supplier.entity';
 export * from '@/modules/catalog/domain/entities/inventory-item.entity';
 export * from '@/modules/catalog/domain/entities/disease.entity';
 
