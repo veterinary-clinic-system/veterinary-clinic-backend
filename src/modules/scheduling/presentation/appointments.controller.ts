@@ -81,8 +81,15 @@ export class AppointmentsController {
     @Query('branchId') branchId?: string,
     @Query('doctorId') doctorId?: string,
     @Query('status') status?: AppointmentStatus,
+    @Query('date') date?: string,
   ) {
-    return this.appointmentsService.listForStaff({ ...pagination, branchId, doctorId, status });
+    return this.appointmentsService.listForStaff({
+      ...pagination,
+      branchId,
+      doctorId,
+      status,
+      date,
+    });
   }
 
   @Get(':id')

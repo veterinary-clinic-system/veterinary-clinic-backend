@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import { InventoryItem } from '@/modules/catalog/domain/entities/inventory-item.entity';
 import { Medication } from '@/modules/catalog/domain/entities/medication.entity';
 import { Examination } from '@/modules/clinical/domain/entities/examination.entity';
 import { LabTestOrder } from '@/modules/clinical/domain/entities/lab-test-order.entity';
@@ -8,7 +9,10 @@ import { PrescriptionItem } from '@/modules/clinical/domain/entities/prescriptio
 import { Prescription } from '@/modules/clinical/domain/entities/prescription.entity';
 import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
-import { AppointmentStatus } from '@/shared/common/enums/appointment-status.enum';
+import {
+  AppointmentStatus,
+  isValidAppointmentStatusTransition,
+} from '@/shared/common/enums/appointment-status.enum';
 import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user.interface';
 import { CreateExaminationDto } from '@/modules/clinical/presentation/dto/create-examination.dto';
 import { UpdateExaminationDto } from '@/modules/clinical/presentation/dto/update-examination.dto';
@@ -77,6 +81,14 @@ export class ExaminationsService {
     if (existing) {
       throw new ConflictException(
         'An examination already exists for this appointment - use PATCH to edit it',
+      );
+    }
+
+    // Khong duoc ghi phieu kham cho mot lich hen da CANCELLED/NO_SHOW - lich da
+    // COMPLETED thi khong the toi day vi da bi chan boi kiem tra `existing` o tren.
+    if (!isValidAppointmentStatusTransition(appointment.status, AppointmentStatus.COMPLETED)) {
+      throw new ConflictException(
+        `Khong the ghi phieu kham cho lich hen dang o trang thai "${appointment.status}"`,
       );
     }
 
@@ -149,7 +161,13 @@ export class ExaminationsService {
     examinationId: string,
     dto: CreatePrescriptionDto,
   ): Promise<Prescription> {
-    await this.assertExists(examinationId);
+    const examination = await this.examinationsRepository.findOne({
+      where: { id: examinationId },
+      relations: ['appointment'],
+    });
+    if (!examination) {
+      throw new NotFoundException('Examination not found');
+    }
 
     const medicationIds = [...new Set(dto.items.map((item) => item.medicationId))];
     const medications = await this.medicationsRepository.find({ where: { id: In(medicationIds) } });
@@ -158,6 +176,7 @@ export class ExaminationsService {
       const missing = medicationIds.filter((id) => !foundIds.has(id));
       throw new NotFoundException(`Medication(s) not found: ${missing.join(', ')}`);
     }
+    const medicationById = new Map(medications.map((m) => [m.id, m]));
 
     const saved = await this.dataSource.transaction(async (manager) => {
       // Prescription.items has { cascade: true } (see prescription.entity.ts) so saving
@@ -174,7 +193,38 @@ export class ExaminationsService {
           }),
         ),
       });
-      return manager.save(prescription);
+      const savedPrescription = await manager.save(prescription);
+
+      // Tru kho tai chi nhanh noi kham, cung transaction voi viec tao don thuoc - ke
+      // don va tru kho phai thanh cong/that bai cung nhau. `durationDays` duoc dung
+      // lam so luong (cung mot gia dinh da neu trong billing.service.ts: `dosage` chi
+      // la text tu do "1 vien x 2 lan/ngay", khong co tan suat co cau truc de nhan
+      // chinh xac hon).
+      //
+      // Neu KHONG co ban ghi InventoryItem cho (thuoc, chi nhanh) nay - bo qua, khong
+      // bao loi: khong phai thuoc nao cung bat buoc phai quan ly ton kho qua man hinh
+      // Inventory. Neu CO ban ghi nhung khong du - chan toan bo don thuoc (giu dung quy
+      // uoc da co san o InventoryService.update(): so luong ket qua khong duoc am), bat
+      // le tan/bac si biet ma bo sung kho truoc khi hoan tat don, thay vi de kho am
+      // trong im lang.
+      for (const item of dto.items) {
+        const medication = medicationById.get(item.medicationId)!;
+        const inventoryItem = await manager.findOne(InventoryItem, {
+          where: { itemId: medication.itemId, branchId: examination.appointment.branchId },
+        });
+        if (!inventoryItem) continue;
+
+        const remaining = inventoryItem.inventoryQuantity - item.durationDays;
+        if (remaining < 0) {
+          throw new ConflictException(
+            `Khong du ton kho cho thuoc "${medication.item.itemName}" tai chi nhanh nay ` +
+              `(con ${inventoryItem.inventoryQuantity}, can ${item.durationDays})`,
+          );
+        }
+        await manager.update(InventoryItem, inventoryItem.id, { inventoryQuantity: remaining });
+      }
+
+      return savedPrescription;
     });
 
     return this.prescriptionsRepository.findOne({

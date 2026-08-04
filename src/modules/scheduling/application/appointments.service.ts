@@ -10,13 +10,14 @@ import { DataSource, Repository } from 'typeorm';
 import { addMinutes } from 'date-fns';
 import { Service } from '@/modules/catalog/domain/entities/service.entity';
 import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
-import { User } from '@/modules/identity/domain/entities/user.entity';
 import { Branch } from '@/modules/organization/domain/entities/branch.entity';
 import { Pet } from '@/modules/pets/domain/entities/pet.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
 import {
   AppointmentStatus,
   SLOT_BLOCKING_STATUSES,
+  TERMINAL_APPOINTMENT_STATUSES,
+  isValidAppointmentStatusTransition,
 } from '@/shared/common/enums/appointment-status.enum';
 import { NotificationType } from '@/shared/common/enums/notification.enum';
 import { Role } from '@/shared/common/enums/role.enum';
@@ -33,6 +34,7 @@ import {
   SlotInfo,
   SlotStatus,
 } from '@/modules/scheduling/application/availability.service';
+import { PartyResolverService } from '@/modules/scheduling/application/party-resolver.service';
 import { mapAppointmentOverlapError } from '@/modules/scheduling/domain/appointment-overlap';
 import { startOfWeek } from 'date-fns';
 
@@ -63,13 +65,13 @@ export interface DayAvailabilityWithDetail extends Omit<DayAvailability, 'slots'
 export class AppointmentsService {
   constructor(
     @InjectRepository(Appointment) private readonly appointmentsRepository: Repository<Appointment>,
-    @InjectRepository(User) private readonly usersRepository: Repository<User>,
     @InjectRepository(Pet) private readonly petsRepository: Repository<Pet>,
     @InjectRepository(Doctor) private readonly doctorsRepository: Repository<Doctor>,
     @InjectRepository(Service) private readonly servicesRepository: Repository<Service>,
     @InjectRepository(Branch) private readonly branchesRepository: Repository<Branch>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly availabilityService: AvailabilityService,
+    private readonly partyResolver: PartyResolverService,
     private readonly notificationsService: NotificationsService,
     private readonly outboxService: OutboxService,
     private readonly prescreeningService: PrescreeningService,
@@ -100,8 +102,8 @@ export class AppointmentsService {
       throw new BadRequestException('Selected service is not available');
     }
 
-    const owner = await this.resolveOwner(dto.phone, dto.ownerFullName, dto.email);
-    const pet = await this.resolvePet(dto, owner);
+    const owner = await this.partyResolver.resolveOwner(dto.phone, dto.ownerFullName, dto.email);
+    const pet = await this.partyResolver.resolvePet(dto, owner);
 
     const startAt = new Date(dto.startAt);
     const endAt = addMinutes(startAt, service.durationMinutes);
@@ -209,6 +211,8 @@ export class AppointmentsService {
       branchId?: string;
       doctorId?: string;
       status?: AppointmentStatus;
+      /** 'yyyy-MM-dd' - lich hen BAT DAU trong ngay do (theo mui gio cua may chu). */
+      date?: string;
     },
   ): Promise<PaginatedResultDto<Appointment>> {
     const qb = this.appointmentsRepository
@@ -225,6 +229,14 @@ export class AppointmentsService {
     if (query.doctorId)
       qb.andWhere('appointment.doctorId = :doctorId', { doctorId: query.doctorId });
     if (query.status) qb.andWhere('appointment.status = :status', { status: query.status });
+    if (query.date) {
+      // So sanh tren nua khoang [ngay, ngay+1) thay vi CAST(start_at AS date) = ... de
+      // con dung duoc chi muc tren (doctor_id, start_at).
+      qb.andWhere(
+        "appointment.startAt >= CAST(:date AS date) AND appointment.startAt < CAST(:date AS date) + INTERVAL '1 day'",
+        { date: query.date },
+      );
+    }
 
     // sortBy is caller-controlled input - never interpolate it unchecked into raw SQL.
     const sortColumn = SORTABLE_COLUMNS.has(query.sortBy ?? '') ? query.sortBy! : 'startAt';
@@ -313,6 +325,25 @@ export class AppointmentsService {
     actor: AuthenticatedUser,
   ): Promise<Appointment> {
     const appointment = await this.findOne(id);
+
+    // Lich hen da ket thuc (COMPLETED/CANCELLED/NO_SHOW) la su kien lich su, khong
+    // the doi status hay doi lich nua - truoc day thieu kiem tra nay nen PATCH co
+    // the dua mot lich COMPLETED lui ve PENDING, hoac nhay thang PENDING -> COMPLETED
+    // (van hop le - xem NON_TERMINAL_ORDER) nhung khong the "mo lai" mot lich da xong.
+    if (dto.status && !isValidAppointmentStatusTransition(appointment.status, dto.status)) {
+      throw new ConflictException(
+        `Khong the chuyen lich hen tu trang thai "${appointment.status}" sang "${dto.status}"`,
+      );
+    }
+    if (
+      (dto.startAt !== undefined || dto.doctorId !== undefined) &&
+      TERMINAL_APPOINTMENT_STATUSES.has(appointment.status)
+    ) {
+      throw new ConflictException(
+        `Khong the doi lich cho mot lich hen da o trang thai ket thuc ("${appointment.status}")`,
+      );
+    }
+
     const reschedule = dto.startAt !== undefined || dto.doctorId !== undefined;
 
     if (reschedule) {
@@ -466,51 +497,6 @@ export class AppointmentsService {
     ) {
       throw new ConflictException('This time slot was just booked - please pick another one');
     }
-  }
-
-  private async resolveOwner(
-    phone: string,
-    fullName: string | undefined,
-    email: string | undefined,
-  ) {
-    let owner = await this.usersRepository.findOne({ where: { phone } });
-    if (!owner) {
-      owner = await this.usersRepository.save(
-        this.usersRepository.create({
-          phone,
-          fullName: fullName ?? 'Khách hàng',
-          email: email ?? null,
-          role: Role.PET_OWNER,
-          passwordHash: null,
-        }),
-      );
-    }
-    return owner;
-  }
-
-  private async resolvePet(dto: CreateBookingDto, owner: User): Promise<Pet> {
-    if (dto.petId) {
-      const pet = await this.petsRepository.findOne({ where: { id: dto.petId } });
-      if (!pet || pet.ownerId !== owner.id) {
-        throw new BadRequestException('Pet does not belong to this owner');
-      }
-      return pet;
-    }
-
-    if (!dto.newPet) {
-      throw new BadRequestException('Either petId or newPet must be provided');
-    }
-
-    return this.petsRepository.save(
-      this.petsRepository.create({
-        name: dto.newPet.name,
-        breedId: dto.newPet.breedId,
-        gender: dto.newPet.gender,
-        weight: dto.newPet.weight ?? null,
-        birthDate: dto.newPet.birthDate ?? null,
-        ownerId: owner.id,
-      }),
-    );
   }
 
   private async notifyOwnerOfUpdate(

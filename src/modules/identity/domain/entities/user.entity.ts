@@ -35,6 +35,19 @@ export class User extends BaseEntity {
   @Column({ name: 'branch_id', type: 'varchar', nullable: true })
   branchId: string | null;
 
+  /**
+   * Ho so khach hang (Role.PET_OWNER) can dia chi de giao thuoc / goi tai nha va mot
+   * o ghi chu tu do cho le tan ("khach quen", "chi lien he qua Zalo"). Khong co trong
+   * diagram.jpg - `Appointment.address` chi la dia chi cua RIENG mot lan hen, khong
+   * thay the duoc dia chi thuong tru cua khach. Voi tai khoan nhan vien hai cot nay
+   * de trong.
+   */
+  @Column({ name: 'address', type: 'text', nullable: true })
+  address: string | null;
+
+  @Column({ name: 'note', type: 'text', nullable: true })
+  note: string | null;
+
   @OneToOne(() => Doctor, (doctor) => doctor.user)
   doctorProfile?: Doctor;
 

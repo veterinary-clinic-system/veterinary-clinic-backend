@@ -1,0 +1,72 @@
+name: veterinary-clinic-system
+
+# 4 tien trinh (backend, worker, ai, web) la 4 repo doc lap nam canh nhau, khong con
+# thu muc goc chung nua - nen file nay dat trong veterinary-clinic-backend/ va tro
+# sang cac thu muc anh em bang duong dan tuong doi.
+#
+# KHONG con tu dinh nghia Postgres/Redis/MinIO nua - ba dich vu do nam trong
+# ../veterinary-clinic-environment/docker-compose.yml (xem README o do). Phai chay
+# `docker compose up -d` trong thu muc do TRUOC khi dung file nay.
+services:
+  # Optional: containerized backend. Khi phat trien hang ngay uu tien `npm run
+  # start:dev` tren host va chi can veterinary-clinic-environment dang chay; dich vu
+  # nay de ca cum chay duoc tron bo bang mot lenh `docker compose --profile full up`.
+  veterinary-clinic-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: veterinary-clinic-backend
+    restart: unless-stopped
+    profiles: ['full']
+    env_file:
+      - .env
+    environment:
+      # veterinary-clinic-environment la MOT project-compose KHAC, khong chung mang
+      # Docker voi file nay - nen phai goi qua host.docker.internal (Docker Desktop
+      # tren Windows tu phan giai ten nay thanh IP cua host) va CONG DA PUBLISH RA
+      # HOST (5433/6380/9000), khong phai cong noi bo cua container.
+      DB_HOST: host.docker.internal
+      DB_PORT: '5433'
+      REDIS_HOST: host.docker.internal
+      REDIS_PORT: '6380'
+      STORAGE_ENDPOINT: http://host.docker.internal:9000
+      AI_SERVICE_BASE_URL: http://veterinary-clinic-ai:8000
+      # Cong noi bo cua container luon co dinh 3000, doc lap voi bien PORT trong .env
+      # (bien do chi dung cho HOST khi chay `npm run start:dev` ngoai Docker).
+      PORT: '3000'
+    ports:
+      # Ve trai la cong HOST (doi sang 3010 vi 3000/3001 tren may nay da bi cac ung
+      # dung khac chiem) - ve phai la cong NOI BO container, luon la 3000.
+      - '3010:3000'
+    volumes:
+      - veterinary-clinic-uploads:/app/uploads
+
+  veterinary-clinic-worker:
+    build:
+      context: ../worker
+      dockerfile: Dockerfile
+    container_name: veterinary-clinic-worker
+    restart: unless-stopped
+    profiles: ['full']
+    env_file:
+      - .env
+    environment:
+      DB_HOST: host.docker.internal
+      DB_PORT: '5433'
+      REDIS_HOST: host.docker.internal
+      REDIS_PORT: '6380'
+
+  veterinary-clinic-ai:
+    build:
+      context: ../veterinary-clinic-ai
+      dockerfile: Dockerfile
+    container_name: veterinary-clinic-ai
+    restart: unless-stopped
+    profiles: ['full']
+    env_file:
+      - ../veterinary-clinic-ai/.env
+    ports:
+      - '8000:8000'
+
+volumes:
+  veterinary-clinic-uploads:

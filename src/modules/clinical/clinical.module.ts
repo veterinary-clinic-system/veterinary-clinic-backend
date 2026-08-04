@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { InventoryItem } from '@/modules/catalog/domain/entities/inventory-item.entity';
 import { Medication } from '@/modules/catalog/domain/entities/medication.entity';
 import { Examination } from '@/modules/clinical/domain/entities/examination.entity';
 import { LabTestOrder } from '@/modules/clinical/domain/entities/lab-test-order.entity';
@@ -20,6 +21,7 @@ import { ExaminationsService } from '@/modules/clinical/application/examinations
       Appointment,
       Doctor,
       Medication,
+      InventoryItem,
     ]),
   ],
   controllers: [ExaminationsController],

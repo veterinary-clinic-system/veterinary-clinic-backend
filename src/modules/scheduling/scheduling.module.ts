@@ -9,16 +9,21 @@ import { Pet } from '@/modules/pets/domain/entities/pet.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
 import { DoctorBreak } from '@/modules/scheduling/domain/entities/doctor-break.entity';
 import { DoctorShift } from '@/modules/scheduling/domain/entities/doctor-shift.entity';
+import { QueueEntry } from '@/modules/scheduling/domain/entities/queue-entry.entity';
 import { NotificationModule } from '@/modules/notification/notification.module';
 import { TriageModule } from '@/modules/triage/triage.module';
 import { AppointmentsController } from '@/modules/scheduling/presentation/appointments.controller';
+import { QueueController } from '@/modules/scheduling/presentation/queue.controller';
 import { AppointmentsService } from '@/modules/scheduling/application/appointments.service';
 import { AvailabilityService } from '@/modules/scheduling/application/availability.service';
+import { PartyResolverService } from '@/modules/scheduling/application/party-resolver.service';
+import { QueueService } from '@/modules/scheduling/application/queue.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       Appointment,
+      QueueEntry,
       User,
       Pet,
       Doctor,
@@ -31,8 +36,8 @@ import { AvailabilityService } from '@/modules/scheduling/application/availabili
     NotificationModule,
     TriageModule,
   ],
-  controllers: [AppointmentsController],
-  providers: [AppointmentsService, AvailabilityService],
-  exports: [AppointmentsService, AvailabilityService],
+  controllers: [AppointmentsController, QueueController],
+  providers: [AppointmentsService, AvailabilityService, PartyResolverService, QueueService],
+  exports: [AppointmentsService, AvailabilityService, QueueService],
 })
 export class SchedulingModule {}

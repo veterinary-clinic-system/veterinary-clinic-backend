@@ -35,6 +35,7 @@ export * from '@/modules/catalog/domain/entities/disease.entity';
 export * from '@/modules/scheduling/domain/entities/doctor-shift.entity';
 export * from '@/modules/scheduling/domain/entities/doctor-break.entity';
 export * from '@/modules/scheduling/domain/entities/appointment.entity';
+export * from '@/modules/scheduling/domain/entities/queue-entry.entity';
 
 export * from '@/modules/triage/domain/entities/pre-screening-result.entity';
 
