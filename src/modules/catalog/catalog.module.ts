@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Category } from '@/modules/catalog/domain/entities/category.entity';
 import { Disease } from '@/modules/catalog/domain/entities/disease.entity';
 import { InventoryItem } from '@/modules/catalog/domain/entities/inventory-item.entity';
 import { Item } from '@/modules/catalog/domain/entities/item.entity';
 import { Medication } from '@/modules/catalog/domain/entities/medication.entity';
+import { Product } from '@/modules/catalog/domain/entities/product.entity';
 import { Service } from '@/modules/catalog/domain/entities/service.entity';
+import { Supplier } from '@/modules/catalog/domain/entities/supplier.entity';
 import { Branch } from '@/modules/organization/domain/entities/branch.entity';
 import { ItemsController } from '@/modules/catalog/presentation/items.controller';
 import { ItemsService } from '@/modules/catalog/application/items.service';
@@ -16,6 +19,12 @@ import { InventoryController } from '@/modules/catalog/presentation/inventory.co
 import { InventoryService } from '@/modules/catalog/application/inventory.service';
 import { DiseasesController } from '@/modules/catalog/presentation/diseases.controller';
 import { DiseasesService } from '@/modules/catalog/application/diseases.service';
+import { CategoriesController } from '@/modules/catalog/presentation/categories.controller';
+import { CategoriesService } from '@/modules/catalog/application/categories.service';
+import { ProductsController } from '@/modules/catalog/presentation/products.controller';
+import { ProductsService } from '@/modules/catalog/application/products.service';
+import { SuppliersController } from '@/modules/catalog/presentation/suppliers.controller';
+import { SuppliersService } from '@/modules/catalog/application/suppliers.service';
 
 /**
  * Catalog module - the system of record for the clinic's price list (Services +
@@ -25,15 +34,48 @@ import { DiseasesService } from '@/modules/catalog/application/diseases.service'
  * owned by another module.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Item, Service, Medication, InventoryItem, Disease, Branch])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Category,
+      Item,
+      Service,
+      Medication,
+      Product,
+      Supplier,
+      InventoryItem,
+      Disease,
+      Branch,
+    ]),
+  ],
   controllers: [
+    CategoriesController,
     ItemsController,
     ServicesController,
+    ProductsController,
+    SuppliersController,
     MedicationsController,
     InventoryController,
     DiseasesController,
   ],
-  providers: [ItemsService, ServicesService, MedicationsService, InventoryService, DiseasesService],
-  exports: [ItemsService, ServicesService, MedicationsService, InventoryService, DiseasesService],
+  providers: [
+    CategoriesService,
+    ItemsService,
+    ServicesService,
+    MedicationsService,
+    ProductsService,
+    SuppliersService,
+    InventoryService,
+    DiseasesService,
+  ],
+  exports: [
+    CategoriesService,
+    ItemsService,
+    ServicesService,
+    MedicationsService,
+    ProductsService,
+    SuppliersService,
+    InventoryService,
+    DiseasesService,
+  ],
 })
 export class CatalogModule {}
