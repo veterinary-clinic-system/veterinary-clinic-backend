@@ -28,6 +28,7 @@ export class ServicesService {
           describe: dto.describe ?? null,
           itemType: ItemType.SERVICE,
           unitPrice: dto.unitPrice,
+          categoryId: dto.categoryId ?? null,
           active: true,
         }),
       );
@@ -50,7 +51,8 @@ export class ServicesService {
   async findAll(query: QueryCatalogEntryDto): Promise<PaginatedResultDto<Service>> {
     const qb = this.servicesRepository
       .createQueryBuilder('service')
-      .leftJoinAndSelect('service.item', 'item');
+      .leftJoinAndSelect('service.item', 'item')
+      .leftJoinAndSelect('item.category', 'category');
 
     qb.andWhere('service.active = :active', { active: query.active ?? true });
 
@@ -70,7 +72,10 @@ export class ServicesService {
   }
 
   async findOne(id: string): Promise<Service> {
-    const service = await this.servicesRepository.findOne({ where: { id }, relations: ['item'] });
+    const service = await this.servicesRepository.findOne({
+      where: { id },
+      relations: ['item', 'item.category'],
+    });
     if (!service) {
       throw new NotFoundException('Service not found');
     }
@@ -92,10 +97,13 @@ export class ServicesService {
       // be deep-partial, so a `Partial<Entity>`-typed variable (which types relations as
       // full related entities) doesn't structurally match even when the relation keys
       // are never actually set at runtime.
-      const itemUpdates: Partial<Pick<Item, 'itemName' | 'describe' | 'unitPrice' | 'active'>> = {};
+      const itemUpdates: Partial<
+        Pick<Item, 'itemName' | 'describe' | 'unitPrice' | 'categoryId' | 'active'>
+      > = {};
       if (dto.itemName !== undefined) itemUpdates.itemName = dto.itemName;
       if (dto.describe !== undefined) itemUpdates.describe = dto.describe;
       if (dto.unitPrice !== undefined) itemUpdates.unitPrice = dto.unitPrice;
+      if (dto.categoryId !== undefined) itemUpdates.categoryId = dto.categoryId;
       if (dto.active !== undefined) itemUpdates.active = dto.active;
       if (Object.keys(itemUpdates).length > 0) {
         await manager.update(Item, service.itemId, itemUpdates);

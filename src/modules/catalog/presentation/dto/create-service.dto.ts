@@ -9,6 +9,7 @@ import {
   Max,
   MaxLength,
   Min,
+  IsUUID,
 } from 'class-validator';
 import { Specialization } from '@/shared/common/enums/specialization.enum';
 
@@ -42,4 +43,9 @@ export class CreateServiceDto {
   @IsOptional()
   @IsEnum(Specialization)
   requiresSpecialization?: Specialization;
+
+  /** Danh muc dich vu (FR-14) - nam tren `Item`. */
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
 }

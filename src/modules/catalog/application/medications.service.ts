@@ -32,6 +32,7 @@ export class MedicationsService {
           describe: dto.describe ?? null,
           itemType: ItemType.MEDICATION,
           unitPrice: dto.unitPrice,
+          categoryId: dto.categoryId ?? null,
           active: true,
         }),
       );
@@ -41,6 +42,11 @@ export class MedicationsService {
           itemId: item.id,
           unit: dto.unit,
           activeIngredient: dto.activeIngredient ?? null,
+          genericName: dto.genericName ?? null,
+          manufacturer: dto.manufacturer ?? null,
+          supplierId: dto.supplierId ?? null,
+          costPrice: dto.costPrice ?? 0,
+          minimumStock: dto.minimumStock ?? 0,
           active: true,
         }),
       );
@@ -54,7 +60,9 @@ export class MedicationsService {
   async findAll(query: QueryCatalogEntryDto): Promise<PaginatedResultDto<Medication>> {
     const qb = this.medicationsRepository
       .createQueryBuilder('medication')
-      .leftJoinAndSelect('medication.item', 'item');
+      .leftJoinAndSelect('medication.item', 'item')
+      .leftJoinAndSelect('item.category', 'category')
+      .leftJoinAndSelect('medication.supplier', 'supplier');
 
     qb.andWhere('medication.active = :active', { active: query.active ?? true });
 
@@ -76,7 +84,7 @@ export class MedicationsService {
   async findOne(id: string): Promise<Medication> {
     const medication = await this.medicationsRepository.findOne({
       where: { id },
-      relations: ['item'],
+      relations: ['item', 'item.category', 'supplier'],
     });
     if (!medication) {
       throw new NotFoundException('Medication not found');
@@ -97,20 +105,39 @@ export class MedicationsService {
       // properties from the update object's type - see services.service.ts's
       // `update()` for why a `Partial<Entity>`-typed variable doesn't structurally
       // match TypeORM's QueryDeepPartialEntity even when relation keys are never set.
-      const itemUpdates: Partial<Pick<Item, 'itemName' | 'describe' | 'unitPrice' | 'active'>> = {};
+      const itemUpdates: Partial<
+        Pick<Item, 'itemName' | 'describe' | 'unitPrice' | 'categoryId' | 'active'>
+      > = {};
       if (dto.itemName !== undefined) itemUpdates.itemName = dto.itemName;
       if (dto.describe !== undefined) itemUpdates.describe = dto.describe;
       if (dto.unitPrice !== undefined) itemUpdates.unitPrice = dto.unitPrice;
+      if (dto.categoryId !== undefined) itemUpdates.categoryId = dto.categoryId;
       if (dto.active !== undefined) itemUpdates.active = dto.active;
       if (Object.keys(itemUpdates).length > 0) {
         await manager.update(Item, medication.itemId, itemUpdates);
       }
 
-      const medicationUpdates: Partial<Pick<Medication, 'unit' | 'activeIngredient' | 'active'>> =
-        {};
+      const medicationUpdates: Partial<
+        Pick<
+          Medication,
+          | 'unit'
+          | 'activeIngredient'
+          | 'genericName'
+          | 'manufacturer'
+          | 'supplierId'
+          | 'costPrice'
+          | 'minimumStock'
+          | 'active'
+        >
+      > = {};
       if (dto.unit !== undefined) medicationUpdates.unit = dto.unit;
       if (dto.activeIngredient !== undefined)
         medicationUpdates.activeIngredient = dto.activeIngredient;
+      if (dto.genericName !== undefined) medicationUpdates.genericName = dto.genericName;
+      if (dto.manufacturer !== undefined) medicationUpdates.manufacturer = dto.manufacturer;
+      if (dto.supplierId !== undefined) medicationUpdates.supplierId = dto.supplierId;
+      if (dto.costPrice !== undefined) medicationUpdates.costPrice = dto.costPrice;
+      if (dto.minimumStock !== undefined) medicationUpdates.minimumStock = dto.minimumStock;
       if (dto.active !== undefined) medicationUpdates.active = dto.active;
       if (Object.keys(medicationUpdates).length > 0) {
         await manager.update(Medication, id, medicationUpdates);

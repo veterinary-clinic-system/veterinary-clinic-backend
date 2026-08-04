@@ -1,5 +1,15 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsNumber, IsOptional, IsString, Min, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+  MaxLength,
+  ValidateIf,
+} from 'class-validator';
 import { ParseOptionalBoolean } from './transforms';
 
 /**
@@ -39,4 +49,37 @@ export class UpdateMedicationDto {
   @ParseOptionalBoolean()
   @IsBoolean()
   active?: boolean;
+
+  // ------------------------------------------------------------------ P5-T4 (FR-15)
+
+  /** Danh muc (FR-15/FR-16) - nam tren `Item`. `null` de go khoi danh muc. */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  categoryId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  genericName?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  manufacturer?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  supplierId?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  costPrice?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minimumStock?: number;
 }

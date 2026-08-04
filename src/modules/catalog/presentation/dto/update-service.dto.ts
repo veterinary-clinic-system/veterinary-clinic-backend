@@ -9,6 +9,8 @@ import {
   Max,
   MaxLength,
   Min,
+  IsUUID,
+  ValidateIf,
 } from 'class-validator';
 import { Specialization } from '@/shared/common/enums/specialization.enum';
 import { ParseOptionalBoolean } from './transforms';
@@ -53,4 +55,10 @@ export class UpdateServiceDto {
   @ParseOptionalBoolean()
   @IsBoolean()
   active?: boolean;
+
+  /** Danh muc (FR-15/FR-16) - nam tren `Item`. `null` de go khoi danh muc. */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  categoryId?: string | null;
 }
