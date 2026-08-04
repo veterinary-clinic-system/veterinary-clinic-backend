@@ -44,6 +44,7 @@ export * from '@/modules/triage/domain/entities/pre-screening-result.entity';
 export * from '@/modules/clinical/domain/entities/medical-record.entity';
 export * from '@/modules/clinical/domain/entities/examination.entity';
 export * from '@/modules/clinical/domain/entities/diagnosis.entity';
+export * from '@/modules/clinical/domain/entities/treatment.entity';
 export * from '@/modules/clinical/domain/entities/prescription.entity';
 export * from '@/modules/clinical/domain/entities/prescription-item.entity';
 export * from '@/modules/clinical/domain/entities/lab-test-order.entity';
