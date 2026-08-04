@@ -6,6 +6,9 @@ import { Appointment } from '@/modules/scheduling/domain/entities/appointment.en
 import { MedicalRecordStatus } from '@/shared/common/enums/medical-record-status.enum';
 import { Examination } from './examination.entity';
 import { Diagnosis } from './diagnosis.entity';
+import { Treatment } from './treatment.entity';
+import { Prescription } from './prescription.entity';
+import { LabTestOrder } from './lab-test-order.entity';
 
 /**
  * Ho so benh an - aggregate root cua SRS FR-07..FR-10.
@@ -29,7 +32,9 @@ import { Diagnosis } from './diagnosis.entity';
 @Entity({ name: 'medical_records' })
 @Index(['petId', 'createdAt'])
 export class MedicalRecord extends BaseEntity {
-  @OneToOne(() => Appointment, { onDelete: 'RESTRICT' })
+  @OneToOne(() => Appointment, (appointment) => appointment.medicalRecord, {
+    onDelete: 'RESTRICT',
+  })
   @JoinColumn({ name: 'appointment_id' })
   appointment: Appointment;
 
@@ -87,5 +92,13 @@ export class MedicalRecord extends BaseEntity {
   @OneToMany(() => Diagnosis, (diagnosis) => diagnosis.medicalRecord)
   diagnoses?: Diagnosis[];
 
-  // `treatments` (P4-T3) duoc noi vao day o task cua no.
+  @OneToMany(() => Treatment, (treatment) => treatment.medicalRecord)
+  treatments?: Treatment[];
+
+  /** Chuyen tu `Examination` sang day o P4-T6 - xem ghi chu trong `prescription.entity.ts`. */
+  @OneToMany(() => Prescription, (prescription) => prescription.medicalRecord)
+  prescriptions?: Prescription[];
+
+  @OneToMany(() => LabTestOrder, (order) => order.medicalRecord)
+  labTestOrders?: LabTestOrder[];
 }

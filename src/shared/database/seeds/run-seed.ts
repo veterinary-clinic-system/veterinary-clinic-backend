@@ -6,6 +6,7 @@ import {
   Appointment,
   Branch,
   Breed,
+  Diagnosis,
   Disease,
   Doctor,
   DoctorShift,
@@ -14,6 +15,7 @@ import {
   Invoice,
   InvoiceItem,
   Item,
+  MedicalRecord,
   Medication,
   OperatingHour,
   Pet,
@@ -22,6 +24,7 @@ import {
   PrescriptionItem,
   Service,
   Species,
+  Treatment,
   User,
 } from '../entity-registry';
 import { Role } from '@/shared/common/enums/role.enum';
@@ -32,6 +35,10 @@ import { CommonSymptom } from '@/shared/common/enums/common-symptom.enum';
 import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import { AppointmentStatus } from '@/shared/common/enums/appointment-status.enum';
 import { PaymentMethod } from '@/shared/common/enums/payment-method.enum';
+import {
+  DiagnosisSeverity,
+  MedicalRecordStatus,
+} from '@/shared/common/enums/medical-record-status.enum';
 
 config();
 
@@ -356,7 +363,10 @@ async function seed() {
   // ------------------------------------------------------------------- Appointments
   const appointmentRepo = dataSource.getRepository(Appointment);
   const preScreeningRepo = dataSource.getRepository(PreScreeningResult);
+  const medicalRecordRepo = dataSource.getRepository(MedicalRecord);
   const examinationRepo = dataSource.getRepository(Examination);
+  const diagnosisRepo = dataSource.getRepository(Diagnosis);
+  const treatmentRepo = dataSource.getRepository(Treatment);
   const prescriptionRepo = dataSource.getRepository(Prescription);
   const prescriptionItemRepo = dataSource.getRepository(PrescriptionItem);
   const invoiceRepo = dataSource.getRepository(Invoice);
@@ -367,6 +377,13 @@ async function seed() {
     date.setDate(date.getDate() + daysFromNow);
     date.setHours(h, m, 0, 0);
     return date;
+  }
+
+  /** Cot `date` cua Postgres (vi du `treatments.start_date`) nhan chuoi `YYYY-MM-DD`. */
+  function toDateOnly(date: Date): string {
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${date.getFullYear()}-${month}-${day}`;
   }
 
   // A completed visit from a few days ago, with a full exam + prescription + paid invoice.
@@ -394,8 +411,21 @@ async function seed() {
     overallConfidence: 0.72,
     rawAiResponse: null,
   });
-  const pastExam = await examinationRepo.save({
+  // Ho so benh an (P4) la lop boc ngoai: phieu kham la phan sinh hieu, con chan doan /
+  // dieu tri / don thuoc / xet nghiem deu treo duoi ho so.
+  const pastRecord = await medicalRecordRepo.save({
     appointmentId: pastAppointment.id,
+    petId: pets[0].id,
+    doctorId: doctors[0].id,
+    visitReason: 'Ngứa da, rụng lông vùng lưng',
+    generalCondition: 'Tỉnh táo, ăn uống bình thường',
+    notes: 'Theo dõi thêm 1 tuần, tái khám nếu không cải thiện.',
+    status: MedicalRecordStatus.COMPLETED,
+    completedAt: atTime(-3, '09:30'),
+  });
+  await examinationRepo.save({
+    appointmentId: pastAppointment.id,
+    medicalRecordId: pastRecord.id,
     doctorId: doctors[0].id,
     diseaseGroups: ['Dị ứng da'],
     diagnosisText: 'Viêm da dị ứng nhẹ, nghi do phấn hoa.',
@@ -406,8 +436,23 @@ async function seed() {
     respiratoryRateBpm: 24,
     attachmentUrls: [],
   });
+  await diagnosisRepo.save({
+    medicalRecordId: pastRecord.id,
+    diseaseId: diseases[0].id,
+    diagnosisText: 'Viêm da dị ứng nhẹ, nghi do phấn hoa.',
+    severity: DiagnosisSeverity.MILD,
+    isPrimary: true,
+  });
+  await treatmentRepo.save({
+    medicalRecordId: pastRecord.id,
+    method: 'Bôi thuốc ngoài da',
+    description: 'Vệ sinh vùng da tổn thương, bôi kem kháng viêm 2 lần/ngày.',
+    startDate: toDateOnly(atTime(-3, '09:00')),
+    endDate: toDateOnly(atTime(4, '09:00')),
+    instruction: 'Không để thú cưng liếm vùng bôi thuốc trong 30 phút sau khi bôi.',
+  });
   const pastPrescription = await prescriptionRepo.save({
-    examinationId: pastExam.id,
+    medicalRecordId: pastRecord.id,
     notes: 'Uống sau ăn',
   });
   await prescriptionItemRepo.save({

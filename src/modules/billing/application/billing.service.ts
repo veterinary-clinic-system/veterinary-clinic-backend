@@ -4,7 +4,7 @@ import { DataSource, ILike, In, Repository } from 'typeorm';
 import { InvoiceItem } from '@/modules/billing/domain/entities/invoice-item.entity';
 import { Invoice } from '@/modules/billing/domain/entities/invoice.entity';
 import { Item } from '@/modules/catalog/domain/entities/item.entity';
-import { Examination } from '@/modules/clinical/domain/entities/examination.entity';
+import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
 import { ItemType } from '@/shared/common/enums/item-type.enum';
 import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
@@ -71,9 +71,14 @@ export class BillingService {
         throw new NotFoundException('Appointment not found');
       }
 
-      // The exam is optional - an invoice can be generated for a plain paid consultation
-      // (service line only) before or without a full exam write-up ever happening.
-      const examination = await manager.findOne(Examination, {
+      // Ho so benh an la TUY CHON - van lap duoc hoa don cho mot lan kham dich vu don
+      // thuan (chi dong dich vu) truoc khi bac si ghi bat cu thu gi.
+      //
+      // Tu P4-T6 doc qua `MedicalRecord` chu khong qua `Examination`: khoa ngoai cua
+      // don thuoc/xet nghiem da chuyen sang ho so. Ket qua ve tien KHONG DOI voi du
+      // lieu cu - backfill sinh dung mot ho so cho moi phieu kham, nen cung tap don
+      // thuoc va cung tap chi dinh xet nghiem di vao hoa don nhu truoc.
+      const medicalRecord = await manager.findOne(MedicalRecord, {
         where: { appointmentId },
         relations: [
           'prescriptions',
@@ -93,9 +98,9 @@ export class BillingService {
         quantity: 1,
       });
 
-      // (b) one line per prescribed medication across every prescription on the exam.
-      if (examination) {
-        for (const prescription of examination.prescriptions ?? []) {
+      // (b) one line per prescribed medication across every prescription on the record.
+      if (medicalRecord) {
+        for (const prescription of medicalRecord.prescriptions ?? []) {
           for (const prescriptionItem of prescription.items ?? []) {
             lines.push({
               itemId: prescriptionItem.medication.item.id,
@@ -114,7 +119,7 @@ export class BillingService {
         // (c) one line per ordered lab test, resolved against the Item catalog by name.
         // Catalog rows aren't written anywhere in this transaction, so a plain
         // (non-transactional) repository read is fine here.
-        for (const labTestOrder of examination.labTestOrders ?? []) {
+        for (const labTestOrder of medicalRecord.labTestOrders ?? []) {
           const matchedItem = await this.itemsRepository.findOne({
             where: { itemType: ItemType.LAB_TEST, itemName: ILike(labTestOrder.testName) },
           });

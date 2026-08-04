@@ -1,9 +1,7 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
 import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
-import { Prescription } from './prescription.entity';
-import { LabTestOrder } from './lab-test-order.entity';
 import { MedicalRecord } from './medical-record.entity';
 
 /**
@@ -71,10 +69,4 @@ export class Examination extends BaseEntity {
 
   @Column({ name: 'examined_at', type: 'timestamptz', default: () => 'now()' })
   examinedAt: Date;
-
-  @OneToMany(() => Prescription, (prescription) => prescription.examination)
-  prescriptions?: Prescription[];
-
-  @OneToMany(() => LabTestOrder, (order) => order.examination)
-  labTestOrders?: LabTestOrder[];
 }

@@ -1,23 +1,26 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
-import { Examination } from './examination.entity';
+import { MedicalRecord } from './medical-record.entity';
 import { PrescriptionItem } from './prescription-item.entity';
 
 /**
  * Not in diagram.jpg - added for prompt.md Section 4.1.4 ("Prescribe medication:
- * dosage, number of days"). One Examination can produce one Prescription grouping
- * multiple PrescriptionItem lines (one per medication).
+ * dosage, number of days"). One medical record can hold several Prescriptions, each
+ * grouping multiple PrescriptionItem lines (one per medication).
+ *
+ * Khoa ngoai la `medical_record_id` tu P4-T6 (truoc do la `examination_id`): theo SRS,
+ * don thuoc la mot KHOI CUA HO SO BENH AN chu khong phai cua rieng phan sinh hieu.
  */
 @Entity({ name: 'prescriptions' })
 export class Prescription extends BaseEntity {
-  @ManyToOne(() => Examination, (examination) => examination.prescriptions, {
+  @ManyToOne(() => MedicalRecord, (record) => record.prescriptions, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'examination_id' })
-  examination: Examination;
+  @JoinColumn({ name: 'medical_record_id' })
+  medicalRecord: MedicalRecord;
 
-  @Column({ name: 'examination_id' })
-  examinationId: string;
+  @Column({ name: 'medical_record_id' })
+  medicalRecordId: string;
 
   @Column({ name: 'notes', type: 'text', nullable: true })
   notes: string | null;

@@ -6,8 +6,8 @@ import { Examination } from '@/modules/clinical/domain/entities/examination.enti
  * (no HTML-to-PDF/browser dependency) - draws directly onto a document the caller
  * already created and will `.pipe()`/`.end()` themselves (see ExaminationsController).
  * `examination` must be loaded with EXAMINATION_DETAIL_RELATIONS (see
- * examinations.service.ts) so appointment/pet/owner/doctor/prescriptions/labTestOrders
- * are all populated.
+ * examinations.service.ts) so appointment/pet/owner/doctor and the medical record's
+ * prescriptions/labTestOrders are all populated.
  */
 export function renderExaminationPdf(
   doc: InstanceType<typeof PDFDocument>,
@@ -48,12 +48,44 @@ export function renderExaminationPdf(
   );
   doc.moveDown();
 
+  // Tu P4-T8 doc tu bang `diagnoses`. `examination.diseaseGroups` / `diagnosisText` chi
+  // con la duong lui cho phieu kham cu chua duoc backfill sang ho so.
+  const diagnoses = examination.medicalRecord?.diagnoses ?? [];
   doc.fontSize(13).text('Diagnosis', { underline: true });
-  doc.fontSize(11).text(examination.diagnosisText || '-');
-  if (examination.diseaseGroups?.length) {
-    doc.text(`Disease group(s): ${examination.diseaseGroups.join(', ')}`);
+  doc.fontSize(11);
+  if (diagnoses.length > 0) {
+    diagnoses.forEach((diagnosis, index) => {
+      const primary = diagnosis.isPrimary ? ' [primary]' : '';
+      let line = `${index + 1}. ${diagnosis.diagnosisText} - Severity: ${diagnosis.severity}${primary}`;
+      if (diagnosis.notes) {
+        line += `, Notes: ${diagnosis.notes}`;
+      }
+      doc.text(line);
+    });
+  } else {
+    doc.text(examination.diagnosisText || '-');
+    if (examination.diseaseGroups?.length) {
+      doc.text(`Disease group(s): ${examination.diseaseGroups.join(', ')}`);
+    }
   }
   doc.moveDown();
+
+  const treatments = examination.medicalRecord?.treatments ?? [];
+  if (treatments.length > 0) {
+    doc.fontSize(13).text('Treatments', { underline: true });
+    doc.fontSize(11);
+    treatments.forEach((treatment, index) => {
+      const period = treatment.endDate
+        ? `${treatment.startDate} → ${treatment.endDate}`
+        : `${treatment.startDate} → ongoing`;
+      let line = `${index + 1}. ${treatment.method} (${period})`;
+      if (treatment.instruction) {
+        line += ` - Instructions: ${treatment.instruction}`;
+      }
+      doc.text(line);
+    });
+    doc.moveDown();
+  }
 
   if (examination.notes) {
     doc.fontSize(13).text('Doctor notes', { underline: true });
@@ -61,7 +93,11 @@ export function renderExaminationPdf(
     doc.moveDown();
   }
 
-  const prescriptionItems = (examination.prescriptions ?? []).flatMap((p) => p.items ?? []);
+  // Don thuoc va chi dinh xet nghiem doc qua HO SO tu P4-T6 (truoc do treo thang duoi
+  // phieu kham). `EXAMINATION_DETAIL_RELATIONS` da nap san chang `medicalRecord`.
+  const prescriptionItems = (examination.medicalRecord?.prescriptions ?? []).flatMap(
+    (p) => p.items ?? [],
+  );
   doc.fontSize(13).text('Prescribed medications', { underline: true });
   doc.fontSize(11);
   if (prescriptionItems.length === 0) {
@@ -79,12 +115,13 @@ export function renderExaminationPdf(
   }
   doc.moveDown();
 
+  const labTestOrders = examination.medicalRecord?.labTestOrders ?? [];
   doc.fontSize(13).text('Lab tests', { underline: true });
   doc.fontSize(11);
-  if (!examination.labTestOrders || examination.labTestOrders.length === 0) {
+  if (labTestOrders.length === 0) {
     doc.text('None');
   } else {
-    examination.labTestOrders.forEach((test, index) => {
+    labTestOrders.forEach((test, index) => {
       let line = `${index + 1}. ${test.testName} - Status: ${test.status}`;
       if (test.resultText) {
         line += `, Result: ${test.resultText}`;
