@@ -108,6 +108,14 @@ export class QueueEntry extends BaseEntity {
   @Column({ name: 'finished_at', type: 'timestamptz', nullable: true })
   finishedAt: Date | null;
 
+  /**
+   * Ly do huy luot cho (FR-05-04). Ban sao cua `Appointment.cancelReason` khi luot cho
+   * co lich hen - giu o day de man hinh hang cho khong phai JOIN, va vi luot cho cua
+   * khach vang lai chua chac da co lich hen de JOIN.
+   */
+  @Column({ name: 'cancel_reason', type: 'text', nullable: true })
+  cancelReason: string | null;
+
   /** Nhan vien thao tac quay le tan. */
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'created_by_user_id' })

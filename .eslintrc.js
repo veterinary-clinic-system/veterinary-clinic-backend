@@ -34,10 +34,12 @@ const crossModuleZones = MODULES.flatMap((target) =>
       // moi dung duoc provider ma B export. Day la day noi DI, khong phai lot vao
       // chi tiet ben trong - be mat van chi la nhung gi B ghi trong `exports`.
       `./${target}.module.ts`,
-      // identity gom ba module con; module goc cua no la identity.module.ts.
+      // identity gom nam module con; module goc cua no la identity.module.ts.
       './auth.module.ts',
       './users.module.ts',
       './customers.module.ts',
+      './permissions.module.ts',
+      './employees.module.ts',
     ],
     message:
       `Module "${source}" khong duoc voi vao ben trong module "${target}". ` +

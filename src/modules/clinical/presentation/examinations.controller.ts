@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { RequirePermissions } from '@/shared/common/decorators/require-permissions.decorator';
+import { Permission } from '@/shared/common/enums/permission.enum';
 import PDFDocument from 'pdfkit';
 import type { Response } from 'express';
-import { Roles } from '@/shared/common/decorators/roles.decorator';
 import { CurrentUser } from '@/shared/common/decorators/current-user.decorator';
-import { Role } from '@/shared/common/enums/role.enum';
 import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user.interface';
 import { ExaminationsService } from '@/modules/clinical/application/examinations.service';
 import { CreateExaminationDto } from './dto/create-examination.dto';
@@ -19,37 +19,37 @@ import { renderExaminationPdf } from '@/modules/clinical/infrastructure/examinat
 export class ExaminationsController {
   constructor(private readonly examinationsService: ExaminationsService) {}
 
-  @Roles(Role.DOCTOR)
+  @RequirePermissions(Permission.MEDICAL_RECORD_CREATE)
   @Post()
   create(@Body() dto: CreateExaminationDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.examinationsService.create(dto, actor);
   }
 
-  @Roles(Role.DOCTOR, Role.RECEPTIONIST, Role.ADMIN)
+  @RequirePermissions(Permission.MEDICAL_RECORD_VIEW)
   @Get('by-appointment/:appointmentId')
   findByAppointment(@Param('appointmentId', ParseUUIDPipe) appointmentId: string) {
     return this.examinationsService.findByAppointment(appointmentId);
   }
 
-  @Roles(Role.DOCTOR, Role.RECEPTIONIST, Role.ADMIN)
+  @RequirePermissions(Permission.MEDICAL_RECORD_VIEW)
   @Get(':id/prescriptions')
   listPrescriptions(@Param('id', ParseUUIDPipe) id: string) {
     return this.examinationsService.listPrescriptions(id);
   }
 
-  @Roles(Role.DOCTOR)
+  @RequirePermissions(Permission.MEDICAL_RECORD_CREATE)
   @Post(':id/prescriptions')
   createPrescription(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreatePrescriptionDto) {
     return this.examinationsService.createPrescription(id, dto);
   }
 
-  @Roles(Role.DOCTOR)
+  @RequirePermissions(Permission.MEDICAL_RECORD_CREATE)
   @Post(':id/lab-tests')
   createLabTest(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateLabTestDto) {
     return this.examinationsService.createLabTest(id, dto);
   }
 
-  @Roles(Role.DOCTOR)
+  @RequirePermissions(Permission.MEDICAL_RECORD_UPDATE)
   @Patch('lab-tests/:labTestId')
   updateLabTest(
     @Param('labTestId', ParseUUIDPipe) labTestId: string,
@@ -59,7 +59,7 @@ export class ExaminationsController {
   }
 
   /** Section 4.1.4: "print/export the exam record and prescription as PDF" - pdfkit only. */
-  @Roles(Role.DOCTOR, Role.RECEPTIONIST, Role.ADMIN)
+  @RequirePermissions(Permission.MEDICAL_RECORD_VIEW)
   @Get(':id/pdf')
   async exportPdf(
     @Param('id', ParseUUIDPipe) id: string,
@@ -76,13 +76,13 @@ export class ExaminationsController {
     doc.end();
   }
 
-  @Roles(Role.DOCTOR, Role.RECEPTIONIST, Role.ADMIN)
+  @RequirePermissions(Permission.MEDICAL_RECORD_VIEW)
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.examinationsService.findOne(id);
   }
 
-  @Roles(Role.DOCTOR)
+  @RequirePermissions(Permission.MEDICAL_RECORD_UPDATE)
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateExaminationDto) {
     return this.examinationsService.update(id, dto);

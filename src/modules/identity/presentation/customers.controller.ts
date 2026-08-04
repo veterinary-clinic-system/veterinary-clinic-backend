@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Roles } from '@/shared/common/decorators/roles.decorator';
-import { Role } from '@/shared/common/enums/role.enum';
+import { RequirePermissions } from '@/shared/common/decorators/require-permissions.decorator';
+import { Permission } from '@/shared/common/enums/permission.enum';
 import { CustomersService } from '@/modules/identity/application/customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
@@ -19,56 +19,73 @@ import { QueryCustomersDto } from './dto/query-customers.dto';
  * KHONG co route DELETE: theo rang buoc R6 (Phan V.4) du lieu y te khong duoc xoa cung,
  * va toan bo lich su kham/hoa don deu tro ve `users.id`. "Xoa khach hang" trong nghiep
  * vu chinh la `POST :id/deactivate`.
+ *
+ * Quyen: dieu khien hoan toan bang `@RequirePermissions` (ma tran `role_permissions`),
+ * khong con `@Roles` - xem ghi chu ve nguyen tac nay trong permissions.controller.ts.
  */
 @ApiTags('customers')
 @Controller('customers')
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
-  @Roles(Role.ADMIN, Role.RECEPTIONIST)
+  @RequirePermissions(Permission.CUSTOMER_CREATE)
   @Post()
   create(@Body() dto: CreateCustomerDto) {
     return this.customersService.create(dto);
   }
 
-  /** Bac si duoc XEM ho so khach de tra cuu trong luc kham, nhung khong duoc sua. */
-  @Roles(Role.ADMIN, Role.RECEPTIONIST, Role.DOCTOR)
+  @RequirePermissions(Permission.CUSTOMER_VIEW)
   @Get()
   findAll(@Query() query: QueryCustomersDto) {
     return this.customersService.findAll(query);
   }
 
-  @Roles(Role.ADMIN, Role.RECEPTIONIST, Role.DOCTOR)
+  @RequirePermissions(Permission.CUSTOMER_VIEW)
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.customersService.findOne(id);
   }
 
-  @Roles(Role.ADMIN, Role.RECEPTIONIST, Role.DOCTOR)
+  @RequirePermissions(Permission.CUSTOMER_VIEW, Permission.PET_VIEW)
   @Get(':id/pets')
   findPets(@Param('id', ParseUUIDPipe) id: string) {
     return this.customersService.findPets(id);
   }
 
-  @Roles(Role.ADMIN, Role.RECEPTIONIST, Role.DOCTOR)
+  /** Tab "Lich hen" cua ho so khach (FR-03-04). */
+  @RequirePermissions(Permission.CUSTOMER_VIEW, Permission.APPOINTMENT_VIEW)
+  @Get(':id/appointments')
+  findAppointments(@Param('id', ParseUUIDPipe) id: string) {
+    return this.customersService.findAppointments(id);
+  }
+
+  /** Tab "Lich su kham" cua ho so khach (FR-03-04). */
+  @RequirePermissions(Permission.CUSTOMER_VIEW, Permission.MEDICAL_RECORD_VIEW)
+  @Get(':id/medical-history')
+  findMedicalHistory(@Param('id', ParseUUIDPipe) id: string) {
+    return this.customersService.findMedicalHistory(id);
+  }
+
+  @RequirePermissions(Permission.CUSTOMER_VIEW, Permission.INVOICE_VIEW)
   @Get(':id/transactions')
   findTransactions(@Param('id', ParseUUIDPipe) id: string) {
     return this.customersService.findTransactions(id);
   }
 
-  @Roles(Role.ADMIN, Role.RECEPTIONIST)
+  @RequirePermissions(Permission.CUSTOMER_UPDATE)
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateCustomerDto) {
     return this.customersService.update(id, dto);
   }
 
-  @Roles(Role.ADMIN, Role.RECEPTIONIST)
+  /** "Xoa" khach hang trong nghiep vu = ngung hoat dong, nen dung quyen CUSTOMER_DELETE. */
+  @RequirePermissions(Permission.CUSTOMER_DELETE)
   @Post(':id/deactivate')
   deactivate(@Param('id', ParseUUIDPipe) id: string) {
     return this.customersService.deactivate(id);
   }
 
-  @Roles(Role.ADMIN, Role.RECEPTIONIST)
+  @RequirePermissions(Permission.CUSTOMER_DELETE)
   @Post(':id/activate')
   activate(@Param('id', ParseUUIDPipe) id: string) {
     return this.customersService.activate(id);

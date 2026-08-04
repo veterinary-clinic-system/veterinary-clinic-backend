@@ -29,8 +29,13 @@ import { PrescreeningService } from '@/modules/triage/application';
 import { CreateBookingDto } from '@/modules/scheduling/presentation/dto/create-booking.dto';
 import { UpdateAppointmentDto } from '@/modules/scheduling/presentation/dto/update-appointment.dto';
 import {
+  CancelAppointmentDto,
+  MarkNoShowDto,
+} from '@/modules/scheduling/presentation/dto/cancel-appointment.dto';
+import {
   AvailabilityService,
   DayAvailability,
+  MonthOverview,
   SlotInfo,
   SlotStatus,
 } from '@/modules/scheduling/application/availability.service';
@@ -59,6 +64,20 @@ export type SlotWithDetail = SlotInfo & { appointmentDetail?: SlotAppointmentDet
 
 export interface DayAvailabilityWithDetail extends Omit<DayAvailability, 'slots'> {
   slots: SlotWithDetail[];
+}
+
+/** Goc nhin cong khai: chi con free/busy, khong he lo lich hen cua nguoi khac. */
+function stripToFreeBusy(days: DayAvailability[]): DayAvailability[] {
+  return days.map((day) => ({
+    ...day,
+    slots: day.slots.map((slot) => ({
+      start: slot.start,
+      end: slot.end,
+      startAt: slot.startAt,
+      endAt: slot.endAt,
+      status: slot.status,
+    })),
+  }));
 }
 
 @Injectable()
@@ -180,7 +199,9 @@ export class AppointmentsService {
   async findOne(id: string): Promise<Appointment> {
     const appointment = await this.appointmentsRepository.findOne({
       where: { id },
-      relations: ['pet', 'pet.owner', 'doctor', 'branch', 'service', 'service.item'],
+      // `cancelledBy` de man hinh chi tiet hien duoc "Da huy boi ..." (FR-05-04) ma
+      // khong phai goi them mot request tra ten nguoi dung.
+      relations: ['pet', 'pet.owner', 'doctor', 'branch', 'service', 'service.item', 'cancelledBy'],
     });
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
@@ -267,55 +288,78 @@ export class AppointmentsService {
       weekStart,
     );
 
-    if (includeDetail) {
-      const appointmentIds = days
-        .flatMap((day) => day.slots)
-        .filter((slot) => slot.status === SlotStatus.BOOKED && slot.appointmentId)
-        .map((slot) => slot.appointmentId!);
+    return includeDetail ? this.attachAppointmentDetail(days) : stripToFreeBusy(days);
+  }
 
-      const byId = new Map<string, Appointment>();
-      if (appointmentIds.length > 0) {
-        const appointments = await this.appointmentsRepository.find({
-          where: appointmentIds.map((id) => ({ id })),
-          relations: ['pet', 'pet.owner'],
-        });
-        appointments.forEach((appointment) => byId.set(appointment.id, appointment));
-      }
+  /**
+   * Che do NGAY cua lich lam viec (FR-05-03). Cung du lieu voi mot cot cua che do tuan -
+   * dung lai `getDoctorDayAvailability` thay vi dung mot duong tinh toan thu hai.
+   */
+  async getDayCalendar(
+    branchId: string,
+    doctorId: string,
+    date: Date,
+  ): Promise<DayAvailabilityWithDetail> {
+    const day = await this.availabilityService.getDoctorDayAvailability(doctorId, branchId, date);
+    const [withDetail] = await this.attachAppointmentDetail([day]);
+    return withDetail;
+  }
 
-      return days.map((day) => ({
-        ...day,
-        slots: day.slots.map((slot): SlotWithDetail => {
-          const appointment = slot.appointmentId ? byId.get(slot.appointmentId) : undefined;
-          if (!appointment) {
-            return slot;
-          }
-          return {
-            ...slot,
-            appointmentDetail: {
-              id: appointment.id,
-              petName: appointment.pet.name,
-              ownerName: appointment.pet.owner.fullName,
-              ownerPhone: appointment.pet.owner.phone,
-              commonSymptoms: appointment.commonSymptoms,
-              otherSymptoms: appointment.otherSymptoms,
-              priorityColor: appointment.priorityColor,
-              status: appointment.status,
-            },
-          };
-        }),
-      }));
+  /**
+   * Che do THANG (FR-05-03) - chi so lieu tong hop moi ngay, khong co luoi slot.
+   * Xem ghi chu trong `AvailabilityService.getMonthOverview` ve ly do.
+   */
+  async getMonthCalendar(
+    branchId: string,
+    doctorId: string | undefined,
+    monthOf: Date,
+  ): Promise<MonthOverview> {
+    return this.availabilityService.getMonthOverview(branchId, doctorId, monthOf);
+  }
+
+  /**
+   * Gan chi tiet lich hen vao cac o da duoc dat. Chi danh cho Doctor/Receptionist/Admin -
+   * Section 4.2: "PetOwner and Guest... only ever see which slots are free, never another
+   * person's appointment details."
+   */
+  private async attachAppointmentDetail(
+    days: DayAvailability[],
+  ): Promise<DayAvailabilityWithDetail[]> {
+    const appointmentIds = days
+      .flatMap((day) => day.slots)
+      .filter((slot) => slot.status === SlotStatus.BOOKED && slot.appointmentId)
+      .map((slot) => slot.appointmentId!);
+
+    const byId = new Map<string, Appointment>();
+    if (appointmentIds.length > 0) {
+      const appointments = await this.appointmentsRepository.find({
+        where: appointmentIds.map((id) => ({ id })),
+        relations: ['pet', 'pet.owner'],
+      });
+      appointments.forEach((appointment) => byId.set(appointment.id, appointment));
     }
 
-    // Public/PetOwner view: strip everything down to free/busy only.
     return days.map((day) => ({
       ...day,
-      slots: day.slots.map((slot) => ({
-        start: slot.start,
-        end: slot.end,
-        startAt: slot.startAt,
-        endAt: slot.endAt,
-        status: slot.status,
-      })),
+      slots: day.slots.map((slot): SlotWithDetail => {
+        const appointment = slot.appointmentId ? byId.get(slot.appointmentId) : undefined;
+        if (!appointment) {
+          return slot;
+        }
+        return {
+          ...slot,
+          appointmentDetail: {
+            id: appointment.id,
+            petName: appointment.pet.name,
+            ownerName: appointment.pet.owner.fullName,
+            ownerPhone: appointment.pet.owner.phone,
+            commonSymptoms: appointment.commonSymptoms,
+            otherSymptoms: appointment.otherSymptoms,
+            priorityColor: appointment.priorityColor,
+            status: appointment.status,
+          },
+        };
+      }),
     }));
   }
 
@@ -325,6 +369,15 @@ export class AppointmentsService {
     actor: AuthenticatedUser,
   ): Promise<Appointment> {
     const appointment = await this.findOne(id);
+
+    // FR-05-04: huy lich va danh vang phai di qua endpoint rieng de bat buoc co ly do.
+    // Neu de PATCH lam duoc luon thi luu vet se thieu bat cu luc nao ai do dung nham
+    // cua - va do la dung trang thai ma FR-05-04 sinh ra de xoa bo.
+    if (dto.status === AppointmentStatus.CANCELLED || dto.status === AppointmentStatus.NO_SHOW) {
+      throw new ConflictException(
+        'Hủy lịch hoặc đánh dấu khách không đến phải thực hiện qua thao tác riêng để ghi lại lý do.',
+      );
+    }
 
     // Lich hen da ket thuc (COMPLETED/CANCELLED/NO_SHOW) la su kien lich su, khong
     // the doi status hay doi lich nua - truoc day thieu kiem tra nay nen PATCH co
@@ -401,11 +454,96 @@ export class AppointmentsService {
     return updated;
   }
 
-  async cancel(id: string, actor: AuthenticatedUser): Promise<Appointment> {
+  /**
+   * Huy lich hen - FR-05-04 doi ghi lai nguoi huy, thoi diem va ly do.
+   *
+   * Khong con di qua `update()`: mot `PATCH { status: CANCELLED }` khong mang theo ly
+   * do, va de no lam duong huy thu hai co nghia la luu vet se thieu bat ky luc nao ai
+   * do dung nham cua. `update()` gio tu choi thang hai trang thai nay.
+   */
+  async cancel(
+    id: string,
+    dto: CancelAppointmentDto,
+    actor: AuthenticatedUser,
+  ): Promise<Appointment> {
     if (actor.role === Role.PET_OWNER) {
       await this.findOneForOwner(id, actor); // throws ForbiddenException if not their own
     }
-    return this.update(id, { status: AppointmentStatus.CANCELLED }, actor);
+    return this.finishAbnormally(id, AppointmentStatus.CANCELLED, dto.reason, actor);
+  }
+
+  /**
+   * Danh dau khach KHONG DEN - FR-06-03, thao tac doc lap voi viec huy lich.
+   *
+   * Chi ap dung cho lich CHUA tiep nhan. Khach da check-in roi bo ve giua chung la
+   * chuyen khac han (huy luot cho - xem `QueueService.update`), gop chung se lam bao
+   * cao ty le vang mat cua P10 sai.
+   */
+  async markNoShow(id: string, dto: MarkNoShowDto, actor: AuthenticatedUser): Promise<Appointment> {
+    const appointment = await this.findOne(id);
+    if (
+      appointment.status === AppointmentStatus.CHECKED_IN ||
+      appointment.status === AppointmentStatus.IN_PROGRESS
+    ) {
+      throw new ConflictException(
+        'Khách đã được tiếp nhận nên không thể đánh dấu "không đến" - hãy hủy lượt chờ nếu khách bỏ về.',
+      );
+    }
+
+    return this.finishAbnormally(
+      id,
+      AppointmentStatus.NO_SHOW,
+      dto.reason?.trim() || 'Khách không đến',
+      actor,
+    );
+  }
+
+  /**
+   * Duong di duy nhat dua mot lich hen sang CANCELLED/NO_SHOW. Doi trang thai va ghi
+   * ba truong luu vet trong CUNG mot lenh UPDATE - khong the co lich da huy ma khong
+   * biet ai huy.
+   */
+  private async finishAbnormally(
+    id: string,
+    status: AppointmentStatus.CANCELLED | AppointmentStatus.NO_SHOW,
+    reason: string,
+    actor: AuthenticatedUser,
+  ): Promise<Appointment> {
+    const appointment = await this.findOne(id);
+
+    // Kiem tra trang thai ket thuc TRUOC `isValidAppointmentStatusTransition`: ham do
+    // coi `from === to` la hop le (de PATCH chi doi ghi chu van gui kem status hien
+    // tai duoc), nen neu chi dua vao no thi huy lai mot lich DA huy se di lot va ghi
+    // de len luu vet cu - mat ca nguoi huy lan ly do that su.
+    if (TERMINAL_APPOINTMENT_STATUSES.has(appointment.status)) {
+      throw new ConflictException(
+        `Lịch hẹn đã ở trạng thái kết thúc ("${appointment.status}") - không thể thực hiện lại thao tác này.`,
+      );
+    }
+
+    if (!isValidAppointmentStatusTransition(appointment.status, status)) {
+      throw new ConflictException(
+        `Khong the chuyen lich hen tu trang thai "${appointment.status}" sang "${status}"`,
+      );
+    }
+
+    await this.appointmentsRepository.update(id, {
+      status,
+      cancelledByUserId: actor.userId,
+      cancelledAt: new Date(),
+      cancelReason: reason,
+    });
+
+    // Khung gio duoc tra lai cho bac si ngay khi lich thoat khoi SLOT_BLOCKING_STATUSES.
+    await this.availabilityService.invalidateDoctorDay(
+      appointment.doctorId,
+      appointment.branchId,
+      appointment.startAt,
+    );
+
+    const updated = await this.findOne(id);
+    await this.notifyOwnerOfUpdate(updated, actor);
+    return updated;
   }
 
   /** Section 4.1.4: "Optionally schedule a follow-up visit" - links back via parentAppointmentId. */

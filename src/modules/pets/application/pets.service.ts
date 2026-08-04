@@ -1,13 +1,15 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, Repository } from 'typeorm';
+import { Brackets, Not, Repository } from 'typeorm';
 import { isUUID } from 'class-validator';
 import { User } from '@/modules/identity/domain/entities/user.entity';
+import { assertCustomerCanOwnPets } from '@/modules/identity/domain/entities/customer-status';
 import { Breed } from '@/modules/pets/domain/entities/breed.entity';
 import { Pet } from '@/modules/pets/domain/entities/pet.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
@@ -32,14 +34,12 @@ export class PetsService {
 
   /** Staff adding a pet profile to an existing owner outside the booking flow (Section 4.1.1). */
   async create(dto: CreatePetDto): Promise<Pet> {
-    const owner = await this.usersRepository.findOne({ where: { id: dto.ownerId } });
-    if (!owner) {
-      throw new BadRequestException('Owner not found');
-    }
+    await assertOwnerIsActive(this.usersRepository, dto.ownerId);
+    await this.assertBreedBelongsToSpecies(dto.breedId, dto.speciesId);
 
-    const breed = await this.breedsRepository.findOne({ where: { id: dto.breedId } });
-    if (!breed) {
-      throw new BadRequestException('Breed not found');
+    const microchipId = normalizeMicrochipId(dto.microchipId);
+    if (microchipId) {
+      await this.assertMicrochipIsFree(microchipId, null);
     }
 
     const pet = this.petsRepository.create({
@@ -48,51 +48,62 @@ export class PetsService {
       gender: dto.gender,
       weight: dto.weight ?? null,
       birthDate: dto.birthDate ?? null,
+      microchipId,
+      color: dto.color ?? null,
       avatarUrl: dto.avatarUrl ?? null,
       notes: dto.notes ?? null,
       allergies: dto.allergies ?? [],
       chronicConditions: dto.chronicConditions ?? [],
       ownerId: dto.ownerId,
     });
-    const saved = await this.petsRepository.save(pet);
+    const saved = await mapMicrochipConflict(() => this.petsRepository.save(pet));
     return this.loadPetOrThrow(saved.id);
   }
 
   async update(id: string, dto: UpdatePetDto): Promise<Pet> {
     const pet = await this.petsRepository.findOne({ where: { id } });
     if (!pet) {
-      throw new NotFoundException('Pet not found');
+      throw new NotFoundException('Không tìm thấy thú cưng');
     }
 
+    // BR-02 chi chan viec CHUYEN sang mot chu nuoi da ngung hoat dong. Sua ten/can nang
+    // cua thu cung dang thuoc mot khach ngung hoat dong van phai lam duoc - khoa lai se
+    // khoa luon ca ho so cu.
     if (dto.ownerId !== undefined && dto.ownerId !== pet.ownerId) {
-      const owner = await this.usersRepository.findOne({ where: { id: dto.ownerId } });
-      if (!owner) {
-        throw new BadRequestException('Owner not found');
-      }
+      await assertOwnerIsActive(this.usersRepository, dto.ownerId);
     }
 
-    if (dto.breedId !== undefined && dto.breedId !== pet.breedId) {
-      const breed = await this.breedsRepository.findOne({ where: { id: dto.breedId } });
-      if (!breed) {
-        throw new BadRequestException('Breed not found');
-      }
+    if (dto.breedId !== undefined || dto.speciesId !== undefined) {
+      await this.assertBreedBelongsToSpecies(dto.breedId ?? pet.breedId, dto.speciesId);
+    }
+
+    const microchipId =
+      dto.microchipId !== undefined ? normalizeMicrochipId(dto.microchipId) : undefined;
+    if (microchipId) {
+      await this.assertMicrochipIsFree(microchipId, id);
     }
 
     // A raw partial UPDATE (rather than mutate-then-save the relation-hydrated entity)
     // so a reassigned breedId/ownerId can't be shadowed by the stale `breed`/`owner`
     // relation objects - same convention as AppointmentsService.update() for doctorId.
-    await this.petsRepository.update(id, {
-      ...(dto.name !== undefined ? { name: dto.name } : {}),
-      ...(dto.breedId !== undefined ? { breedId: dto.breedId } : {}),
-      ...(dto.gender !== undefined ? { gender: dto.gender } : {}),
-      ...(dto.weight !== undefined ? { weight: dto.weight } : {}),
-      ...(dto.birthDate !== undefined ? { birthDate: dto.birthDate } : {}),
-      ...(dto.avatarUrl !== undefined ? { avatarUrl: dto.avatarUrl } : {}),
-      ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
-      ...(dto.allergies !== undefined ? { allergies: dto.allergies } : {}),
-      ...(dto.chronicConditions !== undefined ? { chronicConditions: dto.chronicConditions } : {}),
-      ...(dto.ownerId !== undefined ? { ownerId: dto.ownerId } : {}),
-    });
+    await mapMicrochipConflict(() =>
+      this.petsRepository.update(id, {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.breedId !== undefined ? { breedId: dto.breedId } : {}),
+        ...(dto.gender !== undefined ? { gender: dto.gender } : {}),
+        ...(dto.weight !== undefined ? { weight: dto.weight } : {}),
+        ...(dto.birthDate !== undefined ? { birthDate: dto.birthDate } : {}),
+        ...(microchipId !== undefined ? { microchipId } : {}),
+        ...(dto.color !== undefined ? { color: dto.color } : {}),
+        ...(dto.avatarUrl !== undefined ? { avatarUrl: dto.avatarUrl } : {}),
+        ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+        ...(dto.allergies !== undefined ? { allergies: dto.allergies } : {}),
+        ...(dto.chronicConditions !== undefined
+          ? { chronicConditions: dto.chronicConditions }
+          : {}),
+        ...(dto.ownerId !== undefined ? { ownerId: dto.ownerId } : {}),
+      }),
+    );
 
     return this.loadPetOrThrow(id);
   }
@@ -142,7 +153,11 @@ export class PetsService {
             .where('pet.name ILIKE :search', { search: `%${search}%` })
             .orWhere('owner.phone ILIKE :search', {
               search: `%${search}%`,
-            });
+            })
+            // Ma nghiep vu (FR-04-01) va so microchip - hai thu le tan doc duoc tren
+            // giay to cua khach, khac voi UUID.
+            .orWhere('pet.petCode ILIKE :search', { search: `%${search}%` })
+            .orWhere('pet.microchipId ILIKE :search', { search: `%${search}%` });
           // Only add the exact-id branch when `search` is actually a UUID - a raw
           // non-UUID string in a `uuid = :param` comparison throws a Postgres error.
           if (isUUID(search)) {
@@ -184,8 +199,83 @@ export class PetsService {
       relations: PET_DETAIL_RELATIONS,
     });
     if (!pet) {
-      throw new NotFoundException('Pet not found');
+      throw new NotFoundException('Không tìm thấy thú cưng');
     }
     return pet;
   }
+
+  /**
+   * Muc 16 SRS: loai la truong bat buoc. Giong da chon phai THUOC loai do - neu khong,
+   * mot bieu mau doi loai sang "Mèo" nhung con giu lai giong "Poodle" cua lan chon
+   * truoc se tao ra mot ho so tu mau thuan.
+   */
+  private async assertBreedBelongsToSpecies(breedId: string, speciesId?: string): Promise<Breed> {
+    const breed = await this.breedsRepository.findOne({ where: { id: breedId } });
+    if (!breed) {
+      throw new BadRequestException('Không tìm thấy giống thú cưng đã chọn');
+    }
+    if (speciesId && breed.speciesId !== speciesId) {
+      throw new BadRequestException('Giống đã chọn không thuộc loài đã chọn');
+    }
+    return breed;
+  }
+
+  /**
+   * Mot so microchip chi duoc gan cho mot thu cung. Kiem o day de le tan nhan duoc
+   * thong bao co ten con vat dang giu so do; chi muc `uq_pets_microchip_id` van la
+   * thu chot chan (xem `mapMicrochipConflict`).
+   */
+  private async assertMicrochipIsFree(
+    microchipId: string,
+    excludePetId: string | null,
+  ): Promise<void> {
+    const existing = await this.petsRepository.findOne({
+      where: excludePetId ? { microchipId, id: Not(excludePetId) } : { microchipId },
+    });
+    if (existing) {
+      throw new ConflictException(
+        `Số microchip "${microchipId}" đã được gắn cho thú cưng "${existing.name}" (${existing.petCode}).`,
+      );
+    }
+  }
+}
+
+/** Ma loi PostgreSQL cho vi pham rang buoc UNIQUE. */
+const PG_UNIQUE_VIOLATION = '23505';
+
+/** O trong tren giao dien gui len chuoi rong - phai thanh NULL de khong dinh unique. */
+function normalizeMicrochipId(raw: string | undefined): string | null {
+  const trimmed = raw?.trim();
+  return trimmed ? trimmed : null;
+}
+
+/**
+ * Doi vi pham `uq_pets_microchip_id` cua CSDL thanh 409 co thong bao tieng Viet.
+ *
+ * Van can du da kiem truoc bang `assertMicrochipIsFree`: giua luc doc va luc ghi, mot
+ * request khac co the da chiem so chip do. Cung ly do voi
+ * `mapAppointmentOverlapError` ben scheduling.
+ */
+async function mapMicrochipConflict<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    const candidate = error as { code?: string; constraint?: string } | null;
+    if (
+      candidate?.code === PG_UNIQUE_VIOLATION &&
+      candidate?.constraint === 'uq_pets_microchip_id'
+    ) {
+      throw new ConflictException('Số microchip này vừa được gắn cho một thú cưng khác');
+    }
+    throw error;
+  }
+}
+
+/** BR-02 tai cua "them/chuyen thu cung" - xem `assertCustomerCanOwnPets`. */
+async function assertOwnerIsActive(
+  usersRepository: Repository<User>,
+  ownerId: string,
+): Promise<User> {
+  const owner = await usersRepository.findOne({ where: { id: ownerId } });
+  return assertCustomerCanOwnPets(owner);
 }

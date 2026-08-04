@@ -34,12 +34,8 @@ export const TERMINAL_APPOINTMENT_STATUSES: ReadonlySet<AppointmentStatus> = new
 ]);
 
 /**
- * Thu tu tien trien cua 4 trang thai CHUA ket thuc. Hien tai KHONG co endpoint nao
- * chu dong dat CONFIRMED/CHECKED_IN/IN_PROGRESS (chi PENDING luc dat lich, va
- * COMPLETED luc bac si ghi phieu kham) - nen luat o day CHI cam lui (vi du
- * IN_PROGRESS -> PENDING), khong bat buoc phai di qua tung buoc mot truoc khi toi
- * trang thai ket thuc. Sau nay neu them man hinh "le tan check-in" thi thu tu nay
- * la cho de gan luat chuyen tiep chat hon.
+ * Thu tu tien trien cua 4 trang thai CHUA ket thuc: chi cho di TOI, khong cho lui
+ * (vi du IN_PROGRESS -> PENDING).
  */
 const NON_TERMINAL_ORDER: Record<
   Exclude<
@@ -55,16 +51,29 @@ const NON_TERMINAL_ORDER: Record<
 };
 
 /**
+ * BR-06 - "Appointment chi duoc hoan thanh sau khi pet da duoc tiep nhan."
+ *
+ * Chi hai trang thai nay dan toi COMPLETED duoc. Truoc P3, luat cho nhay thang
+ * PENDING -> COMPLETED vi CHUA CO man hinh le tan check-in; gio da co (man hinh hang
+ * cho) nen khong con ly do de mo. Ket qua thuc te cua viec noi long do: mot lich hen
+ * co the "hoan tat" ma con vat chua bao gio buoc vao phong kham.
+ */
+const CHECKED_IN_STATUSES: ReadonlySet<AppointmentStatus> = new Set([
+  AppointmentStatus.CHECKED_IN,
+  AppointmentStatus.IN_PROGRESS,
+]);
+
+/**
  * True neu chuyen tu `from` sang `to` la hop le. Quy tac:
  *   1. Giu nguyen trang thai (`from === to`) luon hop le - PATCH chi doi truong
  *      khac (notes, priorityColor) van thuong gui kem status hien tai.
  *   2. Da o trang thai KET THUC (COMPLETED/CANCELLED/NO_SHOW) thi KHONG the doi
  *      sang bat ky trang thai nao khac nua - day la loi that su tung xay ra
  *      (PATCH mot lich COMPLETED lui ve PENDING).
- *   3. Tu trang thai CHUA ket thuc, duoc phep di thang toi bat ky trang thai ket
- *      thuc nao (vi du PENDING -> COMPLETED khi bac si ghi phieu kham ma khong ai
- *      tung bam "check-in" rieng - xem ghi chu tren NON_TERMINAL_ORDER).
- *   4. Giua hai trang thai CHUA ket thuc, chi cho di TOI (thu tu tang dan trong
+ *   3. **BR-06**: COMPLETED chi den duoc tu CHECKED_IN hoac IN_PROGRESS.
+ *   4. CANCELLED va NO_SHOW van den duoc tu MOI trang thai chua ket thuc - khach huy
+ *      truoc khi den la chuyen binh thuong.
+ *   5. Giua hai trang thai CHUA ket thuc, chi cho di TOI (thu tu tang dan trong
  *      NON_TERMINAL_ORDER) - khong cho lui.
  */
 export function isValidAppointmentStatusTransition(
@@ -73,6 +82,7 @@ export function isValidAppointmentStatusTransition(
 ): boolean {
   if (from === to) return true;
   if (TERMINAL_APPOINTMENT_STATUSES.has(from)) return false;
+  if (to === AppointmentStatus.COMPLETED) return CHECKED_IN_STATUSES.has(from);
   if (TERMINAL_APPOINTMENT_STATUSES.has(to)) return true;
 
   return (

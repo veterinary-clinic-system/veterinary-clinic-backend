@@ -8,6 +8,13 @@ import { Appointment } from '@/modules/scheduling/domain/entities/appointment.en
 /** diagram.jpg `Pet` box. */
 @Entity({ name: 'pets' })
 export class Pet extends BaseEntity {
+  /**
+   * Ma thu cung doc duoc tai quay (`TC000456`) - SRS FR-04-01. Do cot DEFAULT o tang
+   * CSDL sinh ra (sequence `pet_code_seq`), khong bao gio ghi tu ung dung.
+   */
+  @Column({ name: 'pet_code', length: 32, insert: false, update: false })
+  petCode: string;
+
   @Column({ name: 'name', length: 255 })
   name: string;
 
@@ -26,6 +33,18 @@ export class Pet extends BaseEntity {
 
   @Column({ name: 'birth_date', type: 'date', nullable: true })
   birthDate: string | null;
+
+  /**
+   * So microchip (FR-04-01). Duy nhat trong so cac ho so chua xoa mem - xem chi muc
+   * `uq_pets_microchip_id`. De trong duoc voi thu cung chua gan chip, va nhieu ho so
+   * de trong khong xung dot voi nhau (NULL khong tham gia unique trong Postgres).
+   */
+  @Column({ name: 'microchip_id', type: 'varchar', length: 64, nullable: true })
+  microchipId: string | null;
+
+  /** Mau long (FR-04-01) - van tu do, khong dung enum vi mo ta mau rat mo. */
+  @Column({ name: 'color', type: 'varchar', length: 64, nullable: true })
+  color: string | null;
 
   @Column({ name: 'avatar_url', type: 'varchar', nullable: true })
   avatarUrl: string | null;

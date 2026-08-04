@@ -12,6 +12,8 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { Public } from '@/shared/common/decorators/public.decorator';
 import { Roles } from '@/shared/common/decorators/roles.decorator';
+import { RequirePermissions } from '@/shared/common/decorators/require-permissions.decorator';
+import { Permission } from '@/shared/common/enums/permission.enum';
 import { CurrentUser } from '@/shared/common/decorators/current-user.decorator';
 import { Role } from '@/shared/common/enums/role.enum';
 import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user.interface';
@@ -37,6 +39,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Roles(Role.ADMIN)
+  @RequirePermissions(Permission.EMPLOYEE_MANAGE)
   @Post()
   create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
@@ -59,18 +62,21 @@ export class UsersController {
   // -- Doctor shifts ------------------------------------------------------------------
 
   @Roles(Role.ADMIN, Role.RECEPTIONIST, Role.DOCTOR)
+  @RequirePermissions(Permission.APPOINTMENT_VIEW)
   @Get('doctors/:id/shifts')
   getDoctorShifts(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.getDoctorShifts(id);
   }
 
   @Roles(Role.ADMIN, Role.RECEPTIONIST)
+  @RequirePermissions(Permission.EMPLOYEE_MANAGE)
   @Post('doctors/:id/shifts')
   createDoctorShift(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateDoctorShiftDto) {
     return this.usersService.createDoctorShift(id, dto);
   }
 
   @Roles(Role.ADMIN, Role.RECEPTIONIST)
+  @RequirePermissions(Permission.EMPLOYEE_MANAGE)
   @Patch('doctors/shifts/:shiftId')
   updateDoctorShift(
     @Param('shiftId', ParseUUIDPipe) shiftId: string,
@@ -80,6 +86,7 @@ export class UsersController {
   }
 
   @Roles(Role.ADMIN, Role.RECEPTIONIST)
+  @RequirePermissions(Permission.EMPLOYEE_MANAGE)
   @Delete('doctors/shifts/:shiftId')
   deleteDoctorShift(@Param('shiftId', ParseUUIDPipe) shiftId: string) {
     return this.usersService.deleteDoctorShift(shiftId);
@@ -88,18 +95,21 @@ export class UsersController {
   // -- Doctor breaks --------------------------------------------------------------
 
   @Roles(Role.ADMIN, Role.RECEPTIONIST, Role.DOCTOR)
+  @RequirePermissions(Permission.APPOINTMENT_VIEW)
   @Get('doctors/:id/breaks')
   getDoctorBreaks(@Param('id', ParseUUIDPipe) id: string, @Query('date') date?: string) {
     return this.usersService.getDoctorBreaks(id, date);
   }
 
   @Roles(Role.ADMIN, Role.RECEPTIONIST)
+  @RequirePermissions(Permission.EMPLOYEE_MANAGE)
   @Post('doctors/:id/breaks')
   createDoctorBreak(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateDoctorBreakDto) {
     return this.usersService.createDoctorBreak(id, dto);
   }
 
   @Roles(Role.ADMIN, Role.RECEPTIONIST)
+  @RequirePermissions(Permission.EMPLOYEE_MANAGE)
   @Delete('doctors/breaks/:breakId')
   deleteDoctorBreak(@Param('breakId', ParseUUIDPipe) breakId: string) {
     return this.usersService.deleteDoctorBreak(breakId);
@@ -108,12 +118,16 @@ export class UsersController {
   // -- Doctors: admin edit ----------------------------------------------------------
 
   @Roles(Role.ADMIN)
+  @RequirePermissions(Permission.EMPLOYEE_MANAGE)
   @Patch('doctors/:id')
   updateDoctor(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateDoctorDto) {
     return this.usersService.updateDoctor(id, dto);
   }
 
   // -- Current user (any authenticated role) -----------------------------------------
+  // Hai route duoi co y KHONG gan `@RequirePermissions`: moi tai khoan deu phai xem va
+  // doi duoc thong tin cua CHINH MINH, ke ca khi bi go het quyen nghiep vu. Chung chi
+  // doc/ghi theo `actor.userId` nen khong co be mat de lam dung.
 
   @Get('me')
   getMe(@CurrentUser() actor: AuthenticatedUser) {
@@ -129,6 +143,7 @@ export class UsersController {
   // -- Pet owners (receptionist customer lookup) --------------------------------------
 
   @Roles(Role.ADMIN, Role.RECEPTIONIST)
+  @RequirePermissions(Permission.CUSTOMER_VIEW)
   @Get('pet-owners')
   searchPetOwners(@Query() pagination: PaginationQueryDto, @Query('search') search?: string) {
     return this.usersService.searchPetOwners({ ...pagination, search });
@@ -137,6 +152,7 @@ export class UsersController {
   // -- Users: admin CRUD (generic `:id` routes declared last) -------------------------
 
   @Roles(Role.ADMIN)
+  @RequirePermissions(Permission.EMPLOYEE_MANAGE)
   @Get()
   findAll(
     @Query() pagination: PaginationQueryDto,
@@ -147,12 +163,14 @@ export class UsersController {
   }
 
   @Roles(Role.ADMIN)
+  @RequirePermissions(Permission.EMPLOYEE_MANAGE)
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.findOne(id);
   }
 
   @Roles(Role.ADMIN)
+  @RequirePermissions(Permission.EMPLOYEE_MANAGE)
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateUserDto) {
     return this.usersService.update(id, dto);

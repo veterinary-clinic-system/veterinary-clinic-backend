@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { RequirePermissions } from '@/shared/common/decorators/require-permissions.decorator';
+import { Permission } from '@/shared/common/enums/permission.enum';
 import { Public } from '@/shared/common/decorators/public.decorator';
-import { Roles } from '@/shared/common/decorators/roles.decorator';
-import { Role } from '@/shared/common/enums/role.enum';
 import { ServicesService } from '@/modules/catalog/application/services.service';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
@@ -13,7 +13,7 @@ import { QueryCatalogEntryDto } from './dto/query-catalog-entry.dto';
 export class ServicesController {
   constructor(private readonly servicesService: ServicesService) {}
 
-  @Roles(Role.ADMIN)
+  @RequirePermissions(Permission.CATALOG_MANAGE)
   @Post()
   create(@Body() dto: CreateServiceDto) {
     return this.servicesService.create(dto);
@@ -31,7 +31,7 @@ export class ServicesController {
     return this.servicesService.findOne(id);
   }
 
-  @Roles(Role.ADMIN)
+  @RequirePermissions(Permission.CATALOG_MANAGE)
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateServiceDto) {
     return this.servicesService.update(id, dto);

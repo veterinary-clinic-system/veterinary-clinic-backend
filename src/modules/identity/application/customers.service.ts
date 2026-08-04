@@ -5,9 +5,11 @@ import * as bcrypt from 'bcrypt';
 import { User } from '@/modules/identity/domain/entities/user.entity';
 import { Pet } from '@/modules/pets/domain/entities/pet.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
+import { Examination } from '@/modules/clinical/domain/entities/examination.entity';
 import { Invoice } from '@/modules/billing/domain/entities/invoice.entity';
 import { AppointmentStatus } from '@/shared/common/enums/appointment-status.enum';
 import { PaymentMethod } from '@/shared/common/enums/payment-method.enum';
+import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import { Role } from '@/shared/common/enums/role.enum';
 import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
 import { CreateCustomerDto } from '@/modules/identity/presentation/dto/create-customer.dto';
@@ -22,9 +24,12 @@ const CUSTOMER_SORTABLE_COLUMNS = new Set(['createdAt', 'updatedAt', 'fullName',
 /** Mot dong trong bang tom tat danh sach khach hang. */
 export interface CustomerListRow {
   id: string;
+  /** Ma nghiep vu `KH000123` (FR-03-01). Ho so cu duoc backfill nen luon co gia tri. */
+  customerCode: string | null;
   phone: string;
   fullName: string;
   email: string | null;
+  dateOfBirth: string | null;
   address: string | null;
   note: string | null;
   active: boolean;
@@ -42,6 +47,37 @@ export interface CustomerDetail extends CustomerListRow {
   totalPaid: number;
   /** Tong tien cua cac hoa don CHUA thanh toan, don vi dong. */
   totalUnpaid: number;
+}
+
+/** Mot dong trong tab "Lich hen" cua ho so khach (FR-03-04). */
+export interface CustomerAppointmentRow {
+  appointmentId: string;
+  startAt: Date;
+  endAt: Date;
+  status: AppointmentStatus;
+  priorityColor: PriorityColor | null;
+  petId: string;
+  petName: string;
+  doctorName: string | null;
+  branchName: string | null;
+  serviceName: string | null;
+}
+
+/**
+ * Mot dong trong tab "Lich su kham" - moi phieu kham bac si da ghi cho thu cung cua
+ * khach. Khac tab "Lich hen" o cho: lich hen la KE HOACH (co ca lich bi huy, khach
+ * khong den), phieu kham la thu that su da dien ra trong phong kham.
+ */
+export interface CustomerMedicalHistoryRow {
+  examinationId: string;
+  appointmentId: string;
+  examinedAt: Date;
+  petId: string;
+  petName: string;
+  doctorName: string | null;
+  branchName: string | null;
+  diagnosisText: string | null;
+  diseaseGroups: string[];
 }
 
 /** Mot dong trong lich su giao dich cua khach (mot hoa don = mot lan kham da lap hoa don). */
@@ -72,6 +108,7 @@ export class CustomersService {
     // PetsModule/SchedulingModule dang lam.
     @InjectRepository(Pet) private readonly petsRepository: Repository<Pet>,
     @InjectRepository(Appointment) private readonly appointmentsRepository: Repository<Appointment>,
+    @InjectRepository(Examination) private readonly examinationsRepository: Repository<Examination>,
     @InjectRepository(Invoice) private readonly invoicesRepository: Repository<Invoice>,
   ) {}
 
@@ -106,6 +143,7 @@ export class CustomersService {
         passwordHash: dto.password ? await bcrypt.hash(dto.password, BCRYPT_ROUNDS) : null,
         role: Role.PET_OWNER,
         branchId: null,
+        dateOfBirth: dto.dateOfBirth ?? null,
         address: dto.address ?? null,
         note: dto.note ?? null,
       }),
@@ -127,6 +165,7 @@ export class CustomersService {
     await this.usersRepository.update(id, {
       ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
       ...(dto.email !== undefined ? { email: dto.email } : {}),
+      ...(dto.dateOfBirth !== undefined ? { dateOfBirth: dto.dateOfBirth } : {}),
       ...(dto.address !== undefined ? { address: dto.address } : {}),
       ...(dto.note !== undefined ? { note: dto.note } : {}),
       ...(dto.active !== undefined ? { active: dto.active } : {}),
@@ -276,6 +315,91 @@ export class CustomersService {
   }
 
   /**
+   * Tab "Lich hen" cua ho so khach (FR-03-04): moi lich hen cua moi thu cung, moi nhat
+   * truoc - ke ca lich da huy/khach khong den, vi day la mot so kham chu khong phai
+   * danh sach viec sap lam.
+   */
+  async findAppointments(id: string): Promise<CustomerAppointmentRow[]> {
+    await this.findCustomerEntity(id);
+
+    const rows = await this.appointmentsRepository
+      .createQueryBuilder('appointment')
+      .innerJoin('appointment.pet', 'pet')
+      .leftJoin('appointment.doctor', 'doctor')
+      .leftJoin('appointment.branch', 'branch')
+      .leftJoin('appointment.service', 'service')
+      .leftJoin('service.item', 'serviceItem')
+      .select('appointment.id', 'appointment_id')
+      .addSelect('appointment.start_at', 'start_at')
+      .addSelect('appointment.end_at', 'end_at')
+      .addSelect('appointment.status', 'status')
+      .addSelect('appointment.priority_color', 'priority_color')
+      .addSelect('pet.id', 'pet_id')
+      .addSelect('pet.name', 'pet_name')
+      .addSelect('doctor.full_name', 'doctor_name')
+      .addSelect('branch.branch_name', 'branch_name')
+      .addSelect('serviceItem.item_name', 'service_name')
+      .where('pet.ownerId = :ownerId', { ownerId: id })
+      .orderBy('appointment.start_at', 'DESC')
+      .getRawMany<RawCustomerAppointmentRow>();
+
+    return rows.map((row) => ({
+      appointmentId: row.appointment_id,
+      startAt: new Date(row.start_at),
+      endAt: new Date(row.end_at),
+      status: row.status,
+      priorityColor: row.priority_color,
+      petId: row.pet_id,
+      petName: row.pet_name,
+      doctorName: row.doctor_name,
+      branchName: row.branch_name,
+      serviceName: row.service_name,
+    }));
+  }
+
+  /**
+   * Tab "Lich su kham" (FR-03-04): cac phieu kham bac si da ghi cho thu cung cua khach.
+   *
+   * Doc thang bang `examinations` qua `appointments` thay vi qua module clinical - cung
+   * quy uoc doc-only da dung cho Pet/Appointment/Invoice o dau file. Sau Phase 4, khi
+   * `MedicalRecord` ra doi, day la cho duy nhat can doi de tro sang no.
+   */
+  async findMedicalHistory(id: string): Promise<CustomerMedicalHistoryRow[]> {
+    await this.findCustomerEntity(id);
+
+    const rows = await this.examinationsRepository
+      .createQueryBuilder('examination')
+      .innerJoin('examination.appointment', 'appointment')
+      .innerJoin('appointment.pet', 'pet')
+      .leftJoin('examination.doctor', 'doctor')
+      .leftJoin('appointment.branch', 'branch')
+      .select('examination.id', 'examination_id')
+      .addSelect('appointment.id', 'appointment_id')
+      .addSelect('examination.examined_at', 'examined_at')
+      .addSelect('examination.diagnosis_text', 'diagnosis_text')
+      .addSelect('examination.disease_groups', 'disease_groups')
+      .addSelect('pet.id', 'pet_id')
+      .addSelect('pet.name', 'pet_name')
+      .addSelect('doctor.full_name', 'doctor_name')
+      .addSelect('branch.branch_name', 'branch_name')
+      .where('pet.ownerId = :ownerId', { ownerId: id })
+      .orderBy('examination.examined_at', 'DESC')
+      .getRawMany<RawCustomerMedicalHistoryRow>();
+
+    return rows.map((row) => ({
+      examinationId: row.examination_id,
+      appointmentId: row.appointment_id,
+      examinedAt: new Date(row.examined_at),
+      petId: row.pet_id,
+      petName: row.pet_name,
+      doctorName: row.doctor_name,
+      branchName: row.branch_name,
+      diagnosisText: row.diagnosis_text,
+      diseaseGroups: row.disease_groups ?? [],
+    }));
+  }
+
+  /**
    * Lich su giao dich: moi hoa don da lap cho bat ky thu cung nao cua khach, moi nhat
    * truoc. Tong tien lay tu SUM cac dong hoa don (anh chup gia luc lap hoa don) chu
    * khong JOIN sang bang gia hien tai - hoa don la chung tu bat bien (Phan V.4 #4).
@@ -359,7 +483,9 @@ export class CustomersService {
           sub
             .where('customer.fullName ILIKE :search', { search: `%${search}%` })
             .orWhere('customer.phone ILIKE :search', { search: `%${search}%` })
-            .orWhere('customer.email ILIKE :search', { search: `%${search}%` });
+            .orWhere('customer.email ILIKE :search', { search: `%${search}%` })
+            // FR-03-03 doi tim duoc theo ma khach hang (`?search=KH000123`).
+            .orWhere('customer.customerCode ILIKE :search', { search: `%${search}%` });
         }),
       );
     }
@@ -405,37 +531,47 @@ export class CustomersService {
    * tuong quan - mot cau lenh duy nhat, khong N+1.
    */
   private selectListColumns(qb: ReturnType<CustomersService['buildBaseQuery']>) {
-    return qb
-      .select('customer.id', 'id')
-      .addSelect('customer.phone', 'phone')
-      .addSelect('customer.full_name', 'full_name')
-      .addSelect('customer.email', 'email')
-      .addSelect('customer.address', 'address')
-      .addSelect('customer.note', 'note')
-      .addSelect('customer.active', 'active')
-      .addSelect('customer.created_at', 'created_at')
-      .addSelect(
-        `(SELECT COUNT(*) FROM pets p WHERE p.owner_id = customer.id AND p.deleted_at IS NULL)`,
-        'pet_count',
-      )
-      .addSelect(
-        `(SELECT MAX(a.start_at)
+    return (
+      qb
+        .select('customer.id', 'id')
+        .addSelect('customer.customer_code', 'customer_code')
+        .addSelect('customer.phone', 'phone')
+        .addSelect('customer.full_name', 'full_name')
+        .addSelect('customer.email', 'email')
+        // Ep sang chuoi ngay trong CHINH cau lenh: doc cot `date` bang getRawOne thi
+        // driver pg tra ve mot Date luc 00:00 GIO MAY CHU, va JSON.stringify se day no
+        // lech mui gio (1995-04-20 -> "1995-04-19T17:00:00Z"). `Pet.birthDate` khong
+        // dinh loi nay vi di qua entity chu khong qua raw query.
+        .addSelect("TO_CHAR(customer.date_of_birth, 'YYYY-MM-DD')", 'date_of_birth')
+        .addSelect('customer.address', 'address')
+        .addSelect('customer.note', 'note')
+        .addSelect('customer.active', 'active')
+        .addSelect('customer.created_at', 'created_at')
+        .addSelect(
+          `(SELECT COUNT(*) FROM pets p WHERE p.owner_id = customer.id AND p.deleted_at IS NULL)`,
+          'pet_count',
+        )
+        .addSelect(
+          `(SELECT MAX(a.start_at)
             FROM appointments a
             JOIN pets p ON p.id = a.pet_id
            WHERE p.owner_id = customer.id
              AND a.status = '${AppointmentStatus.COMPLETED}'
              AND a.deleted_at IS NULL
              AND p.deleted_at IS NULL)`,
-        'last_visit_at',
-      );
+          'last_visit_at',
+        )
+    );
   }
 
   private toListRow(row: RawCustomerRow): CustomerListRow {
     return {
       id: row.id,
+      customerCode: row.customer_code,
       phone: row.phone,
       fullName: row.full_name,
       email: row.email,
+      dateOfBirth: row.date_of_birth,
       address: row.address,
       note: row.note,
       active: row.active,
@@ -448,15 +584,42 @@ export class CustomersService {
 
 interface RawCustomerRow {
   id: string;
+  customer_code: string | null;
   phone: string;
   full_name: string;
   email: string | null;
+  date_of_birth: string | null;
   address: string | null;
   note: string | null;
   active: boolean;
   created_at: string;
   pet_count: string;
   last_visit_at: string | null;
+}
+
+interface RawCustomerAppointmentRow {
+  appointment_id: string;
+  start_at: string;
+  end_at: string;
+  status: AppointmentStatus;
+  priority_color: PriorityColor | null;
+  pet_id: string;
+  pet_name: string;
+  doctor_name: string | null;
+  branch_name: string | null;
+  service_name: string | null;
+}
+
+interface RawCustomerMedicalHistoryRow {
+  examination_id: string;
+  appointment_id: string;
+  examined_at: string;
+  diagnosis_text: string | null;
+  disease_groups: string[] | null;
+  pet_id: string;
+  pet_name: string;
+  doctor_name: string | null;
+  branch_name: string | null;
 }
 
 interface RawTransactionRow {

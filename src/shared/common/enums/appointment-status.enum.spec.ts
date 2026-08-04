@@ -36,24 +36,62 @@ describe('isValidAppointmentStatusTransition', () => {
     }
   });
 
-  it('cho phep tu trang thai chua ket thuc di thang toi bat ky trang thai ket thuc nao', () => {
+  it('cho phep huy / danh vang tu MOI trang thai chua ket thuc', () => {
     const nonTerminal = [
       AppointmentStatus.PENDING,
       AppointmentStatus.CONFIRMED,
       AppointmentStatus.CHECKED_IN,
       AppointmentStatus.IN_PROGRESS,
     ];
-    const terminal = [
-      AppointmentStatus.COMPLETED,
-      AppointmentStatus.CANCELLED,
-      AppointmentStatus.NO_SHOW,
-    ];
 
     for (const from of nonTerminal) {
-      for (const to of terminal) {
-        expect(isValidAppointmentStatusTransition(from, to)).toBe(true);
-      }
+      expect(isValidAppointmentStatusTransition(from, AppointmentStatus.CANCELLED)).toBe(true);
+      expect(isValidAppointmentStatusTransition(from, AppointmentStatus.NO_SHOW)).toBe(true);
     }
+  });
+
+  // BR-06: "Appointment chi duoc hoan thanh sau khi pet da duoc tiep nhan."
+  describe('BR-06 - COMPLETED phai di qua tiep nhan', () => {
+    it('chan hoan tat mot lich chua duoc tiep nhan', () => {
+      expect(
+        isValidAppointmentStatusTransition(AppointmentStatus.PENDING, AppointmentStatus.COMPLETED),
+      ).toBe(false);
+      expect(
+        isValidAppointmentStatusTransition(
+          AppointmentStatus.CONFIRMED,
+          AppointmentStatus.COMPLETED,
+        ),
+      ).toBe(false);
+    });
+
+    it('cho phep hoan tat sau khi da check-in hoac dang kham', () => {
+      expect(
+        isValidAppointmentStatusTransition(
+          AppointmentStatus.CHECKED_IN,
+          AppointmentStatus.COMPLETED,
+        ),
+      ).toBe(true);
+      expect(
+        isValidAppointmentStatusTransition(
+          AppointmentStatus.IN_PROGRESS,
+          AppointmentStatus.COMPLETED,
+        ),
+      ).toBe(true);
+    });
+
+    it('luong day du: dat lich -> xac nhan -> check-in -> vao phong -> hoan tat', () => {
+      const flow = [
+        AppointmentStatus.PENDING,
+        AppointmentStatus.CONFIRMED,
+        AppointmentStatus.CHECKED_IN,
+        AppointmentStatus.IN_PROGRESS,
+        AppointmentStatus.COMPLETED,
+      ];
+
+      for (let i = 0; i < flow.length - 1; i += 1) {
+        expect(isValidAppointmentStatusTransition(flow[i], flow[i + 1])).toBe(true);
+      }
+    });
   });
 
   it('cho phep tien ve phia truoc giua cac trang thai chua ket thuc', () => {

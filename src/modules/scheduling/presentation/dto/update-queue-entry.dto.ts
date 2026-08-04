@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import { QueueStatus } from '@/shared/common/enums/queue-status.enum';
 
@@ -21,4 +21,13 @@ export class UpdateQueueEntryDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  /**
+   * Ly do huy luot cho, chi co nghia khi `status = CANCELLED` (FR-05-04). Bo trong thi
+   * he thong ghi "Khách bỏ về trước khi được khám" - luu vet khong duoc phep rong.
+   */
+  @IsOptional()
+  @IsString({ message: 'Lý do hủy không hợp lệ' })
+  @MaxLength(500, { message: 'Lý do hủy không được vượt quá 500 ký tự' })
+  reason?: string;
 }

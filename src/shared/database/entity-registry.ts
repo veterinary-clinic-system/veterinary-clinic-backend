@@ -18,6 +18,8 @@ export * from '@/modules/identity/domain/entities/user.entity';
 export * from '@/modules/identity/domain/entities/refresh-token.entity';
 export * from '@/modules/identity/domain/entities/doctor.entity';
 export * from '@/modules/identity/domain/entities/audit-log.entity';
+export * from '@/modules/identity/domain/entities/role-permission.entity';
+export * from '@/modules/identity/domain/entities/employee.entity';
 
 export * from '@/modules/organization/domain/entities/branch.entity';
 export * from '@/modules/organization/domain/entities/operating-hour.entity';

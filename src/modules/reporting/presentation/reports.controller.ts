@@ -1,19 +1,22 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Roles } from '@/shared/common/decorators/roles.decorator';
-import { Role } from '@/shared/common/enums/role.enum';
+import { RequirePermissions } from '@/shared/common/decorators/require-permissions.decorator';
+import { Permission } from '@/shared/common/enums/permission.enum';
 import { ReportsService } from '@/modules/reporting/application/reports.service';
 import { DateRangeQueryDto } from './dto/date-range-query.dto';
 import { RevenueFilterQueryDto } from './dto/revenue-filter-query.dto';
 import { RevenueQueryDto } from './dto/revenue-query.dto';
 
 /**
- * Read-only reporting/analytics dashboard for management - all routes are an
- * ADMIN/RECEPTIONIST capability (Section 4.1.5-style "statistics" screens), never
- * exposed to Doctor or PetOwner accounts.
+ * Bao cao/thong ke chi doc danh cho quan ly.
+ *
+ * SUA MOT LOI PHAN QUYEN: truoc day la `@Roles(Role.ADMIN, Role.RECEPTIONIST)`, tuc la
+ * le tan xem duoc toan bo doanh thu. BR-15 cua SRS noi ro "Chi Manager/Admin duoc xem
+ * bao cao doanh thu". Nay chuyen sang `REPORT_VIEW`, va trong ma tran mac dinh chi
+ * ADMIN va MANAGER co quyen do.
  */
 @ApiTags('reports')
-@Roles(Role.ADMIN, Role.RECEPTIONIST)
+@RequirePermissions(Permission.REPORT_VIEW)
 @Controller('reports')
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}

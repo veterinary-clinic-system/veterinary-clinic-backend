@@ -12,6 +12,8 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { Public } from '@/shared/common/decorators/public.decorator';
 import { Roles } from '@/shared/common/decorators/roles.decorator';
+import { RequirePermissions } from '@/shared/common/decorators/require-permissions.decorator';
+import { Permission } from '@/shared/common/enums/permission.enum';
 import { Role } from '@/shared/common/enums/role.enum';
 import { BranchesService } from '@/modules/organization/application/branches.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
@@ -35,6 +37,7 @@ export class BranchesController {
    * generic wildcard) so a request to `/branches/admin` isn't swallowed by `:id`.
    */
   @Roles(Role.ADMIN)
+  @RequirePermissions(Permission.BRANCH_MANAGE)
   @Get('admin')
   findAllAdmin() {
     return this.branchesService.findAllAdmin();
@@ -47,12 +50,14 @@ export class BranchesController {
   }
 
   @Roles(Role.ADMIN)
+  @RequirePermissions(Permission.BRANCH_MANAGE)
   @Post()
   create(@Body() dto: CreateBranchDto) {
     return this.branchesService.create(dto);
   }
 
   @Roles(Role.ADMIN)
+  @RequirePermissions(Permission.BRANCH_MANAGE)
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateBranchDto) {
     return this.branchesService.update(id, dto);
@@ -60,6 +65,7 @@ export class BranchesController {
 
   /** Body is a raw JSON array, so `ParseArrayPipe` (not a wrapper DTO) validates each item. */
   @Roles(Role.ADMIN)
+  @RequirePermissions(Permission.BRANCH_MANAGE)
   @Put(':id/opening-hours')
   replaceOpeningHours(
     @Param('id', ParseUUIDPipe) id: string,

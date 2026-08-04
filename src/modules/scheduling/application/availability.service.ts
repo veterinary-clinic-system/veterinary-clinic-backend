@@ -1,13 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
-import { format } from 'date-fns';
+import { addDays, addMonths, format, startOfMonth } from 'date-fns';
 import type Redis from 'ioredis';
 import { OperatingHour } from '@/modules/organization/domain/entities/operating-hour.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
 import { DoctorBreak } from '@/modules/scheduling/domain/entities/doctor-break.entity';
 import { DoctorShift } from '@/modules/scheduling/domain/entities/doctor-shift.entity';
-import { SLOT_BLOCKING_STATUSES } from '@/shared/common/enums/appointment-status.enum';
+import {
+  AppointmentStatus,
+  SLOT_BLOCKING_STATUSES,
+} from '@/shared/common/enums/appointment-status.enum';
+import { PRIORITY_COLOR_SEVERITY, PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import { REDIS_CLIENT } from '@/shared/redis/redis.constants';
 import {
   generateSlots,
@@ -36,6 +40,61 @@ export interface DayAvailability {
   dayOfWeek: number;
   isBranchOpen: boolean;
   slots: SlotInfo[];
+}
+
+/** Mot o ngay trong che do THANG (FR-05-03) - chi so lieu tong hop, khong co luoi slot. */
+export interface MonthDaySummary {
+  /** 'yyyy-MM-dd'. */
+  date: string;
+  dayOfWeek: number;
+  isBranchOpen: boolean;
+  /** So lich hen con hieu luc (chua bi huy / khach khong den). */
+  appointmentCount: number;
+  /** So lich da huy hoac khach khong den - de o lich thang khong "mat" chung. */
+  closedCount: number;
+  /** Mau uu tien NANG NHAT trong ngay; null khi khong lich nao duoc gan mau. */
+  topPriorityColor: PriorityColor | null;
+}
+
+export interface MonthOverview {
+  /** 'yyyy-MM'. */
+  month: string;
+  days: MonthDaySummary[];
+}
+
+/** Trang thai lich hen van "con hieu luc" - dung cho so dem cua che do thang. */
+const ACTIVE_STATUS_LIST = [
+  AppointmentStatus.PENDING,
+  AppointmentStatus.CONFIRMED,
+  AppointmentStatus.CHECKED_IN,
+  AppointmentStatus.IN_PROGRESS,
+  AppointmentStatus.COMPLETED,
+]
+  .map((status) => `'${status}'`)
+  .join(', ');
+
+/** Bang rank cua `PRIORITY_COLOR_SEVERITY`, viet duoi dang SQL. 99 = chua gan mau. */
+const PRIORITY_RANK_SQL = `CASE appointment.priority_color
+    ${Object.entries(PRIORITY_COLOR_SEVERITY)
+      .map(([color, rank]) => `WHEN '${color}' THEN ${rank}`)
+      .join('\n    ')}
+    ELSE 99
+  END`;
+
+const RANK_TO_PRIORITY_COLOR = new Map<number, PriorityColor>(
+  Object.entries(PRIORITY_COLOR_SEVERITY).map(([color, rank]) => [rank, color as PriorityColor]),
+);
+
+function rankToPriorityColor(rank: string | number | null | undefined): PriorityColor | null {
+  if (rank === null || rank === undefined) return null;
+  return RANK_TO_PRIORITY_COLOR.get(Number(rank)) ?? null;
+}
+
+interface RawMonthDayRow {
+  date: string;
+  active_count: string;
+  closed_count: string;
+  top_priority_rank: string | null;
 }
 
 /**
@@ -195,6 +254,79 @@ export class AvailabilityService {
       days.push(await this.getDoctorDayAvailability(doctorId, branchId, date));
     }
     return days;
+  }
+
+  /**
+   * Che do THANG cua lich lam viec (FR-05-03).
+   *
+   * CO Y khong dung lai `getDoctorDayAvailability`: dung luoi slot 30 phut cho ca thang
+   * la ~30 x 20 o cho moi bac si, chi de ve mot con so dem tren moi o lich - vua nang
+   * vua lam phinh cache Redis. O day chi can MOT cau lenh gom nhom theo ngay; NFR-02
+   * doi che do thang duoi 500ms.
+   *
+   * `doctorId` tuy chon: bo trong = toan bo chi nhanh (goc nhin cua quan ly), co gia
+   * tri = loc theo mot bac si nhu hai che do kia.
+   */
+  async getMonthOverview(
+    branchId: string,
+    doctorId: string | undefined,
+    monthOf: Date,
+  ): Promise<MonthOverview> {
+    const monthStart = startOfMonth(monthOf);
+    const monthEnd = addMonths(monthStart, 1);
+
+    const qb = this.appointmentsRepository
+      .createQueryBuilder('appointment')
+      .select("TO_CHAR(appointment.start_at, 'YYYY-MM-DD')", 'date')
+      .addSelect(
+        `COUNT(*) FILTER (WHERE appointment.status IN (${ACTIVE_STATUS_LIST}))`,
+        'active_count',
+      )
+      .addSelect(
+        `COUNT(*) FILTER (WHERE appointment.status NOT IN (${ACTIVE_STATUS_LIST}))`,
+        'closed_count',
+      )
+      // Rank nho hon = nang hon (xem PRIORITY_COLOR_SEVERITY). MIN tren rank chinh la
+      // "mau uu tien cao nhat trong ngay"; 99 cho lich chua gan mau de chung khong
+      // thang MIN. Chi tinh tren lich CON HIEU LUC - neu khong, mot ngay ma moi ca deu
+      // da huy van hien nhan "Do - Cap cuu" tren o lich thang.
+      .addSelect(
+        `MIN(CASE WHEN appointment.status IN (${ACTIVE_STATUS_LIST}) THEN ${PRIORITY_RANK_SQL} END)`,
+        'top_priority_rank',
+      )
+      .where('appointment.branchId = :branchId', { branchId })
+      .andWhere('appointment.startAt >= :monthStart AND appointment.startAt < :monthEnd', {
+        monthStart,
+        monthEnd,
+      })
+      .groupBy("TO_CHAR(appointment.start_at, 'YYYY-MM-DD')");
+
+    if (doctorId) {
+      qb.andWhere('appointment.doctorId = :doctorId', { doctorId });
+    }
+
+    const rows = await qb.getRawMany<RawMonthDayRow>();
+    const byDate = new Map(rows.map((row) => [row.date, row]));
+
+    // Ngay chi nhanh mo cua chi phu thuoc thu trong tuan - mot truy van cho ca thang.
+    const operatingHours = await this.operatingHoursRepository.find({ where: { branchId } });
+    const openDaysOfWeek = new Set(operatingHours.map((hour) => hour.dayOfWeek));
+
+    const days: MonthDaySummary[] = [];
+    for (let cursor = monthStart; cursor < monthEnd; cursor = addDays(cursor, 1)) {
+      const dateStr = format(cursor, 'yyyy-MM-dd');
+      const row = byDate.get(dateStr);
+      days.push({
+        date: dateStr,
+        dayOfWeek: cursor.getDay(),
+        isBranchOpen: openDaysOfWeek.has(cursor.getDay()),
+        appointmentCount: Number(row?.active_count ?? 0),
+        closedCount: Number(row?.closed_count ?? 0),
+        topPriorityColor: rankToPriorityColor(row?.top_priority_rank),
+      });
+    }
+
+    return { month: format(monthStart, 'yyyy-MM'), days };
   }
 
   /** True when `inner` falls entirely inside `outer` (used for the shift-vs-slot check). */

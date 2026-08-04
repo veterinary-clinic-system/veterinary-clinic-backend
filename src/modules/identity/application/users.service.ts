@@ -13,7 +13,7 @@ import { User } from '@/modules/identity/domain/entities/user.entity';
 import { Branch } from '@/modules/organization/domain/entities/branch.entity';
 import { DoctorBreak } from '@/modules/scheduling/domain/entities/doctor-break.entity';
 import { DoctorShift } from '@/modules/scheduling/domain/entities/doctor-shift.entity';
-import { Role } from '@/shared/common/enums/role.enum';
+import { BRANCH_SCOPED_ROLES, Role } from '@/shared/common/enums/role.enum';
 import { PaginationQueryDto } from '@/shared/common/dto/pagination-query.dto';
 import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
 import { CreateUserDto } from '@/modules/identity/presentation/dto/create-user.dto';
@@ -77,8 +77,8 @@ export class UsersService {
         throw new BadRequestException('Branch not found');
       }
     }
-    if (dto.role === Role.DOCTOR && !branchId) {
-      throw new BadRequestException('branchId is required for doctor accounts');
+    if (BRANCH_SCOPED_ROLES.includes(dto.role) && !branchId) {
+      throw new BadRequestException(`branchId is required for ${dto.role} accounts`);
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);

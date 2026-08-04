@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { RequirePermissions } from '@/shared/common/decorators/require-permissions.decorator';
+import { Permission } from '@/shared/common/enums/permission.enum';
 import { Public } from '@/shared/common/decorators/public.decorator';
-import { Roles } from '@/shared/common/decorators/roles.decorator';
-import { Role } from '@/shared/common/enums/role.enum';
 import { SpeciesService } from '@/modules/pets/application/species.service';
 import { CreateBreedDto } from './dto/create-breed.dto';
 import { CreateSpeciesDto } from './dto/create-species.dto';
@@ -19,7 +19,7 @@ export class SpeciesController {
     return this.speciesService.findAll();
   }
 
-  @Roles(Role.ADMIN)
+  @RequirePermissions(Permission.CATALOG_MANAGE)
   @Post()
   create(@Body() dto: CreateSpeciesDto) {
     return this.speciesService.create(dto);
@@ -31,7 +31,7 @@ export class SpeciesController {
     return this.speciesService.findBreeds(id);
   }
 
-  @Roles(Role.ADMIN)
+  @RequirePermissions(Permission.CATALOG_MANAGE)
   @Post(':id/breeds')
   createBreed(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateBreedDto) {
     return this.speciesService.createBreed(id, dto);

@@ -343,9 +343,18 @@ export class QueueService {
    *   IN_ROOM   -> lich hen IN_PROGRESS (bac si bat dau kham)
    *   DONE      -> KHONG dong lich hen. Lich hen chi thanh COMPLETED khi bac si ghi
    *                phieu kham - dong no o day se lam phieu kham khong ghi duoc nua.
-   *   CANCELLED -> lich hen NO_SHOW (khach bo ve truoc khi duoc kham)
+   *   CANCELLED -> lich hen CANCELLED, kem luu vet (FR-05-04)
+   *
+   * Truoc P3, huy luot cho day lich hen sang NO_SHOW. Da sua thanh CANCELLED: khach
+   * DA buoc vao phong kham roi moi bo ve thi khong phai la "khong den". Gop chung hai
+   * viec lam bao cao ty le vang mat cua P10 sai, va FR-06-03 doi hai thao tac tach
+   * bach - "khong den" gio la `POST /appointments/:id/no-show` rieng.
    */
-  async update(id: string, dto: UpdateQueueEntryDto): Promise<QueueEntry> {
+  async update(
+    id: string,
+    dto: UpdateQueueEntryDto,
+    actor: AuthenticatedUser,
+  ): Promise<QueueEntry> {
     const entry = await this.findOne(id);
 
     if (dto.status && !isValidQueueStatusTransition(entry.status, dto.status)) {
@@ -355,12 +364,19 @@ export class QueueService {
     }
 
     const now = new Date();
+    // Ly do huy lan sang tan lich hen (FR-05-04) nen phai co gia tri ngay ca khi le tan
+    // bam huy ma khong go gi - de trong thi bao cao huy cua P10 lai la mot con so tron.
+    const cancelReason = dto.reason?.trim() || 'Khách bỏ về trước khi được khám';
+
     const patch = {
       ...(dto.status ? { status: dto.status } : {}),
       ...(dto.priorityColor ? { priorityColor: dto.priorityColor } : {}),
       ...(dto.note !== undefined ? { note: dto.note } : {}),
       ...(dto.status === QueueStatus.IN_ROOM ? { calledAt: now } : {}),
       ...(dto.status && TERMINAL_QUEUE_STATUSES.has(dto.status) ? { finishedAt: now } : {}),
+      // Luot cho giu ban sao ly do de man hinh hang cho hien duoc ma khong phai JOIN
+      // sang lich hen (luot cho cua khach vang lai chua chac da co lich hen).
+      ...(dto.status === QueueStatus.CANCELLED ? { cancelReason } : {}),
     };
     // `manager.update` voi mot object rong nem loi - mot PATCH khong doi gi thi chi
     // don gian tra ve nguyen trang.
@@ -384,7 +400,10 @@ export class QueueService {
         });
       } else if (dto.status === QueueStatus.CANCELLED) {
         await manager.update(Appointment, entry.appointmentId, {
-          status: AppointmentStatus.NO_SHOW,
+          status: AppointmentStatus.CANCELLED,
+          cancelledByUserId: actor.userId,
+          cancelledAt: now,
+          cancelReason,
         });
       }
     });

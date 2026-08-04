@@ -3,12 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApiTags } from '@nestjs/swagger';
 import { Notification } from '@/modules/notification/domain/entities/notification.entity';
-import { Roles } from '@/shared/common/decorators/roles.decorator';
-import { Role } from '@/shared/common/enums/role.enum';
+import { RequirePermissions } from '@/shared/common/decorators/require-permissions.decorator';
+import { Permission } from '@/shared/common/enums/permission.enum';
 
 @ApiTags('notifications')
 @Controller('notifications')
-@Roles(Role.ADMIN, Role.RECEPTIONIST, Role.DOCTOR)
+@RequirePermissions(Permission.APPOINTMENT_VIEW)
 export class NotificationsController {
   constructor(
     @InjectRepository(Notification)

@@ -2,6 +2,8 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '@/modules/identity/domain/entities/user.entity';
+import { assertCustomerCanOwnPets } from '@/modules/identity/domain/entities/customer-status';
+import { Breed } from '@/modules/pets/domain/entities/breed.entity';
 import { Pet } from '@/modules/pets/domain/entities/pet.entity';
 import { Role } from '@/shared/common/enums/role.enum';
 import { CreatePetInlineDto } from '@/modules/scheduling/presentation/dto/create-pet-inline.dto';
@@ -27,6 +29,7 @@ export class PartyResolverService {
   constructor(
     @InjectRepository(User) private readonly usersRepository: Repository<User>,
     @InjectRepository(Pet) private readonly petsRepository: Repository<Pet>,
+    @InjectRepository(Breed) private readonly breedsRepository: Repository<Breed>,
   ) {}
 
   /**
@@ -37,7 +40,10 @@ export class PartyResolverService {
   async resolveOwner(phone: string, fullName?: string, email?: string): Promise<User> {
     const existing = await this.usersRepository.findOne({ where: { phone } });
     if (existing) {
-      return existing;
+      // BR-02: khach da ngung hoat dong khong duoc gan them lich hen/luot kham moi.
+      // Chan ngay tai day thay vi de di tiep roi hong o buoc sau - le tan can biet
+      // phai kich hoat lai ho so khach truoc.
+      return assertCustomerCanOwnPets(existing);
     }
 
     return this.usersRepository.save(
@@ -67,6 +73,20 @@ export class PartyResolverService {
 
     if (!input.newPet) {
       throw new BadRequestException('Phải cung cấp petId hoặc newPet');
+    }
+
+    // BR-02 lan hai: `resolveOwner` da chan khach ngung hoat dong, nhung `resolvePet`
+    // la ham cong khai - mot luong moi goi thang vao day van phai vap phai luat nay.
+    assertCustomerCanOwnPets(owner);
+
+    // Muc 16 SRS: giong phai ton tai va phai thuoc dung loai bieu mau da chon. Truoc
+    // day `breedId` di thang xuong khoa ngoai - mot id sai se noi len thanh loi 500.
+    const breed = await this.breedsRepository.findOne({ where: { id: input.newPet.breedId } });
+    if (!breed) {
+      throw new BadRequestException('Không tìm thấy giống thú cưng đã chọn');
+    }
+    if (input.newPet.speciesId && breed.speciesId !== input.newPet.speciesId) {
+      throw new BadRequestException('Giống đã chọn không thuộc loài đã chọn');
     }
 
     return this.petsRepository.save(

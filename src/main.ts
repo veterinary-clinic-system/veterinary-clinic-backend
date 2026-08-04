@@ -35,6 +35,11 @@ async function bootstrap() {
       // doesn't hard-fail the request over it.
       transform: true,
       transformOptions: { enableImplicitConversion: true },
+      // Mot loi cho MOI truong, thay vi doi het luat cua truong do. Bo trong `reason`
+      // truoc day tra ve ca ba dong - trong do co "Ly do huy khong duoc vuot qua 500 ky
+      // tu" cho mot gia tri khong ton tai, doc nhu loi cua he thong chu khong phai loi
+      // cua nguoi nhap. Cac truong KHAC van bao loi day du.
+      stopAtFirstError: true,
     }),
   );
 

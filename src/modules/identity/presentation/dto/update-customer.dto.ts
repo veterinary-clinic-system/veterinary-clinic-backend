@@ -1,4 +1,12 @@
-import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsEmail,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 /**
  * `phone` va `role` khong duoc khai bao o day co chu dich (giong `UpdateUserDto`):
@@ -8,24 +16,28 @@ import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength, MinLength } from '
  */
 export class UpdateCustomerDto {
   @IsOptional()
-  @IsString()
-  @MinLength(2)
-  @MaxLength(255)
+  @IsString({ message: 'Vui lòng nhập họ tên khách hàng' })
+  @MinLength(2, { message: 'Họ tên phải có ít nhất 2 ký tự' })
+  @MaxLength(255, { message: 'Họ tên không được vượt quá 255 ký tự' })
   fullName?: string;
 
   @IsOptional()
-  @IsEmail()
+  @IsEmail({}, { message: 'Email không đúng định dạng' })
   email?: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString({}, { message: 'Ngày sinh không hợp lệ' })
+  dateOfBirth?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Địa chỉ không hợp lệ' })
   address?: string;
 
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Ghi chú không hợp lệ' })
   note?: string;
 
   @IsOptional()
-  @IsBoolean()
+  @IsBoolean({ message: 'Trạng thái hoạt động không hợp lệ' })
   active?: boolean;
 }

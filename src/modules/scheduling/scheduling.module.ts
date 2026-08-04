@@ -5,6 +5,7 @@ import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
 import { User } from '@/modules/identity/domain/entities/user.entity';
 import { Branch } from '@/modules/organization/domain/entities/branch.entity';
 import { OperatingHour } from '@/modules/organization/domain/entities/operating-hour.entity';
+import { Breed } from '@/modules/pets/domain/entities/breed.entity';
 import { Pet } from '@/modules/pets/domain/entities/pet.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
 import { DoctorBreak } from '@/modules/scheduling/domain/entities/doctor-break.entity';
@@ -26,6 +27,9 @@ import { QueueService } from '@/modules/scheduling/application/queue.service';
       QueueEntry,
       User,
       Pet,
+      // Doc-only: doi chieu giong <-> loai khi tao ho so thu cung ngay trong luong dat
+      // lich / tiep nhan khach vang lai (muc 16 SRS).
+      Breed,
       Doctor,
       Service,
       Branch,

@@ -13,6 +13,24 @@ import { RefreshToken } from './refresh-token.entity';
  */
 @Entity({ name: 'users' })
 export class User extends BaseEntity {
+  /**
+   * Ma khach hang doc duoc tai quay (`KH000123`) - SRS FR-03-01.
+   *
+   * CHI khach hang (`role = PET_OWNER`) co ma; tai khoan nhan vien de NULL (ho co
+   * `employees.employee_code` rieng). Gia tri do trigger `trg_assign_customer_code`
+   * cap o tang CSDL nen `insert/update: false` - ung dung khong bao gio ghi cot nay,
+   * chi doc lai sau khi luu.
+   */
+  @Column({
+    name: 'customer_code',
+    type: 'varchar',
+    length: 32,
+    nullable: true,
+    insert: false,
+    update: false,
+  })
+  customerCode: string | null;
+
   @Column({ name: 'phone', unique: true, length: 20 })
   @Index()
   phone: string;
@@ -42,6 +60,10 @@ export class User extends BaseEntity {
    * thay the duoc dia chi thuong tru cua khach. Voi tai khoan nhan vien hai cot nay
    * de trong.
    */
+  /** Ngay sinh khach hang (FR-03-01). Tai khoan nhan vien de trong. */
+  @Column({ name: 'date_of_birth', type: 'date', nullable: true })
+  dateOfBirth: string | null;
+
   @Column({ name: 'address', type: 'text', nullable: true })
   address: string | null;
 

@@ -3,13 +3,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApiTags } from '@nestjs/swagger';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
-import { Roles } from '@/shared/common/decorators/roles.decorator';
-import { Role } from '@/shared/common/enums/role.enum';
+import { RequirePermissions } from '@/shared/common/decorators/require-permissions.decorator';
+import { Permission } from '@/shared/common/enums/permission.enum';
 import { PrescreeningService } from '@/modules/triage/application/prescreening.service';
 
+/**
+ * Tien chan doan AI la phan MO RONG ngoai SRS, gan chat voi lich hen nen dung chung
+ * quyen `APPOINTMENT_VIEW` thay vi mo them mot nhom quyen rieng.
+ */
 @ApiTags('prescreening')
 @Controller('appointments/:appointmentId/prescreening')
-@Roles(Role.ADMIN, Role.RECEPTIONIST, Role.DOCTOR)
+@RequirePermissions(Permission.APPOINTMENT_VIEW)
 export class PrescreeningController {
   constructor(
     private readonly prescreeningService: PrescreeningService,

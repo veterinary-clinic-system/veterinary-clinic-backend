@@ -11,6 +11,7 @@ import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
 import {
   AppointmentStatus,
+  TERMINAL_APPOINTMENT_STATUSES,
   isValidAppointmentStatusTransition,
 } from '@/shared/common/enums/appointment-status.enum';
 import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user.interface';
@@ -84,11 +85,18 @@ export class ExaminationsService {
       );
     }
 
-    // Khong duoc ghi phieu kham cho mot lich hen da CANCELLED/NO_SHOW - lich da
-    // COMPLETED thi khong the toi day vi da bi chan boi kiem tra `existing` o tren.
+    // Ghi phieu kham dong luon lich hen thanh COMPLETED, nen phai hop le theo dung luat
+    // chuyen trang thai. Hai truong hop bi chan o day:
+    //   - Lich da CANCELLED/NO_SHOW: khong con gi de kham.
+    //   - **BR-06**: lich chua duoc TIEP NHAN (PENDING/CONFIRMED). Le tan phai check-in
+    //     truoc - neu khong, he thong se co nhung lan kham "hoan tat" ma con vat chua
+    //     bao gio buoc vao phong.
+    // Lich da COMPLETED khong the toi day vi da bi chan boi kiem tra `existing` o tren.
     if (!isValidAppointmentStatusTransition(appointment.status, AppointmentStatus.COMPLETED)) {
       throw new ConflictException(
-        `Khong the ghi phieu kham cho lich hen dang o trang thai "${appointment.status}"`,
+        TERMINAL_APPOINTMENT_STATUSES.has(appointment.status)
+          ? `Không thể ghi phiếu khám cho lịch hẹn đã ở trạng thái kết thúc ("${appointment.status}").`
+          : 'Chưa tiếp nhận thú cưng nên chưa thể ghi phiếu khám - vui lòng check-in tại quầy lễ tân trước (BR-06).',
       );
     }
 
