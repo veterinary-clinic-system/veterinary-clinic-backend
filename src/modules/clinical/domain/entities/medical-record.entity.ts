@@ -1,10 +1,11 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, OneToOne } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
 import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
 import { Pet } from '@/modules/pets/domain/entities/pet.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
 import { MedicalRecordStatus } from '@/shared/common/enums/medical-record-status.enum';
 import { Examination } from './examination.entity';
+import { Diagnosis } from './diagnosis.entity';
 
 /**
  * Ho so benh an - aggregate root cua SRS FR-07..FR-10.
@@ -83,5 +84,8 @@ export class MedicalRecord extends BaseEntity {
   @OneToOne(() => Examination, (examination) => examination.medicalRecord)
   examination?: Examination;
 
-  // `diagnoses` (P4-T2) va `treatments` (P4-T3) duoc noi vao day o task cua chung.
+  @OneToMany(() => Diagnosis, (diagnosis) => diagnosis.medicalRecord)
+  diagnoses?: Diagnosis[];
+
+  // `treatments` (P4-T3) duoc noi vao day o task cua no.
 }
