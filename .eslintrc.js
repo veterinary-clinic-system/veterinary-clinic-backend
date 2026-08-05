@@ -7,6 +7,7 @@ const MODULES = [
   'triage',
   'clinical',
   'billing',
+  'sales',
   'notification',
   'reporting',
 ];

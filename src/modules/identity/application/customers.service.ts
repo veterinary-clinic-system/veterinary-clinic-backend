@@ -12,6 +12,7 @@ import {
 } from '@/shared/common/enums/medical-record-status.enum';
 import { Invoice } from '@/modules/billing/domain/entities/invoice.entity';
 import { AppointmentStatus } from '@/shared/common/enums/appointment-status.enum';
+import { InvoiceStatus } from '@/shared/common/enums/invoice-status.enum';
 import { PaymentMethod } from '@/shared/common/enums/payment-method.enum';
 import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import { Role } from '@/shared/common/enums/role.enum';
@@ -46,11 +47,40 @@ export interface CustomerListRow {
 export interface CustomerDetail extends CustomerListRow {
   appointmentCount: number;
   completedAppointmentCount: number;
+  /** So hoa don KHAM (`source = CLINIC`) - dung cho nhan tab "Hoa don". */
   invoiceCount: number;
-  /** Tong tien DA THANH TOAN, don vi dong. Hoa don chua thanh toan khong tinh vao day. */
+  /** So hoa don BAN LE (`source = POS`) - dung cho nhan tab "Lich su mua hang" (P8-T9). */
+  purchaseCount: number;
+  /**
+   * TONG CHI TIEU: tien khach da thuc tra, gom CA hoa don kham lan hoa don ban le
+   * (acceptance P8-T9). Tinh tu bang `payments` chu khong tu co `paid` - hoa don tra
+   * mot phan phai duoc tinh dung phan da tra, va dong hoan tien (so am) tu tru ra.
+   */
   totalPaid: number;
-  /** Tong tien cua cac hoa don CHUA thanh toan, don vi dong. */
+  /** Con phai thu = tong hoa don chua huy/chua hoan tru di so da thu, khong bao gio am. */
   totalUnpaid: number;
+}
+
+/**
+ * Mot dong trong tab "Lich su mua hang" - mot hoa don BAN LE tai quay (P8-T9).
+ *
+ * Tach hoan toan khoi `CustomerTransactionRow` (hoa don kham): hai loai giao dich nay
+ * khong co chung truong nao dang ke ngoai so tien - ban le khong co thu cung, khong co
+ * bac si, khong co lich hen, con hoa don kham thi khong co danh sach mat hang de tom tat.
+ */
+export interface CustomerPurchaseRow {
+  invoiceId: string;
+  invoiceCode: string;
+  /** Thoi diem lap hoa don - voi ban le thi day cung la luc mua. */
+  purchasedAt: Date;
+  branchName: string | null;
+  status: InvoiceStatus;
+  /** Tom tat cac mat hang: "Thuc an hat x1, Vitamin x2". */
+  itemSummary: string;
+  itemCount: number;
+  totalAmount: number;
+  paidAt: Date | null;
+  paymentMethod: PaymentMethod | null;
 }
 
 /** Mot dong trong tab "Lich hen" cua ho so khach (FR-03-04). */
@@ -292,30 +322,72 @@ export class CustomersService {
       .where('pet.ownerId = :ownerId', { ownerId: id })
       .getRawOne<{ appointment_count: string; completed_count: string }>();
 
-    const money = await this.invoicesRepository
-      .createQueryBuilder('invoice')
-      .innerJoin('invoice.appointment', 'appointment')
-      .innerJoin('appointment.pet', 'pet')
-      .leftJoin('invoice.items', 'item')
-      .select('COUNT(DISTINCT invoice.id)', 'invoice_count')
-      .addSelect(
-        'COALESCE(SUM(item.price * item.quantity) FILTER (WHERE invoice.paid), 0)',
-        'total_paid',
-      )
-      .addSelect(
-        'COALESCE(SUM(item.price * item.quantity) FILTER (WHERE NOT invoice.paid), 0)',
-        'total_unpaid',
-      )
-      .where('pet.ownerId = :ownerId', { ownerId: id })
-      .getRawOne<{ invoice_count: string; total_paid: string; total_unpaid: string }>();
+    const money = await this.moneyStatsOf(id);
 
     return {
       ...this.toListRow(row),
       appointmentCount: Number(stats?.appointment_count ?? 0),
       completedAppointmentCount: Number(stats?.completed_count ?? 0),
-      invoiceCount: Number(money?.invoice_count ?? 0),
-      totalPaid: Number(money?.total_paid ?? 0),
-      totalUnpaid: Number(money?.total_unpaid ?? 0),
+      ...money,
+    };
+  }
+
+  /**
+   * So lieu tien cua mot khach - P8-T9.
+   *
+   * BA THAY DOI SO VOI BAN TRUOC P8, deu cung mot goc: hoa don khong con buoc phai gan
+   * vao lich hen.
+   *   1. Loc theo `invoices.customer_id` thay vi JOIN qua `appointment -> pet -> owner`.
+   *      JOIN cu bo qua toan bo hoa don ban le (chung khong co lich hen), nen tong chi
+   *      tieu se thieu dung phan khach mua hang tai quay.
+   *   2. Tien lay tu `invoices.total_amount` (da chot, da tru giam gia) thay vi
+   *      `SUM(price x quantity)` - hai so nay khac nhau ngay khi hoa don co giam gia.
+   *   3. So DA THU tinh tu bang `payments`, khong tu co `paid`: hoa don tra mot phan
+   *      phai duoc tinh dung phan da tra, va dong hoan tien mang so am tu tru ra.
+   *
+   * Hai truy van rieng thay vi mot: JOIN `payments` vao `invoices` roi SUM se nhan doi
+   * `total_amount` cua moi hoa don co nhieu lan tra.
+   */
+  private async moneyStatsOf(customerId: string): Promise<{
+    invoiceCount: number;
+    purchaseCount: number;
+    totalPaid: number;
+    totalUnpaid: number;
+  }> {
+    const [billed] = await this.invoicesRepository.query(
+      `
+      SELECT COUNT(*) FILTER (WHERE "source" = 'CLINIC')                       AS "clinic_count",
+             COUNT(*) FILTER (WHERE "source" = 'POS')                          AS "pos_count",
+             COALESCE(SUM("total_amount") FILTER (
+               WHERE "status" NOT IN ('CANCELLED', 'REFUNDED')
+             ), 0)                                                             AS "total_billed"
+      FROM "invoices"
+      WHERE "customer_id" = $1 AND "deleted_at" IS NULL
+      `,
+      [customerId],
+    );
+
+    const [received] = await this.invoicesRepository.query(
+      `
+      SELECT COALESCE(SUM(payment."amount"), 0) AS "total_paid"
+      FROM "payments" payment
+      JOIN "invoices" invoice ON invoice."id" = payment."invoice_id"
+      WHERE invoice."customer_id" = $1
+        AND invoice."deleted_at" IS NULL
+        AND payment."deleted_at" IS NULL
+        AND payment."status" IN ('SUCCESS', 'REFUNDED')
+      `,
+      [customerId],
+    );
+
+    const totalPaid = Number(received?.total_paid ?? 0);
+    const totalBilled = Number(billed?.total_billed ?? 0);
+
+    return {
+      invoiceCount: Number(billed?.clinic_count ?? 0),
+      purchaseCount: Number(billed?.pos_count ?? 0),
+      totalPaid,
+      totalUnpaid: Math.max(0, totalBilled - totalPaid),
     };
   }
 
@@ -472,6 +544,61 @@ export class CustomersService {
       paidAt: row.paid_at ? new Date(row.paid_at) : null,
       paymentMethod: row.payment_method,
       totalAmount: Number(row.total_amount),
+    }));
+  }
+
+  /**
+   * Lich su MUA HANG tai quay - P8-T9, tach khoi tab "Hoa don" (hoa don kham).
+   *
+   * Vi sao hai tab chu khong mot: hai loai giao dich tra loi hai cau hoi khac nhau. "Con
+   * thu cung nay da kham nhung gi, het bao nhieu" doc theo lich hen va bac si; "khach
+   * nay hay mua gi o quay" doc theo mat hang. Tron chung thi ca hai cot deu mot nua bo
+   * trong, va khong cau nao tra loi gon duoc.
+   */
+  async findPurchases(id: string): Promise<CustomerPurchaseRow[]> {
+    await this.findCustomerEntity(id);
+
+    const rows: RawPurchaseRow[] = await this.invoicesRepository.query(
+      `
+      SELECT invoice."id"                AS "invoice_id",
+             invoice."invoice_code"      AS "invoice_code",
+             invoice."created_at"        AS "purchased_at",
+             invoice."status"            AS "status",
+             invoice."total_amount"      AS "total_amount",
+             invoice."paid_at"           AS "paid_at",
+             invoice."payment_method"    AS "payment_method",
+             branch."branch_name"        AS "branch_name",
+             COALESCE(COUNT(line."id"), 0) AS "item_count",
+             COALESCE(
+               STRING_AGG(item."item_name" || ' x' || line."quantity", ', '
+                          ORDER BY item."item_name"),
+               ''
+             )                           AS "item_summary"
+      FROM "invoices" invoice
+      LEFT JOIN "branches" branch ON branch."id" = invoice."branch_id"
+      LEFT JOIN "invoice_items" line
+             ON line."invoice_id" = invoice."id" AND line."deleted_at" IS NULL
+      LEFT JOIN "items" item ON item."id" = line."item_id"
+      WHERE invoice."customer_id" = $1
+        AND invoice."source" = 'POS'
+        AND invoice."deleted_at" IS NULL
+      GROUP BY invoice."id", branch."branch_name"
+      ORDER BY invoice."created_at" DESC
+      `,
+      [id],
+    );
+
+    return rows.map((row) => ({
+      invoiceId: row.invoice_id,
+      invoiceCode: row.invoice_code,
+      purchasedAt: new Date(row.purchased_at),
+      branchName: row.branch_name,
+      status: row.status,
+      itemSummary: row.item_summary,
+      itemCount: Number(row.item_count),
+      totalAmount: Number(row.total_amount),
+      paidAt: row.paid_at ? new Date(row.paid_at) : null,
+      paymentMethod: row.payment_method,
     }));
   }
 
@@ -667,6 +794,20 @@ const CUSTOMER_DIAGNOSES_JSON_SUBQUERY = `(
    WHERE diag."medical_record_id" = "medicalRecord"."id"
      AND diag."deleted_at" IS NULL
 )`;
+
+/** Dong tho cua truy van lich su mua hang (P8-T9). */
+interface RawPurchaseRow {
+  invoice_id: string;
+  invoice_code: string;
+  purchased_at: string;
+  status: InvoiceStatus;
+  total_amount: string;
+  paid_at: string | null;
+  payment_method: PaymentMethod | null;
+  branch_name: string | null;
+  item_count: string;
+  item_summary: string;
+}
 
 interface RawTransactionRow {
   invoice_id: string;

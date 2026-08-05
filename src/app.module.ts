@@ -32,6 +32,7 @@ import { SchedulingModule } from '@/modules/scheduling/scheduling.module';
 import { TriageModule } from '@/modules/triage/triage.module';
 import { ClinicalModule } from '@/modules/clinical/clinical.module';
 import { BillingModule } from '@/modules/billing/billing.module';
+import { SalesModule } from '@/modules/sales/sales.module';
 import { NotificationModule } from '@/modules/notification/notification.module';
 import { ReportingModule } from '@/modules/reporting/reporting.module';
 import { StorageModule } from '@/shared/storage/storage.module';
@@ -77,6 +78,7 @@ import { StorageModule } from '@/shared/storage/storage.module';
     TriageModule,
     ClinicalModule,
     BillingModule,
+    SalesModule,
     NotificationModule,
     ReportingModule,
     StorageModule,

@@ -3,11 +3,17 @@ import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { InvoiceItem } from '@/modules/billing/domain/entities/invoice-item.entity';
 import { Invoice } from '@/modules/billing/domain/entities/invoice.entity';
+import { Payment } from '@/modules/billing/domain/entities/payment.entity';
+import { CatalogModule } from '@/modules/catalog/catalog.module';
 import { Item } from '@/modules/catalog/domain/entities/item.entity';
 import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
+import { User } from '@/modules/identity/domain/entities/user.entity';
+import { Branch } from '@/modules/organization/domain/entities/branch.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
 import { BillingController } from '@/modules/billing/presentation/billing.controller';
+import { PaymentsController } from '@/modules/billing/presentation/payments.controller';
 import { BillingService } from '@/modules/billing/application/billing.service';
+import { PaymentsService } from '@/modules/billing/application/payments.service';
 import { PAYMENT_PROVIDER } from '@/modules/billing/application/ports/payment.port';
 import { ManualPaymentAdapter } from '@/modules/billing/infrastructure/payment/manual-payment.adapter';
 import { VnpayPaymentAdapter } from '@/modules/billing/infrastructure/payment/vnpay-payment.adapter';
@@ -20,10 +26,25 @@ import { VnpayPaymentAdapter } from '@/modules/billing/infrastructure/payment/vn
  * resolve unit prices and to match lab test orders to a priced catalog entry.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Invoice, InvoiceItem, Appointment, MedicalRecord, Item])],
-  controllers: [BillingController],
+  imports: [
+    TypeOrmModule.forFeature([
+      Invoice,
+      InvoiceItem,
+      Payment,
+      Appointment,
+      MedicalRecord,
+      Item,
+      Branch,
+      User,
+    ]),
+    // Hoan tien mot hoa don POS phai tra hang ve kho (P8-T3) - di qua barrel
+    // `catalog/application`, cua duy nhat de dung toi ton kho.
+    CatalogModule,
+  ],
+  controllers: [BillingController, PaymentsController],
   providers: [
     BillingService,
+    PaymentsService,
     ManualPaymentAdapter,
     VnpayPaymentAdapter,
     {
@@ -36,6 +57,6 @@ import { VnpayPaymentAdapter } from '@/modules/billing/infrastructure/payment/vn
       ) => (config.get<string>('payment.provider') === 'vnpay' ? vnpay : manual),
     },
   ],
-  exports: [BillingService],
+  exports: [BillingService, PaymentsService],
 })
 export class BillingModule {}

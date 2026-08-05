@@ -62,6 +62,10 @@ export * from '@/modules/clinical/domain/entities/lab-test-order.entity';
 
 export * from '@/modules/billing/domain/entities/invoice.entity';
 export * from '@/modules/billing/domain/entities/invoice-item.entity';
+export * from '@/modules/billing/domain/entities/payment.entity';
+
+export * from '@/modules/sales/domain/entities/cart.entity';
+export * from '@/modules/sales/domain/entities/cart-item.entity';
 
 export * from '@/modules/notification/domain/entities/notification.entity';
 export * from '@/modules/notification/domain/entities/outbox-event.entity';

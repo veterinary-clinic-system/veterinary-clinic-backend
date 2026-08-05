@@ -66,6 +66,13 @@ export class CustomersController {
     return this.customersService.findMedicalHistory(id);
   }
 
+  /** Lich su mua hang tai quay (P8-T9) - tach khoi lich su giao dich kham o duoi. */
+  @RequirePermissions(Permission.CUSTOMER_VIEW, Permission.INVOICE_VIEW)
+  @Get(':id/purchases')
+  findPurchases(@Param('id', ParseUUIDPipe) id: string) {
+    return this.customersService.findPurchases(id);
+  }
+
   @RequirePermissions(Permission.CUSTOMER_VIEW, Permission.INVOICE_VIEW)
   @Get(':id/transactions')
   findTransactions(@Param('id', ParseUUIDPipe) id: string) {

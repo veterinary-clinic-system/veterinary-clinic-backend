@@ -1,22 +1,23 @@
 import { IsEnum, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { PaymentMethod } from '@/shared/common/enums/payment-method.enum';
 
-export class PayInvoiceDto {
+/** POST /pos/carts/:id/checkout - UC-04. */
+export class CheckoutCartDto {
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod;
 
   /**
-   * So tien cua LAN tra nay. Bo trong = tra het phan con lai (hanh vi truoc P8-T2, giu
-   * nguyen de man hinh hoa don cu khong phai doi).
+   * So tien khach dua. Bo trong = tra du.
    *
-   * Tra du bi tu choi 409 chu khong lam tron - xem `PaymentsService.record`.
+   * Cho phep tra thieu (hoa don ve `PARTIALLY_PAID`) vi ban chiu mot phan cho khach quen
+   * la co that o cua hang nho; tra DU thi bi tu choi 409 - phan thua la tien thoi lai,
+   * khong phai doanh thu (xem `PaymentsService.record`).
    */
   @IsOptional()
   @IsInt()
   @Min(1)
-  amount?: number;
+  amountPaid?: number;
 
-  /** Ma giao dich ben ngoai (UNC chuyen khoan, ma VNPay) - de ke toan doi soat. */
   @IsOptional()
   @IsString()
   @MaxLength(128)
