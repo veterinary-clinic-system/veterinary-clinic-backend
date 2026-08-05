@@ -105,13 +105,12 @@ export class BillingService {
             lines.push({
               itemId: prescriptionItem.medication.item.id,
               price: prescriptionItem.medication.item.unitPrice,
-              // ASSUMPTION: medications are billed per day of the prescribed course, i.e.
-              // quantity = durationDays, not a per-dose unit count (tablets/ml actually
-              // dispensed). PrescriptionItem only stores a free-text `dosage` string
-              // (e.g. "1 tablet twice a day") with no structured frequency field to
-              // multiply out, so `durationDays` is the only structured quantity signal
-              // available to bill against.
-              quantity: prescriptionItem.durationDays,
+              // Tu P7-T1: tinh tien theo SO LUONG THUC CAP do bac si nhap, khong con
+              // phai lay tam `durationDays` nua. Hoa don da lap truoc do khong doi so:
+              // gia da duoc chot trong `invoice_items`, va migration
+              // `1793000000000` backfill `quantity = duration_days` nen ngay ca khi
+              // lap lai hoa don cho don thuoc cu, ket qua van y het cong thuc cu.
+              quantity: prescriptionItem.quantity,
             });
           }
         }

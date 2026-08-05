@@ -8,3 +8,5 @@
  */
 export { ExaminationsService } from './examinations.service';
 export { MedicalRecordsService } from './medical-records.service';
+export { PrescriptionsService } from './prescriptions.service';
+export type { PrescriptionItemStock, PrescriptionView } from './prescriptions.service';

@@ -1,18 +1,19 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
-import { InventoryItem } from '@/modules/catalog/domain/entities/inventory-item.entity';
-import { Medication } from '@/modules/catalog/domain/entities/medication.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { Examination } from '@/modules/clinical/domain/entities/examination.entity';
 import { LabTestOrder } from '@/modules/clinical/domain/entities/lab-test-order.entity';
 import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
-import { PrescriptionItem } from '@/modules/clinical/domain/entities/prescription-item.entity';
 import { Prescription } from '@/modules/clinical/domain/entities/prescription.entity';
 import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
 import { MedicalRecordStatus } from '@/shared/common/enums/medical-record-status.enum';
 import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user.interface';
 import { MedicalRecordsService } from '@/modules/clinical/application/medical-records.service';
+import {
+  PrescriptionView,
+  PrescriptionsService,
+} from '@/modules/clinical/application/prescriptions.service';
 import { CreateExaminationDto } from '@/modules/clinical/presentation/dto/create-examination.dto';
 import { UpdateExaminationDto } from '@/modules/clinical/presentation/dto/update-examination.dto';
 import { CreatePrescriptionDto } from '@/modules/clinical/presentation/dto/create-prescription.dto';
@@ -54,13 +55,10 @@ export class ExaminationsService {
     @InjectRepository(Examination) private readonly examinationsRepository: Repository<Examination>,
     @InjectRepository(Appointment) private readonly appointmentsRepository: Repository<Appointment>,
     @InjectRepository(Doctor) private readonly doctorsRepository: Repository<Doctor>,
-    @InjectRepository(Prescription)
-    private readonly prescriptionsRepository: Repository<Prescription>,
     @InjectRepository(LabTestOrder)
     private readonly labTestOrdersRepository: Repository<LabTestOrder>,
-    @InjectRepository(Medication) private readonly medicationsRepository: Repository<Medication>,
-    @InjectDataSource() private readonly dataSource: DataSource,
     private readonly medicalRecordsService: MedicalRecordsService,
+    private readonly prescriptionsService: PrescriptionsService,
   ) {}
 
   /**
@@ -166,91 +164,29 @@ export class ExaminationsService {
    * Duong vao van la id PHIEU KHAM (giao dien hien tai goi
    * `POST /examinations/:id/prescriptions`) nhung don thuoc duoc ghi vao HO SO cua
    * phieu kham do - khoa ngoai da doi o P4-T6.
+   *
+   * Tu P7, toan bo nghiep vu don thuoc nam o `PrescriptionsService`; ham nay chi con la
+   * cua vao cu duoc giu lai cho giao dien hien co. HAI THAY DOI QUAN TRONG so voi truoc:
+   *
+   *   1. KE DON KHONG CON TRU KHO. Ke khong phai la giao - thuoc chi roi kho khi duoc si
+   *      bam cap phat (`PrescriptionsService.dispense`, BR-10).
+   *   2. Doan tru kho cu ghi thang vao `inventory_items`, bo qua lo va so cai. Ke tu P6
+   *      do la viec bi cam: no pha bat bien `SUM(quantityChange) = inventory_quantity`.
+   *
+   * Ke don gio chi CANH BAO khi thieu hang - `stockCheck` trong ket qua tra ve cho biet
+   * dong nao thieu (FR-11-02).
    */
   async createPrescription(
     examinationId: string,
     dto: CreatePrescriptionDto,
-  ): Promise<Prescription> {
-    const examination = await this.examinationsRepository.findOne({
-      where: { id: examinationId },
-      relations: ['appointment', 'medicalRecord'],
-    });
-    if (!examination) {
-      throw new NotFoundException('Examination not found');
-    }
-    const medicalRecordId = this.requireMedicalRecordId(examination);
-
-    const medicationIds = [...new Set(dto.items.map((item) => item.medicationId))];
-    const medications = await this.medicationsRepository.find({ where: { id: In(medicationIds) } });
-    if (medications.length !== medicationIds.length) {
-      const foundIds = new Set(medications.map((m) => m.id));
-      const missing = medicationIds.filter((id) => !foundIds.has(id));
-      throw new NotFoundException(`Medication(s) not found: ${missing.join(', ')}`);
-    }
-    const medicationById = new Map(medications.map((m) => [m.id, m]));
-
-    const saved = await this.dataSource.transaction(async (manager) => {
-      // Prescription.items has { cascade: true } (see prescription.entity.ts) so saving
-      // the Prescription with its `items` array populated inserts both in one go.
-      const prescription = manager.create(Prescription, {
-        medicalRecordId,
-        notes: dto.notes ?? null,
-        items: dto.items.map((item) =>
-          manager.create(PrescriptionItem, {
-            medicationId: item.medicationId,
-            dosage: item.dosage,
-            durationDays: item.durationDays,
-            instructions: item.instructions ?? null,
-          }),
-        ),
-      });
-      const savedPrescription = await manager.save(prescription);
-
-      // Tru kho tai chi nhanh noi kham, cung transaction voi viec tao don thuoc - ke
-      // don va tru kho phai thanh cong/that bai cung nhau. `durationDays` duoc dung
-      // lam so luong (cung mot gia dinh da neu trong billing.service.ts: `dosage` chi
-      // la text tu do "1 vien x 2 lan/ngay", khong co tan suat co cau truc de nhan
-      // chinh xac hon).
-      //
-      // Neu KHONG co ban ghi InventoryItem cho (thuoc, chi nhanh) nay - bo qua, khong
-      // bao loi: khong phai thuoc nao cung bat buoc phai quan ly ton kho qua man hinh
-      // Inventory. Neu CO ban ghi nhung khong du - chan toan bo don thuoc (giu dung quy
-      // uoc da co san o InventoryService.update(): so luong ket qua khong duoc am), bat
-      // le tan/bac si biet ma bo sung kho truoc khi hoan tat don, thay vi de kho am
-      // trong im lang.
-      for (const item of dto.items) {
-        const medication = medicationById.get(item.medicationId)!;
-        const inventoryItem = await manager.findOne(InventoryItem, {
-          where: { itemId: medication.itemId, branchId: examination.appointment.branchId },
-        });
-        if (!inventoryItem) continue;
-
-        const remaining = inventoryItem.inventoryQuantity - item.durationDays;
-        if (remaining < 0) {
-          throw new ConflictException(
-            `Khong du ton kho cho thuoc "${medication.item.itemName}" tai chi nhanh nay ` +
-              `(con ${inventoryItem.inventoryQuantity}, can ${item.durationDays})`,
-          );
-        }
-        await manager.update(InventoryItem, inventoryItem.id, { inventoryQuantity: remaining });
-      }
-
-      return savedPrescription;
-    });
-
-    return this.prescriptionsRepository.findOne({
-      where: { id: saved.id },
-      relations: ['items', 'items.medication', 'items.medication.item'],
-    }) as Promise<Prescription>;
+  ): Promise<PrescriptionView> {
+    const examination = await this.loadOrThrow(examinationId);
+    return this.prescriptionsService.create(this.requireMedicalRecordId(examination), dto);
   }
 
   async listPrescriptions(examinationId: string): Promise<Prescription[]> {
     const medicalRecordId = this.requireMedicalRecordId(await this.loadOrThrow(examinationId));
-    return this.prescriptionsRepository.find({
-      where: { medicalRecordId },
-      relations: ['items', 'items.medication', 'items.medication.item'],
-      order: { createdAt: 'ASC' },
-    });
+    return this.prescriptionsService.findByMedicalRecord(medicalRecordId);
   }
 
   /** Section 4.1.4: "order lab tests" - result is filled in later via updateLabTest. */

@@ -1,5 +1,7 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
+import { PrescriptionStatus } from '@/shared/common/enums/prescription-status.enum';
+import { User } from '@/modules/identity/domain/entities/user.entity';
 import { MedicalRecord } from './medical-record.entity';
 import { PrescriptionItem } from './prescription-item.entity';
 
@@ -12,6 +14,8 @@ import { PrescriptionItem } from './prescription-item.entity';
  * don thuoc la mot KHOI CUA HO SO BENH AN chu khong phai cua rieng phan sinh hieu.
  */
 @Entity({ name: 'prescriptions' })
+// Truy van nong nhat cua quay thuoc: "cac don dang cho cap phat, cu nhat truoc".
+@Index('idx_prescriptions_status_created', ['status', 'createdAt'])
 export class Prescription extends BaseEntity {
   @ManyToOne(() => MedicalRecord, (record) => record.prescriptions, {
     onDelete: 'CASCADE',
@@ -24,6 +28,29 @@ export class Prescription extends BaseEntity {
 
   @Column({ name: 'notes', type: 'text', nullable: true })
   notes: string | null;
+
+  /** Vong doi FR-11-03 - xem `prescription-status.enum.ts`. */
+  @Column({
+    name: 'status',
+    type: 'enum',
+    enum: PrescriptionStatus,
+    default: PrescriptionStatus.PRESCRIBED,
+  })
+  status: PrescriptionStatus;
+
+  /**
+   * Duoc si da cap phat. `ON DELETE SET NULL`: nhan vien nghi viec khong duoc lam mat
+   * don thuoc - cung danh doi da chap nhan o `InventoryTransaction.performedByUser`.
+   */
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'dispensed_by_user_id' })
+  dispensedByUser: User | null;
+
+  @Column({ name: 'dispensed_by_user_id', type: 'uuid', nullable: true })
+  dispensedByUserId: string | null;
+
+  @Column({ name: 'dispensed_at', type: 'timestamptz', nullable: true })
+  dispensedAt: Date | null;
 
   @OneToMany(() => PrescriptionItem, (item) => item.prescription, { cascade: true })
   items?: PrescriptionItem[];

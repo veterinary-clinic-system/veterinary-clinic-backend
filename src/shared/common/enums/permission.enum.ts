@@ -37,6 +37,12 @@ export enum Permission {
   MEDICAL_RECORD_CREATE = 'MEDICAL_RECORD_CREATE',
   MEDICAL_RECORD_UPDATE = 'MEDICAL_RECORD_UPDATE',
 
+  // Don thuoc & cap phat (P7 - FR-11)
+  PRESCRIPTION_VIEW = 'PRESCRIPTION_VIEW',
+  PRESCRIPTION_CREATE = 'PRESCRIPTION_CREATE',
+  /** Cap phat thuoc va tru kho - tach khoi CREATE vi day la hai vai tro khac nhau. */
+  PRESCRIPTION_DISPENSE = 'PRESCRIPTION_DISPENSE',
+
   // Danh muc (dich vu, thuoc, san pham)
   CATALOG_VIEW = 'CATALOG_VIEW',
   CATALOG_MANAGE = 'CATALOG_MANAGE',
@@ -89,6 +95,11 @@ export const PERMISSION_GROUPS: Record<string, Permission[]> = {
     Permission.MEDICAL_RECORD_CREATE,
     Permission.MEDICAL_RECORD_UPDATE,
   ],
+  'Đơn thuốc': [
+    Permission.PRESCRIPTION_VIEW,
+    Permission.PRESCRIPTION_CREATE,
+    Permission.PRESCRIPTION_DISPENSE,
+  ],
   'Danh mục': [Permission.CATALOG_VIEW, Permission.CATALOG_MANAGE],
   Kho: [Permission.INVENTORY_VIEW, Permission.INVENTORY_IMPORT, Permission.INVENTORY_EXPORT],
   'Bán hàng': [Permission.POS_SELL],
@@ -140,6 +151,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     Permission.QUEUE_VIEW,
     Permission.QUEUE_MANAGE,
     Permission.MEDICAL_RECORD_VIEW,
+    Permission.PRESCRIPTION_VIEW,
     Permission.CATALOG_VIEW,
     Permission.CATALOG_MANAGE,
     Permission.INVENTORY_VIEW,
@@ -168,6 +180,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     Permission.MEDICAL_RECORD_VIEW,
     Permission.MEDICAL_RECORD_CREATE,
     Permission.MEDICAL_RECORD_UPDATE,
+    // Bac si KE don nhung KHONG cap phat - SRS 4.5 giao viec cap phat cho duoc si, va
+    // tach hai quyen nay chinh la cai lam nen the kiem tra cheo cua quy trinh dung thuoc.
+    Permission.PRESCRIPTION_VIEW,
+    Permission.PRESCRIPTION_CREATE,
     Permission.CATALOG_VIEW,
     Permission.INVENTORY_VIEW,
     Permission.INVOICE_VIEW,
@@ -190,6 +206,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     Permission.QUEUE_VIEW,
     Permission.QUEUE_MANAGE,
     Permission.MEDICAL_RECORD_VIEW,
+    Permission.PRESCRIPTION_VIEW,
     Permission.CATALOG_VIEW,
     Permission.INVENTORY_VIEW,
     Permission.INVOICE_VIEW,
@@ -204,6 +221,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     Permission.CUSTOMER_VIEW,
     Permission.PET_VIEW,
     Permission.MEDICAL_RECORD_VIEW,
+    // Duoc si CAP PHAT nhung KHONG ke don - mat con lai cua the kiem tra cheo o tren.
+    Permission.PRESCRIPTION_VIEW,
+    Permission.PRESCRIPTION_DISPENSE,
     Permission.CATALOG_VIEW,
     Permission.CATALOG_MANAGE,
     Permission.INVENTORY_VIEW,

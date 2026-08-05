@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { InventoryItem } from '@/modules/catalog/domain/entities/inventory-item.entity';
+import { CatalogModule } from '@/modules/catalog/catalog.module';
 import { Medication } from '@/modules/catalog/domain/entities/medication.entity';
 import { Examination } from '@/modules/clinical/domain/entities/examination.entity';
 import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
@@ -18,8 +18,10 @@ import {
   MedicalRecordsController,
   TreatmentsController,
 } from '@/modules/clinical/presentation/medical-records.controller';
+import { PrescriptionsController } from '@/modules/clinical/presentation/prescriptions.controller';
 import { ExaminationsService } from '@/modules/clinical/application/examinations.service';
 import { MedicalRecordsService } from '@/modules/clinical/application/medical-records.service';
+import { PrescriptionsService } from '@/modules/clinical/application/prescriptions.service';
 
 @Module({
   imports: [
@@ -35,16 +37,19 @@ import { MedicalRecordsService } from '@/modules/clinical/application/medical-re
       Doctor,
       Pet,
       Medication,
-      InventoryItem,
     ]),
+    // P7: don thuoc tru kho khi cap phat. Chi duoc di qua barrel `catalog/application`
+    // (tuc `InventoryService`) - ghi thang vao `inventory_items` la dieu P6 cam.
+    CatalogModule,
   ],
   controllers: [
     ExaminationsController,
     MedicalRecordsController,
     DiagnosesController,
     TreatmentsController,
+    PrescriptionsController,
   ],
-  providers: [ExaminationsService, MedicalRecordsService],
-  exports: [ExaminationsService, MedicalRecordsService],
+  providers: [ExaminationsService, MedicalRecordsService, PrescriptionsService],
+  exports: [ExaminationsService, MedicalRecordsService, PrescriptionsService],
 })
 export class ClinicalModule {}

@@ -128,6 +128,18 @@ async function seed() {
       role: Role.RECEPTIONIST,
       branchId: branch2.id,
     },
+    // Duoc si - them o P7. Quay thuoc la vai tro DUY NHAT duoc cap phat thuoc
+    // (`PRESCRIPTION_DISPENSE`), nen khong co tai khoan nay thi khong ai thu duoc man
+    // hinh quay thuoc ngoai ADMIN - ma ADMIN co toan quyen nen khong the tay the
+    // kiem tra cheo giua nguoi ke va nguoi cap.
+    {
+      phone: '0900000004',
+      email: 'duocsi.q1@vetclinic.local',
+      fullName: 'Đỗ Thị Dược',
+      passwordHash: staffPasswordHash,
+      role: Role.PHARMACIST,
+      branchId: branch1.id,
+    },
   ]);
 
   // -------------------------------------------------------------------------- Doctors
@@ -549,6 +561,7 @@ async function seed() {
   );
   console.log('  Receptionist login: phone 0900000002 / password Staff@12345');
   console.log('  Doctor login: phone 0900000010 / password Staff@12345');
+  console.log('  Pharmacist login: phone 0900000004 / password Staff@12345');
   console.log('  Pet owner login: phone 0911111111 / password Owner@12345');
 
   await dataSource.destroy();
