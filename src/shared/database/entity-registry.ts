@@ -35,6 +35,14 @@ export * from '@/modules/catalog/domain/entities/medication.entity';
 export * from '@/modules/catalog/domain/entities/product.entity';
 export * from '@/modules/catalog/domain/entities/supplier.entity';
 export * from '@/modules/catalog/domain/entities/inventory-item.entity';
+export * from '@/modules/catalog/domain/entities/inventory-batch.entity';
+export * from '@/modules/catalog/domain/entities/inventory-transaction.entity';
+export * from '@/modules/catalog/domain/entities/purchase-order.entity';
+export * from '@/modules/catalog/domain/entities/purchase-order-item.entity';
+export * from '@/modules/catalog/domain/entities/goods-receipt.entity';
+export * from '@/modules/catalog/domain/entities/goods-receipt-item.entity';
+export * from '@/modules/catalog/domain/entities/stock-take.entity';
+export * from '@/modules/catalog/domain/entities/stock-take-item.entity';
 export * from '@/modules/catalog/domain/entities/disease.entity';
 
 export * from '@/modules/scheduling/domain/entities/doctor-shift.entity';
