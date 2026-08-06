@@ -46,6 +46,13 @@ const MEDICAL_RECORD_DETAIL_RELATIONS = [
   'prescriptions.items.medication',
   'prescriptions.items.medication.item',
   'labTestOrders',
+  // P9-T7: ket qua xet nghiem ve MUON la binh thuong (xem `LaboratoriesService`), nen
+  // bac si mo lai ho so - ke ca ho so da `COMPLETED` - phai thay ngay bang chi so vua
+  // duoc ky thuat vien nhap, khong phai mo them mot man hinh khac de tra cuu.
+  'labTestOrders.results',
+  'vaccinations',
+  'vaccinations.vaccine',
+  'vaccinations.vaccine.item',
 ];
 
 /** Danh sach benh su: du de dung mot dong tom tat, khong keo theo ca don thuoc. */

@@ -38,6 +38,8 @@ export enum InventoryReferenceType {
   GOODS_RECEIPT = 'GOODS_RECEIPT',
   INVOICE = 'INVOICE',
   PRESCRIPTION = 'PRESCRIPTION',
+  /** Mui tiem da thuc hien (P9) - `vaccinations.id`. */
+  VACCINATION = 'VACCINATION',
   STOCK_TAKE = 'STOCK_TAKE',
   /** Thao tac tay tren man hinh kho, khong co chung tu nao khac. */
   MANUAL = 'MANUAL',

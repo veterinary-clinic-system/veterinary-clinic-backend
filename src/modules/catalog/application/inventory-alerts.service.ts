@@ -126,9 +126,12 @@ export class InventoryAlertsService {
   // ------------------------------------------------------------------ Ben trong
 
   /**
-   * Ton so voi nguong. LEFT JOIN ca `products` lan `medications` vi mot mat hang chi la
-   * mot trong hai - COALESCE lay cai nao co, mac dinh 0 (khong dat nguong = khong canh
-   * bao LOW_STOCK, nhung ton 0 van vao nhom OUT_OF_STOCK).
+   * Ton so voi nguong. LEFT JOIN ca `products`, `medications` lan `vaccines` vi mot mat
+   * hang chi la mot trong ba - COALESCE lay cai nao co, mac dinh 0 (khong dat nguong =
+   * khong canh bao LOW_STOCK, nhung ton 0 van vao nhom OUT_OF_STOCK).
+   *
+   * `vaccines` duoc them o P9: vaccine la hang ton kho day du nghia, va bo no ra khoi
+   * truy van nay se lam mot loai hang duy nhat trong he thong khong bao gio bao sap het.
    */
   private queryStockLevels(branchId?: string): Promise<InventoryAlertRow[]> {
     return this.dataSource.query(
@@ -140,7 +143,8 @@ export class InventoryAlertsService {
              inv."branch_id"                                               AS "branchId",
              branch."branch_name"                                          AS "branchName",
              inv."inventory_quantity"                                      AS "quantity",
-             COALESCE(product."minimum_stock", medication."minimum_stock", 0) AS "minimumStock"
+             COALESCE(product."minimum_stock", medication."minimum_stock",
+                      vaccine."minimum_stock", 0)                          AS "minimumStock"
       FROM "inventory_items" inv
       JOIN "items" item ON item."id" = inv."item_id" AND item."deleted_at" IS NULL
       JOIN "branches" branch ON branch."id" = inv."branch_id"
@@ -148,10 +152,14 @@ export class InventoryAlertsService {
              ON product."item_id" = item."id" AND product."deleted_at" IS NULL
       LEFT JOIN "medications" medication
              ON medication."item_id" = item."id" AND medication."deleted_at" IS NULL
+      LEFT JOIN "vaccines" vaccine
+             ON vaccine."item_id" = item."id" AND vaccine."deleted_at" IS NULL
       WHERE inv."deleted_at" IS NULL
         AND inv."active" = true
         AND ($1::uuid IS NULL OR inv."branch_id" = $1::uuid)
-        AND inv."inventory_quantity" <= COALESCE(product."minimum_stock", medication."minimum_stock", 0)
+        AND inv."inventory_quantity" <= COALESCE(product."minimum_stock",
+                                                 medication."minimum_stock",
+                                                 vaccine."minimum_stock", 0)
       ORDER BY inv."inventory_quantity" ASC, item."item_name" ASC
       `,
       [branchId ?? null],

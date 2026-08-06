@@ -16,7 +16,10 @@ import { Service } from '@/modules/catalog/domain/entities/service.entity';
 import { StockTake } from '@/modules/catalog/domain/entities/stock-take.entity';
 import { StockTakeItem } from '@/modules/catalog/domain/entities/stock-take-item.entity';
 import { Supplier } from '@/modules/catalog/domain/entities/supplier.entity';
+import { Vaccine } from '@/modules/catalog/domain/entities/vaccine.entity';
 import { Branch } from '@/modules/organization/domain/entities/branch.entity';
+import { Pet } from '@/modules/pets/domain/entities/pet.entity';
+import { Species } from '@/modules/pets/domain/entities/species.entity';
 import { NotificationModule } from '@/modules/notification/notification.module';
 import { ItemsController } from '@/modules/catalog/presentation/items.controller';
 import { ItemsService } from '@/modules/catalog/application/items.service';
@@ -42,6 +45,8 @@ import { ProductsController } from '@/modules/catalog/presentation/products.cont
 import { ProductsService } from '@/modules/catalog/application/products.service';
 import { SuppliersController } from '@/modules/catalog/presentation/suppliers.controller';
 import { SuppliersService } from '@/modules/catalog/application/suppliers.service';
+import { VaccinesController } from '@/modules/catalog/presentation/vaccines.controller';
+import { VaccinesService } from '@/modules/catalog/application/vaccines.service';
 
 /**
  * Catalog module - the system of record for the clinic's price list (Services +
@@ -67,6 +72,7 @@ import { SuppliersService } from '@/modules/catalog/application/suppliers.servic
       Service,
       Medication,
       Product,
+      Vaccine,
       Supplier,
       InventoryItem,
       InventoryBatch,
@@ -79,6 +85,11 @@ import { SuppliersService } from '@/modules/catalog/application/suppliers.servic
       StockTakeItem,
       Disease,
       Branch,
+      // Chi DOC: `VaccinesService` loc vaccine theo loai cua thu cung (P9-T1). Hai
+      // bang nay thuoc `pets`, catalog khong bao gio ghi vao chung - cung quy uoc voi
+      // `Branch` o tren.
+      Pet,
+      Species,
     ]),
     NotificationModule,
   ],
@@ -89,6 +100,7 @@ import { SuppliersService } from '@/modules/catalog/application/suppliers.servic
     ProductsController,
     SuppliersController,
     MedicationsController,
+    VaccinesController,
     InventoryController,
     InventoryTransactionsController,
     PurchaseOrdersController,
@@ -103,6 +115,7 @@ import { SuppliersService } from '@/modules/catalog/application/suppliers.servic
     MedicationsService,
     ProductsService,
     SuppliersService,
+    VaccinesService,
     InventoryService,
     InventoryAlertsService,
     PurchaseOrdersService,
@@ -117,6 +130,7 @@ import { SuppliersService } from '@/modules/catalog/application/suppliers.servic
     MedicationsService,
     ProductsService,
     SuppliersService,
+    VaccinesService,
     InventoryService,
     DiseasesService,
   ],

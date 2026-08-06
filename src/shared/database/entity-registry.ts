@@ -33,6 +33,7 @@ export * from '@/modules/catalog/domain/entities/item.entity';
 export * from '@/modules/catalog/domain/entities/service.entity';
 export * from '@/modules/catalog/domain/entities/medication.entity';
 export * from '@/modules/catalog/domain/entities/product.entity';
+export * from '@/modules/catalog/domain/entities/vaccine.entity';
 export * from '@/modules/catalog/domain/entities/supplier.entity';
 export * from '@/modules/catalog/domain/entities/inventory-item.entity';
 export * from '@/modules/catalog/domain/entities/inventory-batch.entity';
@@ -59,6 +60,8 @@ export * from '@/modules/clinical/domain/entities/treatment.entity';
 export * from '@/modules/clinical/domain/entities/prescription.entity';
 export * from '@/modules/clinical/domain/entities/prescription-item.entity';
 export * from '@/modules/clinical/domain/entities/lab-test-order.entity';
+export * from '@/modules/clinical/domain/entities/laboratory-result.entity';
+export * from '@/modules/clinical/domain/entities/vaccination.entity';
 
 export * from '@/modules/billing/domain/entities/invoice.entity';
 export * from '@/modules/billing/domain/entities/invoice-item.entity';

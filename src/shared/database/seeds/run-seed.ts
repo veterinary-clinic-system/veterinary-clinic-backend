@@ -11,6 +11,7 @@ import {
   Doctor,
   DoctorShift,
   Examination,
+  InventoryBatch,
   InventoryItem,
   Invoice,
   InvoiceItem,
@@ -26,6 +27,7 @@ import {
   Species,
   Treatment,
   User,
+  Vaccine,
 } from '../entity-registry';
 import { Role } from '@/shared/common/enums/role.enum';
 import { Specialization } from '@/shared/common/enums/specialization.enum';
@@ -282,11 +284,78 @@ async function seed() {
     );
   }
 
+  // Vaccine (P9-T1) - danh muc tiem chung. `speciesApplicable` rong o vaccine dai vi no
+  // dung cho moi loai; hai cai con lai gan dich danh cho va meo.
+  const vaccineRepo = dataSource.getRepository(Vaccine);
+  const vaccineSeeds = [
+    {
+      name: 'Vaccine dại (Rabisin)',
+      disease: 'Bệnh dại',
+      price: 120_000,
+      doseCount: 1,
+      intervalDays: null,
+      boosterIntervalDays: 365,
+      species: [] as Species[],
+    },
+    {
+      name: 'Vaccine 5 bệnh cho chó (DHPPi-L)',
+      disease: 'Care, Parvo, Viêm gan, Ho cũi, Lepto',
+      price: 250_000,
+      doseCount: 3,
+      intervalDays: 21,
+      boosterIntervalDays: 365,
+      species: [dog],
+    },
+    {
+      name: 'Vaccine 4 bệnh cho mèo (FVRCP)',
+      disease: 'Giảm bạch cầu, Viêm mũi khí quản, Calici, Chlamydia',
+      price: 230_000,
+      doseCount: 2,
+      intervalDays: 28,
+      boosterIntervalDays: 365,
+      species: [cat],
+    },
+  ];
+  for (const v of vaccineSeeds) {
+    const item = await itemRepo.save({
+      itemName: v.name,
+      itemType: ItemType.VACCINE,
+      unitPrice: v.price,
+    });
+    await vaccineRepo.save({
+      itemId: item.id,
+      item,
+      diseasePrevented: v.disease,
+      doseCount: v.doseCount,
+      intervalDays: v.intervalDays,
+      boosterIntervalDays: v.boosterIntervalDays,
+      speciesApplicable: v.species,
+      minimumStock: 5,
+    });
+  }
+
   const inventoryRepo = dataSource.getRepository(InventoryItem);
+  const batchRepo = dataSource.getRepository(InventoryBatch);
   const allItems = await itemRepo.find();
   for (const branch of [branch1, branch2]) {
-    await inventoryRepo.save(
+    const inventoryItems = await inventoryRepo.save(
       allItems.map((item) => ({ itemId: item.id, branchId: branch.id, inventoryQuantity: 50 })),
+    );
+    // MOT LO CHO MOI DONG TON. Truoc P9 seed chi ghi `inventory_quantity` va bo trong
+    // `inventory_batches`, tuc la vi pham quyet dinh (B) cua P6: so tong la ban cache cua
+    // SUM(batches.quantity). Hau qua khong lo ra ngay - man hinh kho van hien 50 - nhung
+    // FEFO khong tim thay lo nao de xuat, nen cap phat thuoc, ban POS va tiem vaccine tren
+    // du lieu seed deu bao "khong du ton kho" du so tren man hinh la 50.
+    await batchRepo.save(
+      inventoryItems.map((inventoryItem) => ({
+        inventoryItemId: inventoryItem.id,
+        batchNo: 'SEED-001',
+        // Han dung con xa: lo seed khong duoc phep het han giua ky demo, va cung khong
+        // duoc "khong han" - de con cho ma kiem thu BR-11 nhin thay mot ngay that.
+        expiryDate: '2028-12-31',
+        quantity: 50,
+        costPrice: 0,
+      })),
     );
   }
 

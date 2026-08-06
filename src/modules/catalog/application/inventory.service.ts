@@ -189,16 +189,17 @@ export class InventoryService {
       });
     }
     if (query.lowStock) {
-      // "Sap het" doc nguong tu ho so san pham/thuoc cua chinh item do. LEFT JOIN ca hai
-      // vi mot item chi la mot trong hai - COALESCE lay cai nao co.
+      // "Sap het" doc nguong tu ho so san pham/thuoc/vaccine cua chinh item do. LEFT JOIN
+      // ca ba vi mot item chi la mot trong ba - COALESCE lay cai nao co.
       qb.leftJoin('products', 'product', 'product.item_id = item.id AND product.deleted_at IS NULL')
         .leftJoin(
           'medications',
           'medication',
           'medication.item_id = item.id AND medication.deleted_at IS NULL',
         )
+        .leftJoin('vaccines', 'vaccine', 'vaccine.item_id = item.id AND vaccine.deleted_at IS NULL')
         .andWhere(
-          'inventory.inventoryQuantity <= COALESCE(product.minimum_stock, medication.minimum_stock, 0)',
+          'inventory.inventoryQuantity <= COALESCE(product.minimum_stock, medication.minimum_stock, vaccine.minimum_stock, 0)',
         );
     }
 

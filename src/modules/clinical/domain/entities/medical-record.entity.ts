@@ -9,6 +9,7 @@ import { Diagnosis } from './diagnosis.entity';
 import { Treatment } from './treatment.entity';
 import { Prescription } from './prescription.entity';
 import { LabTestOrder } from './lab-test-order.entity';
+import { Vaccination } from './vaccination.entity';
 
 /**
  * Ho so benh an - aggregate root cua SRS FR-07..FR-10.
@@ -101,4 +102,12 @@ export class MedicalRecord extends BaseEntity {
 
   @OneToMany(() => LabTestOrder, (order) => order.medicalRecord)
   labTestOrders?: LabTestOrder[];
+
+  /**
+   * Cac mui tiem ghi nhan trong lan kham nay (P9). Quan he mot chieu ve phia ho so:
+   * `Vaccination.medicalRecordId` nullable vi tiem don le khong di kem lan kham nao -
+   * xem `vaccination.entity.ts`.
+   */
+  @OneToMany(() => Vaccination, (vaccination) => vaccination.medicalRecord)
+  vaccinations?: Vaccination[];
 }

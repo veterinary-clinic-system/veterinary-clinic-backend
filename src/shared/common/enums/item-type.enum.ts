@@ -13,5 +13,13 @@ export enum ItemType {
    * thi POS va Invoice phai xu ly hai nguon gia, va moi bao cao doanh thu phai UNION.
    */
   PRODUCT = 'PRODUCT',
+  /**
+   * Vaccine - SRS FR-12 (P9). Cung ly do voi PRODUCT: vaccine co gia, ban duoc, nam
+   * trong kho co lo va han dung, nen no phai la mot `Item` chu khong phai mot bang
+   * song song. Tach khoi MEDICATION vi hai thu duoc CHON o hai cho khac nhau va theo
+   * hai tieu chi khac nhau - thuoc chon theo hoat chat, vaccine chon theo benh phong
+   * ngua va loai duoc tiem.
+   */
+  VACCINE = 'VACCINE',
   OTHER = 'OTHER',
 }
