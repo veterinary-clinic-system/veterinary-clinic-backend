@@ -6,6 +6,8 @@ import { Permission } from '@/shared/common/enums/permission.enum';
 import { Role } from '@/shared/common/enums/role.enum';
 import { PermissionsService } from '@/modules/identity/application/permissions.service';
 import { SetRolePermissionsDto } from './dto/set-role-permissions.dto';
+import { Audit } from '@/shared/common/decorators/audit.decorator';
+import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
 /**
  * Ma tran phan quyen. BR-16: "Chi Admin duoc quan ly role va permission".
@@ -47,12 +49,14 @@ export class PermissionsController {
     return this.permissionsService.getMatrix();
   }
 
+  @Audit({ action: AuditAction.UPDATE, entity: 'RolePermission', snapshot: false })
   @Put('roles/:role')
   async setRolePermissions(@Param('role') role: Role, @Body() dto: SetRolePermissionsDto) {
     const permissions = await this.permissionsService.setRolePermissions(role, dto.permissions);
     return { role, permissions };
   }
 
+  @Audit({ action: AuditAction.UPDATE, entity: 'RolePermission', snapshot: false })
   @Post('roles/:role/reset')
   async resetRole(@Param('role') role: Role) {
     const permissions = await this.permissionsService.resetRoleToDefault(role);

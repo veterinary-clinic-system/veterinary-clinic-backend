@@ -5,6 +5,7 @@ import { InvoiceItem } from '@/modules/billing/domain/entities/invoice-item.enti
 import { Invoice } from '@/modules/billing/domain/entities/invoice.entity';
 import { Payment } from '@/modules/billing/domain/entities/payment.entity';
 import { CatalogModule } from '@/modules/catalog/catalog.module';
+import { NotificationModule } from '@/modules/notification/notification.module';
 import { Item } from '@/modules/catalog/domain/entities/item.entity';
 import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
 import { User } from '@/modules/identity/domain/entities/user.entity';
@@ -40,6 +41,8 @@ import { VnpayPaymentAdapter } from '@/modules/billing/infrastructure/payment/vn
     // Hoan tien mot hoa don POS phai tra hang ve kho (P8-T3) - di qua barrel
     // `catalog/application`, cua duy nhat de dung toi ton kho.
     CatalogModule,
+    // Thanh toan that bai bao cho le tan/quan ly qua hop thu trong ung dung (P10-T5).
+    NotificationModule,
   ],
   controllers: [BillingController, PaymentsController],
   providers: [

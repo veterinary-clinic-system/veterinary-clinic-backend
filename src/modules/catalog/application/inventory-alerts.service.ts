@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { OutboxService } from '@/modules/notification/application';
+import { OutboxService, StaffNotificationsService } from '@/modules/notification/application';
+import { StaffNotificationType } from '@/shared/common/enums/staff-notification.enum';
 import { toDateOnly } from '@/modules/catalog/domain/inventory-allocation.util';
 
 /**
@@ -38,6 +39,45 @@ export interface InventoryAlerts {
   expired: InventoryAlertRow[];
 }
 
+/** Bon nhom canh bao kho anh xa mot-doi-mot sang bon loai thong bao nhan vien (P10-T5). */
+const STAFF_NOTIFICATION_TYPE: Record<InventoryAlertKind, StaffNotificationType> = {
+  LOW_STOCK: StaffNotificationType.LOW_STOCK,
+  OUT_OF_STOCK: StaffNotificationType.OUT_OF_STOCK,
+  EXPIRING_SOON: StaffNotificationType.EXPIRING_SOON,
+  EXPIRED: StaffNotificationType.EXPIRED,
+};
+
+/**
+ * Tieu de mot dong thong bao la TEN MAT HANG, khong phai ten loai canh bao.
+ *
+ * Giao dien da hien loai canh bao bang mot nhan mau ngay canh ("Hết hàng", "Sắp hết
+ * hạn"), nen mot tieu de "Hàng đã hết" chi lap lai chinh cai nhan do bang chu khac -
+ * hai dong dau tien cua thong bao noi cung mot dieu, va nguoi doc van chua biet la hang
+ * nao. Ten mat hang o day tra loi ngay cau ho thuc su hoi.
+ */
+function alertTitle(row: InventoryAlertRow): string {
+  return `${row.itemName} (${row.itemCode})`;
+}
+
+/**
+ * Noi dung mot dong thong bao.
+ *
+ * Viet du de KHONG PHAI MO MAN HINH KHAC moi hieu: co chi nhanh va con so cu the. Ten
+ * mat hang khong lap lai o day - no da la tieu de.
+ */
+function describeAlert(kind: InventoryAlertKind, row: InventoryAlertRow): string {
+  switch (kind) {
+    case 'OUT_OF_STOCK':
+      return `${row.branchName}: đã hết hàng — không bán và không cấp phát được.`;
+    case 'LOW_STOCK':
+      return `${row.branchName}: còn ${row.quantity}, đã chạm ngưỡng tối thiểu ${row.minimumStock}.`;
+    case 'EXPIRING_SOON':
+      return `${row.branchName}, lô ${row.batchNo ?? '—'}: hết hạn ngày ${row.expiryDate ?? '—'} (còn ${row.daysUntilExpiry ?? 0} ngày).`;
+    case 'EXPIRED':
+      return `${row.branchName}, lô ${row.batchNo ?? '—'}: đã hết hạn ngày ${row.expiryDate ?? '—'} — cần lập phiếu xuất hủy.`;
+  }
+}
+
 /**
  * Canh bao ton kho - SRS FR-18-04.
  *
@@ -60,6 +100,7 @@ export class InventoryAlertsService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly outboxService: OutboxService,
+    private readonly staffNotificationsService: StaffNotificationsService,
   ) {}
 
   private get expiringSoonDays(): number {
@@ -111,10 +152,24 @@ export class InventoryAlertsService {
     await this.dataSource.transaction(async (em) => {
       for (const event of events) {
         const scope = event.row.batchId ?? event.row.inventoryItemId;
+        const dedupeKey = `inv-alert:${event.kind}:${scope}:${today}`;
+
         await this.outboxService.record(em, {
           type: `INVENTORY_${event.kind}`,
           payload: { ...event.row, kind: event.kind, detectedOn: today },
-          dedupeKey: `inv-alert:${event.kind}:${scope}:${today}`,
+          dedupeKey,
+        });
+
+        // Thong bao trong ung dung di CUNG transaction voi su kien outbox, nhung KHONG
+        // qua outbox (P10-T5): no khong roi khoi CSDL nay nen khong can mot chang trung
+        // gian de bao dam gui. Nguoi nhan theo bang muc 18 SRS - duoc si va quan ly.
+        await this.staffNotificationsService.notify(em, {
+          type: STAFF_NOTIFICATION_TYPE[event.kind],
+          title: alertTitle(event.row),
+          body: describeAlert(event.kind, event.row),
+          link: '/staff/inventory/alerts',
+          branchId: event.row.branchId,
+          dedupeKey,
         });
       }
     });

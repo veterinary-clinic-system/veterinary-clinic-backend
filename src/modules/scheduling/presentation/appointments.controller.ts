@@ -26,6 +26,8 @@ import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { CancelAppointmentDto, MarkNoShowDto } from './dto/cancel-appointment.dto';
 import { QueryWeekDto } from './dto/query-week.dto';
 import { QueryDayDto, QueryMonthDto } from './dto/query-calendar.dto';
+import { Audit } from '@/shared/common/decorators/audit.decorator';
+import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
 @ApiTags('appointments')
 @Controller('appointments')
@@ -131,6 +133,17 @@ export class AppointmentsController {
   }
 
   @RequirePermissions(Permission.APPOINTMENT_UPDATE)
+  @Audit({
+    action: AuditAction.UPDATE,
+    entity: 'Appointment',
+    // Xac nhan lich va doi gio kham di chung mot handler - xem `AuditActionResolver`.
+    resolveAction: (body) => {
+      const status = (body as { status?: string } | undefined)?.status;
+      if (status === AppointmentStatus.CONFIRMED) return AuditAction.APPROVE;
+      if (status === AppointmentStatus.CANCELLED) return AuditAction.CANCEL;
+      return undefined;
+    },
+  })
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -141,6 +154,7 @@ export class AppointmentsController {
   }
 
   /** Cung ly do voi `findOne` o tren - `cancel` tu kiem tra quyen so huu voi PET_OWNER. */
+  @Audit({ action: AuditAction.CANCEL, entity: 'Appointment' })
   @Post(':id/cancel')
   cancel(
     @Param('id', ParseUUIDPipe) id: string,
@@ -155,6 +169,7 @@ export class AppointmentsController {
    * thu cung, nen co `@RequirePermissions` trong khi `cancel` o tren thi khong.
    */
   @RequirePermissions(Permission.APPOINTMENT_UPDATE)
+  @Audit({ action: AuditAction.UPDATE, entity: 'Appointment' })
   @Post(':id/no-show')
   markNoShow(
     @Param('id', ParseUUIDPipe) id: string,

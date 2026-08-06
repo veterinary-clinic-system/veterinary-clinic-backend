@@ -8,6 +8,7 @@ import { User } from '@/modules/identity/domain/entities/user.entity';
 import { AuthController } from '@/modules/identity/presentation/auth.controller';
 import { AuthService } from '@/modules/identity/application/auth.service';
 import { JwtStrategy } from '@/modules/identity/infrastructure/strategies/jwt.strategy';
+import { AuditLogModule } from './audit-log.module';
 
 @Module({
   imports: [
@@ -21,6 +22,8 @@ import { JwtStrategy } from '@/modules/identity/infrastructure/strategies/jwt.st
         signOptions: { expiresIn: config.get<string>('jwt.accessExpiresIn') },
       }),
     }),
+    // P10-T2: `AuthService` tu ghi audit `LOGIN`/`LOGOUT` - xem ghi chu dau service do.
+    AuditLogModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

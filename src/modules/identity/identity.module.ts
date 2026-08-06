@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuditLogModule } from './audit-log.module';
 import { AuthModule } from './auth.module';
 import { CustomersModule } from './customers.module';
 import { EmployeesModule } from './employees.module';
@@ -15,7 +16,21 @@ import { UsersModule } from './users.module';
  * tiep AuthModule/UsersModule/CustomersModule ben trong.
  */
 @Module({
-  imports: [AuthModule, UsersModule, CustomersModule, PermissionsModule, EmployeesModule],
-  exports: [AuthModule, UsersModule, CustomersModule, PermissionsModule, EmployeesModule],
+  imports: [
+    AuthModule,
+    UsersModule,
+    CustomersModule,
+    PermissionsModule,
+    EmployeesModule,
+    AuditLogModule,
+  ],
+  exports: [
+    AuthModule,
+    UsersModule,
+    CustomersModule,
+    PermissionsModule,
+    EmployeesModule,
+    AuditLogModule,
+  ],
 })
 export class IdentityModule {}

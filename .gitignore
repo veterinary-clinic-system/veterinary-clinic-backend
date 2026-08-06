@@ -19,3 +19,6 @@ npm-debug.log*
 # IDE
 .vscode/
 .idea/
+
+# Ban sao luu CSDL (scripts/backup-db.sh) - du lieu that, khong bao gio commit.
+backups/

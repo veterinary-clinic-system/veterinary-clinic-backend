@@ -7,6 +7,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { join } from 'path';
 import { AppModule } from './app.module';
+import { formatValidationErrors } from './shared/common/validation/validation-error.formatter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -39,7 +40,14 @@ async function bootstrap() {
       // truoc day tra ve ca ba dong - trong do co "Ly do huy khong duoc vuot qua 500 ky
       // tu" cho mot gia tri khong ton tai, doc nhu loi cua he thong chu khong phai loi
       // cua nguoi nhap. Cac truong KHAC van bao loi day du.
-      stopAtFirstError: true,
+      //
+      // KHONG dung `stopAtFirstError` de lam viec do (P10-T8): co ay de chinh
+      // class-validator chon luat nao duoc bao, va no chon theo thu tu NGUOC voi thu tu
+      // khai bao decorator. Ket qua la thong diep phu thuoc vao viec `@MaxLength` duoc
+      // go tren hay duoi `@IsNotEmpty` - mot chi tiet khong ai nho, va da tung cho ra
+      // "note không được vượt quá 500 ký tự" cho mot truong bo trong. Bo dinh dang o
+      // duoi chon theo mot bang uu tien co dinh, giong nhau o moi DTO.
+      exceptionFactory: formatValidationErrors,
     }),
   );
 

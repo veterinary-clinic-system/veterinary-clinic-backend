@@ -11,6 +11,8 @@ import { Payment } from '@/modules/billing/domain/entities/payment.entity';
 import { InvoiceStatus, deriveInvoiceStatus } from '@/shared/common/enums/invoice-status.enum';
 import { PaymentMethod } from '@/shared/common/enums/payment-method.enum';
 import { PaymentStatus, SETTLED_PAYMENT_STATUSES } from '@/shared/common/enums/payment-status.enum';
+import { StaffNotificationsService } from '@/modules/notification/application';
+import { StaffNotificationType } from '@/shared/common/enums/staff-notification.enum';
 import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
 import { QueryPaymentsDto } from '@/modules/billing/presentation/dto/query-payments.dto';
 
@@ -64,6 +66,7 @@ export class PaymentsService {
   constructor(
     @InjectRepository(Payment) private readonly paymentsRepository: Repository<Payment>,
     @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly staffNotificationsService: StaffNotificationsService,
   ) {}
 
   /**
@@ -117,6 +120,26 @@ export class PaymentsService {
       );
 
       await this.syncStatus(em, invoice.id);
+
+      // Thanh toan that bai -> bao cho le tan va quan ly (muc 18 SRS, P10-T5). Day la
+      // truong hop DUY NHAT trong ham nay can nguoi xu ly: mot lan `SUCCESS` khong can
+      // ai lam gi, con `FAILED` nghia la khach dang dung o quay voi mot hoa don chua
+      // dong duoc - va man hinh POS thi da chuyen sang khach ke tiep.
+      if (status === PaymentStatus.FAILED) {
+        await this.staffNotificationsService.notify(em, {
+          type: StaffNotificationType.PAYMENT_FAILED,
+          title: 'Thanh toán thất bại',
+          body:
+            `Hóa đơn ${invoice.invoiceCode}: giao dịch ${params.method} số tiền ` +
+            `${params.amount.toLocaleString('vi-VN')} đ không thành công.`,
+          link: `/staff/billing/${invoice.id}`,
+          branchId: invoice.branchId,
+          // Khoa theo dong thanh toan chu khong theo hoa don: mot hoa don co the that
+          // bai nhieu lan (thu lai the khac), va moi lan la mot viec phai xu ly rieng.
+          dedupeKey: `payment-failed:${payment.id}`,
+        });
+      }
+
       return payment;
     });
   }

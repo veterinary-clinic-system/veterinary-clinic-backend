@@ -7,6 +7,8 @@ import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user
 import { LaboratoriesService } from '@/modules/clinical/application/laboratories.service';
 import { SaveLaboratoryResultsDto } from './dto/save-laboratory-results.dto';
 import { QueryLabQueueDto } from './dto/query-lab-queue.dto';
+import { Audit } from '@/shared/common/decorators/audit.decorator';
+import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
 /**
  * Xet nghiem co cau truc - SRS FR-13 (P9-T5, T6, T7).
@@ -61,6 +63,7 @@ export class LaboratoriesController {
    * `MEDICAL_RECORD_UPDATE` - xem ghi chu o `Permission.LABORATORY_RESULT_ENTER`.
    */
   @RequirePermissions(Permission.LABORATORY_RESULT_ENTER)
+  @Audit({ action: AuditAction.UPDATE, entity: 'LabTestOrder' })
   @Put('orders/:id/results')
   saveResults(
     @Param('id', ParseUUIDPipe) id: string,

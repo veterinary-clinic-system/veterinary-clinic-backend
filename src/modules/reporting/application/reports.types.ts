@@ -50,3 +50,64 @@ export interface AiAccuracyReport {
   acceptanceRate: number;
   breakdownByColor: AiAccuracyByColor[];
 }
+
+// ------------------------------------------------------- Bao cao van hanh (P10-T4)
+
+/**
+ * `GET /reports/revenue/summary` - sau con so cua SRS muc 19.
+ *
+ * Doc tu bang `payments` (tien THUC THU), khac `RevenueByPeriod` doc tu `invoice_items`
+ * (gia tri da BAN). Xem ghi chu dau `OperationalReportsService`.
+ */
+export interface RevenueSummaryReport {
+  /** Da thu rong = SUCCESS + REFUNDED (dong hoan mang so am). */
+  totalRevenue: number;
+  totalPaid: number;
+  /** So duong - tri tuyet doi cua tong cac dong hoan tien. */
+  totalRefunded: number;
+  /** Con phai thu cua cac hoa don lap trong ky. */
+  totalUnpaid: number;
+  invoiceCount: number;
+  unpaidInvoiceCount: number;
+}
+
+/** `GET /reports/inventory` - anh chup kho tai thoi diem doc, khong theo khoang ngay. */
+export interface InventoryReport {
+  totalProducts: number;
+  totalMedicines: number;
+  totalVaccines: number;
+  lowStock: number;
+  outOfStock: number;
+  expiringSoon: number;
+  expired: number;
+  /** Nguong dang dung cho `expiringSoon`, de giao dien ghi dung nhan. */
+  expiringSoonDays: number;
+}
+
+/** Mot dong cua `GET /reports/sales`, ban chay nhat truoc. */
+export interface SalesReportRow {
+  itemCode: string;
+  itemName: string;
+  itemType: string;
+  quantitySold: number;
+  totalRevenue: number;
+}
+
+/** Mot bac si trong bang `GET /reports/exams`. */
+export interface TopVeterinarian {
+  doctorId: string;
+  doctorName: string;
+  examCount: number;
+  noShowCount: number;
+}
+
+/** `GET /reports/exams` - bo sung No-show va Top Veterinarians cho bao cao kham. */
+export interface ExamSummaryReport {
+  totalAppointments: number;
+  completed: number;
+  noShow: number;
+  cancelled: number;
+  /** `noShow / totalAppointments`, trong khoang [0, 1]. */
+  noShowRate: number;
+  topVeterinarians: TopVeterinarian[];
+}

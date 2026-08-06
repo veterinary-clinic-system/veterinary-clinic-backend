@@ -3,6 +3,16 @@ import { NotificationChannel } from '@/shared/common/enums/notification.enum';
 export interface NotificationMessage {
   recipientPhone: string;
   message: string;
+  /**
+   * Dia chi thu cua nguoi nhan - CHI kenh `EMAIL` dung toi (P10-T6).
+   *
+   * De tuy chon chu khong bat buoc: phan lon khach cua phong kham chi de lai so dien
+   * thoai, va bat buoc truong nay se lam moi lan nhac lich qua SMS phai bia ra mot dia
+   * chi rong. Kenh email tu tu choi khi khong co no - xem `EmailNotificationProvider`.
+   */
+  recipientEmail?: string | null;
+  /** Tieu de thu. Cac kenh khac bo qua. */
+  subject?: string;
 }
 
 export interface NotificationSendResult {

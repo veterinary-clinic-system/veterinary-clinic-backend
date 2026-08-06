@@ -11,6 +11,8 @@ import { PetProfileService } from '@/modules/pets/application/pet-profile.servic
 import { CreatePetDto } from './dto/create-pet.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
 import { QueryPetsDto } from './dto/query-pets.dto';
+import { Audit } from '@/shared/common/decorators/audit.decorator';
+import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
 @ApiTags('pets')
 @Controller('pets')
@@ -22,6 +24,7 @@ export class PetsController {
 
   /** Receptionist/Doctor/Admin adding a pet to an existing owner's profile (Section 4.1.1). */
   @RequirePermissions(Permission.PET_CREATE)
+  @Audit({ action: AuditAction.CREATE, entity: 'Pet' })
   @Post()
   create(@Body() dto: CreatePetDto) {
     return this.petsService.create(dto);
@@ -98,6 +101,7 @@ export class PetsController {
   }
 
   @RequirePermissions(Permission.PET_UPDATE)
+  @Audit({ action: AuditAction.UPDATE, entity: 'Pet' })
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdatePetDto) {
     return this.petsService.update(id, dto);

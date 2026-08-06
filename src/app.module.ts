@@ -19,6 +19,7 @@ import { DatabaseModule } from './shared/database/database.module';
 import { RedisModule } from './shared/redis/redis.module';
 import { AllExceptionsFilter } from './shared/common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './shared/common/interceptors/logging.interceptor';
+import { AuditInterceptor } from './shared/common/interceptors/audit.interceptor';
 import { JwtAuthGuard } from './shared/common/guards/jwt-auth.guard';
 import { RolesGuard } from './shared/common/guards/roles.guard';
 
@@ -36,6 +37,7 @@ import { SalesModule } from '@/modules/sales/sales.module';
 import { NotificationModule } from '@/modules/notification/notification.module';
 import { ReportingModule } from '@/modules/reporting/reporting.module';
 import { StorageModule } from '@/shared/storage/storage.module';
+import { HealthModule } from '@/shared/health/health.module';
 
 @Module({
   imports: [
@@ -82,6 +84,7 @@ import { StorageModule } from '@/shared/storage/storage.module';
     NotificationModule,
     ReportingModule,
     StorageModule,
+    HealthModule,
   ],
   providers: [
     // ThrottlerGuard is deliberately NOT global here - Section 5 only asks to rate-limit
@@ -92,6 +95,10 @@ import { StorageModule } from '@/shared/storage/storage.module';
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+    // Audit toan cuc nhung CHI hoat dong tren handler co `@Audit(...)` - khong co
+    // decorator thi interceptor tra ve ngay. Dat o day thay vi gan tay tung controller
+    // de khong bao gio co chuyen "quen boc" mot endpoint moi (P10-T1).
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })
 export class AppModule {}

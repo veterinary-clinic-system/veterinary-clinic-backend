@@ -24,7 +24,12 @@ import { Role } from '@/shared/common/enums/role.enum';
 import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user.interface';
 import { PaginationQueryDto } from '@/shared/common/dto/pagination-query.dto';
 import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
-import { NotificationsService, OutboxService } from '@/modules/notification/application';
+import {
+  NotificationsService,
+  OutboxService,
+  StaffNotificationsService,
+} from '@/modules/notification/application';
+import { StaffNotificationType } from '@/shared/common/enums/staff-notification.enum';
 import { PrescreeningService } from '@/modules/triage/application';
 import { CreateBookingDto } from '@/modules/scheduling/presentation/dto/create-booking.dto';
 import { UpdateAppointmentDto } from '@/modules/scheduling/presentation/dto/update-appointment.dto';
@@ -93,6 +98,7 @@ export class AppointmentsService {
     private readonly partyResolver: PartyResolverService,
     private readonly notificationsService: NotificationsService,
     private readonly outboxService: OutboxService,
+    private readonly staffNotificationsService: StaffNotificationsService,
     private readonly prescreeningService: PrescreeningService,
   ) {}
 
@@ -178,6 +184,7 @@ export class AppointmentsService {
     await this.notificationsService.scheduleAppointmentReminder({
       appointment,
       recipientPhone: owner.phone,
+      recipientEmail: owner.email,
       petName: pet.name,
     });
 
@@ -543,6 +550,26 @@ export class AppointmentsService {
 
     const updated = await this.findOne(id);
     await this.notifyOwnerOfUpdate(updated, actor);
+
+    // Bao cho le tan va quan ly - bang muc 18 SRS (P10-T5). CHI khi HUY, khong khi
+    // NO_SHOW: "khach khong den" la ket qua duoc ghi nhan sau gio hen, khong con viec
+    // gi de ai xu ly ngay; con mot lich bi huy thi con khung gio vua trong ra va co
+    // the con khach dang cho duoc xep vao do.
+    if (status === AppointmentStatus.CANCELLED) {
+      await this.staffNotificationsService.notify(this.dataSource.manager, {
+        type: StaffNotificationType.APPOINTMENT_CANCELLED,
+        title: 'Lịch hẹn bị hủy',
+        body:
+          `${updated.pet?.name ?? 'Thú cưng'} — ${updated.service?.item?.itemName ?? 'dịch vụ'} ` +
+          `lúc ${updated.startAt.toLocaleString('vi-VN')} đã bị hủy. Lý do: ${reason}`,
+        link: `/staff/appointments/${id}`,
+        branchId: updated.branchId,
+        // Mot lich chi huy duoc dung mot lan (`TERMINAL_APPOINTMENT_STATUSES` chan lan
+        // hai), nen id la du de khoa - khong can gan them moc thoi gian.
+        dedupeKey: `appt-cancelled:${id}`,
+      });
+    }
+
     return updated;
   }
 
@@ -596,6 +623,21 @@ export class AppointmentsService {
     endAt: Date,
     excludeAppointmentId?: string,
   ): Promise<void> {
+    // KHONG DAT DUOC LICH TRONG QUA KHU - SRS muc 16 (P10-T8).
+    //
+    // Thieu cho nay cho toi P10: mot POST voi `startAt` nam nam 2020 tra ve 201 va tao
+    // that mot lich hen. Khong phep kiem tra nao khac bat duoc no - `@IsDateString()`
+    // chi kiem dinh dang, con luoi khung gio thi chi hoi "gio nay co trong ca lam viec
+    // khong", ma 16:00 cua mot ngay nam 2020 thi van la 16:00. Hau qua khong chi la mot
+    // ban ghi rac: bao cao ty le vang mat cua P10-T4 dem cac lich "da den han" nen mot
+    // lich qua khu khong ai den se tinh vao mau so ngay lap tuc.
+    //
+    // Dat o day chu khong o DTO de moi duong tao lich deu di qua - `createBooking`,
+    // `scheduleFollowUp` va moi lan doi gio ve sau.
+    if (startAt.getTime() < Date.now()) {
+      throw new BadRequestException('Không thể đặt lịch hẹn vào thời điểm trong quá khứ');
+    }
+
     const overlapping = await this.appointmentsRepository
       .createQueryBuilder('appointment')
       .where('appointment.doctorId = :doctorId', { doctorId })
@@ -656,6 +698,7 @@ export class AppointmentsService {
           ? NotificationType.APPOINTMENT_CANCELLED
           : NotificationType.APPOINTMENT_UPDATED,
       recipientPhone: appointment.pet.owner.phone,
+      recipientEmail: appointment.pet.owner.email,
       message,
     });
   }

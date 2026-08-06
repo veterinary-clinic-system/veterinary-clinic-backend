@@ -10,6 +10,8 @@ import { PayInvoiceDto } from './dto/pay-invoice.dto';
 import { QueryInvoicesDto } from './dto/query-invoices.dto';
 import { CancelInvoiceDto, RefundInvoiceDto } from './dto/refund-invoice.dto';
 import { ReplaceInvoiceItemsDto } from './dto/replace-invoice-items.dto';
+import { Audit } from '@/shared/common/decorators/audit.decorator';
+import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
 @ApiTags('billing')
 @Controller('billing')
@@ -47,6 +49,7 @@ export class BillingController {
   }
 
   @RequirePermissions(Permission.PAYMENT_CREATE)
+  @Audit({ action: AuditAction.PAYMENT, entity: 'Invoice' })
   @Patch('invoices/:id/pay')
   pay(
     @Param('id', ParseUUIDPipe) id: string,
@@ -71,6 +74,7 @@ export class BillingController {
    * sua duoc ca - hang rao that nam o trang thai, khong o ma tran quyen.
    */
   @RequirePermissions(Permission.INVOICE_CREATE)
+  @Audit({ action: AuditAction.UPDATE, entity: 'Invoice' })
   @Patch('invoices/:id/items')
   replaceItems(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReplaceInvoiceItemsDto) {
     return this.billingService.replaceItems(id, dto.items);
@@ -78,6 +82,7 @@ export class BillingController {
 
   /** Hoan tien - BR-14. `PAYMENT_REFUND` chi MANAGER/ADMIN co (P8-T7). */
   @RequirePermissions(Permission.PAYMENT_REFUND)
+  @Audit({ action: AuditAction.PAYMENT, entity: 'Invoice' })
   @Post('invoices/:id/refund')
   refund(
     @Param('id', ParseUUIDPipe) id: string,
@@ -89,6 +94,7 @@ export class BillingController {
 
   /** Huy hoa don - chi khi chua thu dong nao, nguoc lai 409 huong dan dung refund. */
   @RequirePermissions(Permission.INVOICE_CREATE)
+  @Audit({ action: AuditAction.CANCEL, entity: 'Invoice' })
   @Post('invoices/:id/cancel')
   cancel(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CancelInvoiceDto) {
     return this.billingService.cancel(id, dto.reason);

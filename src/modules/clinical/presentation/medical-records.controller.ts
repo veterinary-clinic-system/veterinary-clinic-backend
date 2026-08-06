@@ -22,6 +22,9 @@ import { OpenMedicalRecordDto } from './dto/open-medical-record.dto';
 import { UpdateDiagnosisDto } from './dto/update-diagnosis.dto';
 import { UpdateMedicalRecordDto } from './dto/update-medical-record.dto';
 import { UpdateTreatmentDto } from './dto/update-treatment.dto';
+import { AmendMedicalRecordDto } from './dto/amend-medical-record.dto';
+import { Audit } from '@/shared/common/decorators/audit.decorator';
+import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
 /**
  * SRS FR-07..FR-10 - ho so benh an.
@@ -55,7 +58,27 @@ export class MedicalRecordsController {
     return this.medicalRecordsService.findByAppointment(appointmentId);
   }
 
+  /**
+   * Sua ho so DA HOAN TAT - SRS FR-08 (P10-T2).
+   *
+   * Duong rieng chu khong noi long `PATCH :id`: BR-08 khoa ho so da chot, va viec sua no
+   * la mot NGHIEP VU KHAC han - co ly do bat buoc, co gioi han nguoi thuc hien, va luon
+   * de lai mot dong nhat ky kiem toan. Gop vao mot handler thi ba dieu kien do se thanh
+   * ba nhanh `if` trong cung mot ham va som muon co nhanh bi bo qua.
+   */
   @RequirePermissions(Permission.MEDICAL_RECORD_UPDATE)
+  @Audit({ action: AuditAction.UPDATE, entity: 'MedicalRecord' })
+  @Patch(':id/amend')
+  amend(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AmendMedicalRecordDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.medicalRecordsService.amend(id, dto, actor);
+  }
+
+  @RequirePermissions(Permission.MEDICAL_RECORD_UPDATE)
+  @Audit({ action: AuditAction.UPDATE, entity: 'MedicalRecord' })
   @Post(':id/complete')
   @HttpCode(HttpStatus.OK)
   complete(@Param('id', ParseUUIDPipe) id: string) {

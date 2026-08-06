@@ -6,6 +6,8 @@ import { CustomersService } from '@/modules/identity/application/customers.servi
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { QueryCustomersDto } from './dto/query-customers.dto';
+import { Audit } from '@/shared/common/decorators/audit.decorator';
+import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
 /**
  * Ho so khach hang (Role.PET_OWNER) nhin tu quay le tan.
@@ -29,6 +31,7 @@ export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
   @RequirePermissions(Permission.CUSTOMER_CREATE)
+  @Audit({ action: AuditAction.CREATE, entity: 'User' })
   @Post()
   create(@Body() dto: CreateCustomerDto) {
     return this.customersService.create(dto);
@@ -80,6 +83,7 @@ export class CustomersController {
   }
 
   @RequirePermissions(Permission.CUSTOMER_UPDATE)
+  @Audit({ action: AuditAction.UPDATE, entity: 'User' })
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateCustomerDto) {
     return this.customersService.update(id, dto);
@@ -87,12 +91,14 @@ export class CustomersController {
 
   /** "Xoa" khach hang trong nghiep vu = ngung hoat dong, nen dung quyen CUSTOMER_DELETE. */
   @RequirePermissions(Permission.CUSTOMER_DELETE)
+  @Audit({ action: AuditAction.DELETE, entity: 'User' })
   @Post(':id/deactivate')
   deactivate(@Param('id', ParseUUIDPipe) id: string) {
     return this.customersService.deactivate(id);
   }
 
   @RequirePermissions(Permission.CUSTOMER_DELETE)
+  @Audit({ action: AuditAction.UPDATE, entity: 'User' })
   @Post(':id/activate')
   activate(@Param('id', ParseUUIDPipe) id: string) {
     return this.customersService.activate(id);

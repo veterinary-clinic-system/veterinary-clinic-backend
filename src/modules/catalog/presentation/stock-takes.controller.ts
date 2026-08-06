@@ -11,6 +11,8 @@ import {
   SubmitStockTakeCountsDto,
 } from './dto/create-stock-take.dto';
 import { QueryStockTakesDto } from './dto/query-stock-takes.dto';
+import { Audit } from '@/shared/common/decorators/audit.decorator';
+import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
 /**
  * Kiem ke - SRS FR-18-03.
@@ -50,6 +52,7 @@ export class StockTakesController {
   }
 
   @RequirePermissions(Permission.INVENTORY_EXPORT)
+  @Audit({ action: AuditAction.STOCK_ADJUSTMENT, entity: 'StockTake' })
   @Post(':id/confirm')
   confirm(
     @Param('id', ParseUUIDPipe) id: string,

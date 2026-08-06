@@ -26,6 +26,8 @@ import { OpenMedicalRecordDto } from '@/modules/clinical/presentation/dto/open-m
 import { UpdateDiagnosisDto } from '@/modules/clinical/presentation/dto/update-diagnosis.dto';
 import { UpdateMedicalRecordDto } from '@/modules/clinical/presentation/dto/update-medical-record.dto';
 import { UpdateTreatmentDto } from '@/modules/clinical/presentation/dto/update-treatment.dto';
+import { AmendMedicalRecordDto } from '@/modules/clinical/presentation/dto/amend-medical-record.dto';
+import { Role } from '@/shared/common/enums/role.enum';
 
 /** Do quan he cho mot lan doc CHI TIET - dung cac khoi SRS doi (FR-07). */
 const MEDICAL_RECORD_DETAIL_RELATIONS = [
@@ -164,6 +166,46 @@ export class MedicalRecordsService {
   async update(id: string, dto: UpdateMedicalRecordDto): Promise<MedicalRecord> {
     const record = await this.loadOrThrow(id);
     this.assertEditable(record);
+
+    await this.medicalRecordsRepository.update(id, {
+      ...(dto.visitReason !== undefined ? { visitReason: dto.visitReason } : {}),
+      ...(dto.generalCondition !== undefined ? { generalCondition: dto.generalCondition } : {}),
+      ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+    });
+
+    return this.findOne(id);
+  }
+
+  /**
+   * Sua ho so DA HOAN TAT - SRS FR-08, P10-T2.
+   *
+   * BR-08 cam sua ho so `COMPLETED`, va `update()` o tren thuc thi dieu do. Nhung FR-08
+   * viet day du la: *"Neu can sua, phai luu audit log"* - tuc SRS luon du tinh se co
+   * duong sua, kem dieu kien. Day la duong do, va ba dieu kien lam nen no:
+   *
+   *   1. `reason` BAT BUOC (xem `AmendMedicalRecordDto`);
+   *   2. chi ADMIN hoac CHINH BAC SI da lap ho so - nguoi khac 403. Mot bac si khac
+   *      khong duoc sua ket luan chuyen mon ma minh khong dua ra;
+   *   3. moi lan goi deu sinh mot dong `audit_logs` (decorator `@Audit` tren handler).
+   *
+   * PHAM VI HEP CO CHU DICH: chi ba truong mo ta cua chinh ho so. Chan doan, dieu tri va
+   * don thuoc KHONG sua duoc qua day - chung la ban ghi rieng, va sua chung phai di qua
+   * chinh chung de con vet. Endpoint nay danh cho truong hop that: go nham ly do kham,
+   * ghi thieu mot cau tinh trang, chot ho so som mot phut.
+   */
+  async amend(
+    id: string,
+    dto: AmendMedicalRecordDto,
+    actor: AuthenticatedUser,
+  ): Promise<MedicalRecord> {
+    const record = await this.loadOrThrow(id);
+
+    if (record.status !== MedicalRecordStatus.COMPLETED) {
+      throw new ConflictException(
+        'Hồ sơ này chưa hoàn tất - hãy sửa bằng đường thông thường (PATCH /medical-records/:id).',
+      );
+    }
+    await this.assertCanAmend(record, actor);
 
     await this.medicalRecordsRepository.update(id, {
       ...(dto.visitReason !== undefined ? { visitReason: dto.visitReason } : {}),
@@ -438,6 +480,26 @@ export class MedicalRecordsService {
       TERMINAL_APPOINTMENT_STATUSES.has(appointment.status)
         ? `Không thể mở hồ sơ bệnh án cho lịch hẹn đã ở trạng thái kết thúc ("${appointment.status}").`
         : 'Chưa tiếp nhận thú cưng nên chưa thể mở hồ sơ bệnh án - vui lòng check-in tại quầy lễ tân trước (BR-06).',
+    );
+  }
+
+  /**
+   * Ai duoc sua mot ho so da chot - dieu kien (2) cua `amend`.
+   *
+   * ADMIN duoc, vi phai co mot duong sua khi bac si da nghi viec. Ngoai ra CHI bac si da
+   * lap chinh ho so do. Khong mo cho MANAGER: quan ly co quyen quan tri he thong nhung
+   * khong co tham quyen chuyen mon de sua mot ket luan y te.
+   */
+  private async assertCanAmend(record: MedicalRecord, actor: AuthenticatedUser): Promise<void> {
+    if (actor.role === Role.ADMIN) {
+      return;
+    }
+    const doctor = await this.doctorsRepository.findOne({ where: { userId: actor.userId } });
+    if (doctor && doctor.id === record.doctorId) {
+      return;
+    }
+    throw new ForbiddenException(
+      'Chỉ quản trị viên hoặc chính bác sĩ đã lập hồ sơ mới được sửa hồ sơ đã hoàn tất (FR-08).',
     );
   }
 

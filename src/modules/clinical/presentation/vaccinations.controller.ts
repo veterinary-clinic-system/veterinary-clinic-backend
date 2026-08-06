@@ -7,6 +7,8 @@ import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user
 import { VaccinationsService } from '@/modules/clinical/application/vaccinations.service';
 import { CreateVaccinationDto } from './dto/create-vaccination.dto';
 import { QueryVaccinationsDueDto } from './dto/query-vaccinations-due.dto';
+import { Audit } from '@/shared/common/decorators/audit.decorator';
+import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
 /**
  * So tiem chung - SRS FR-12 (P9-T3).
@@ -20,6 +22,7 @@ export class VaccinationsController {
   constructor(private readonly vaccinationsService: VaccinationsService) {}
 
   @RequirePermissions(Permission.VACCINATION_CREATE)
+  @Audit({ action: AuditAction.DISPENSE, entity: 'Vaccination' })
   @Post()
   create(@Body() dto: CreateVaccinationDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.vaccinationsService.create(dto, actor);

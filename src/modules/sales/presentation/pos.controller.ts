@@ -10,9 +10,11 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Audit } from '@/shared/common/decorators/audit.decorator';
 import { CurrentUser } from '@/shared/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/shared/common/decorators/require-permissions.decorator';
 import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user.interface';
+import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 import { Permission } from '@/shared/common/enums/permission.enum';
 import { PosService } from '@/modules/sales/application/pos.service';
 import { AddCartItemDto, SetCartItemQuantityDto } from './dto/add-cart-item.dto';
@@ -96,8 +98,20 @@ export class PosController {
     return this.posService.setDiscount(id, dto, actor.userId);
   }
 
-  /** UC-04 - mot transaction: kiem ton, lap hoa don, ghi tien, tru kho. */
+  /**
+   * UC-04 - mot transaction: kiem ton, lap hoa don, ghi tien, tru kho.
+   *
+   * `@Audit` voi `snapshot: false` (P10-T8): thuc the bi tac dong la HOA DON vua duoc
+   * tao ra trong chinh handler nay, nen khong co gi de chup TRUOC - `:id` tren duong
+   * dan la gio hang chu khong phai hoa don. Interceptor tu lay id hoa don tu ket qua
+   * tra ve va ghi lai body cua request.
+   *
+   * Truoc P10-T8 endpoint nay KHONG sinh dong audit nao, du no la duong thu tien chinh
+   * cua ca he thong - FR-26 liet ke `PAYMENT` dich danh, va mot lan ban hang tai quay
+   * khong luu vet la dung cho kiem toan vien can nhin nhat.
+   */
   @RequirePermissions(Permission.POS_SELL)
+  @Audit({ action: AuditAction.PAYMENT, entity: 'Invoice', snapshot: false })
   @Post('carts/:id/checkout')
   checkout(
     @Param('id', ParseUUIDPipe) id: string,

@@ -11,6 +11,8 @@ import { CreateInventoryDto } from './dto/create-inventory.dto';
 import { UpdateInventoryDto } from './dto/update-inventory.dto';
 import { QueryInventoryDto } from './dto/query-inventory.dto';
 import { IssueInventoryDto, ReceiveInventoryDto } from './dto/issue-inventory.dto';
+import { Audit } from '@/shared/common/decorators/audit.decorator';
+import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
 /**
  * Kho - SRS FR-18.
@@ -66,6 +68,7 @@ export class InventoryController {
 
   /** Nhap kho khong qua phieu nhap - hang mau, hang le, hang chuyen tu chi nhanh khac. */
   @RequirePermissions(Permission.INVENTORY_IMPORT)
+  @Audit({ action: AuditAction.STOCK_ADJUSTMENT, entity: 'InventoryItem', snapshot: false })
   @Post('receive')
   receive(@Body() dto: ReceiveInventoryDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.inventoryService.receive({
@@ -88,6 +91,7 @@ export class InventoryController {
    * Ban le va cap thuoc KHONG di qua day: xem comment o `IssueInventoryDto`.
    */
   @RequirePermissions(Permission.INVENTORY_EXPORT)
+  @Audit({ action: AuditAction.STOCK_ADJUSTMENT, entity: 'InventoryItem', snapshot: false })
   @Post('issue')
   issue(@Body() dto: IssueInventoryDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.inventoryService.issue({
@@ -101,6 +105,7 @@ export class InventoryController {
   }
 
   @RequirePermissions(Permission.INVENTORY_EXPORT)
+  @Audit({ action: AuditAction.STOCK_ADJUSTMENT, entity: 'InventoryItem' })
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,

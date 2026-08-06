@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,10 +10,27 @@ import { User } from '@/modules/identity/domain/entities/user.entity';
 import { Role } from '@/shared/common/enums/role.enum';
 import { RegisterPetOwnerDto } from '@/modules/identity/presentation/dto/register-pet-owner.dto';
 import { LoginDto } from '@/modules/identity/presentation/dto/login.dto';
-import { AccessTokenPayload, RefreshTokenPayload, TokenPair } from './auth.types';
+import { AUDIT_RECORDER, AuditRecorder } from '@/shared/common/audit/audit-recorder.port';
+import { AuditAction } from '@/shared/common/enums/audit-action.enum';
+import {
+  AccessTokenPayload,
+  AuthRequestContext,
+  RefreshTokenPayload,
+  TokenPair,
+} from './auth.types';
 
 const BCRYPT_ROUNDS = 12;
 
+/**
+ * `LOGIN`/`LOGOUT` duoc ghi audit TU DAY chu khong qua `AuditInterceptor` - P10-T2.
+ *
+ * Interceptor doc `request.user` de biet ai vua lam gi, nhung dang nhap la hanh dong
+ * XAC LAP `request.user`: luc no chay xong thi request van la `@Public()` va khong co
+ * danh tinh nao de ghi. Chi service nay biet dong `User` nao vua duoc xac thuc.
+ *
+ * Va vi the day cung la cho duy nhat trong du an mot service tu goi audit. Moi nghiep vu
+ * con lai deu di qua decorator `@Audit(...)`.
+ */
 @Injectable()
 export class AuthService {
   constructor(
@@ -22,6 +39,7 @@ export class AuthService {
     private readonly refreshTokensRepository: Repository<RefreshToken>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @Inject(AUDIT_RECORDER) private readonly auditRecorder: AuditRecorder,
   ) {}
 
   /**
@@ -56,7 +74,12 @@ export class AuthService {
     return this.issueTokenPair(user);
   }
 
-  async login(dto: LoginDto): Promise<TokenPair> {
+  /**
+   * @param context IP + user-agent cua nguoi dang nhap, do controller lay tu request.
+   *   Tuy chon de cac loi goi cu (va test) khong phai sua - khi bo trong thi dong audit
+   *   van duoc ghi, chi thieu hai cot do.
+   */
+  async login(dto: LoginDto, context: AuthRequestContext = {}): Promise<TokenPair> {
     const user = await this.usersRepository
       .createQueryBuilder('user')
       .addSelect('user.passwordHash')
@@ -71,6 +94,20 @@ export class AuthService {
     if (!passwordMatches) {
       throw new UnauthorizedException('Invalid phone number or password');
     }
+
+    // CHI ghi khi dang nhap THANH CONG. Dang nhap that bai khong doi du lieu nao nen no
+    // khong thuoc ve nhat ky THAY DOI; theo doi tan cong do mat khau la viec cua log ung
+    // dung va cua bo gioi han tan suat (`@Throttle` tren AuthController).
+    this.auditRecorder.record({
+      actorUserId: user.id,
+      action: AuditAction.LOGIN,
+      entityName: 'User',
+      entityId: user.id,
+      // Khong ghi `dto` - no chua mat khau. Chi ghi thu du de doi chieu ve sau.
+      changes: { phone: user.phone, role: user.role },
+      ipAddress: context.ipAddress ?? null,
+      userAgent: context.userAgent ?? null,
+    });
 
     return this.issueTokenPair(user);
   }
@@ -113,12 +150,25 @@ export class AuthService {
     return newPair;
   }
 
-  async logout(refreshToken: string): Promise<void> {
+  async logout(refreshToken: string, context: AuthRequestContext = {}): Promise<void> {
     try {
       const payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(refreshToken, {
         secret: this.configService.get<string>('jwt.refreshSecret'),
       });
       await this.refreshTokensRepository.update({ id: payload.jti }, { revokedAt: new Date() });
+
+      // Trong `try` co chu dich: mot token da het han hoac da bi thu hoi thi khong co
+      // phien nao ket thuc o day ca, va ghi `LOGOUT` cho no se lam nhat ky day nhung
+      // dong khong tuong ung voi hanh dong nao that.
+      this.auditRecorder.record({
+        actorUserId: payload.sub,
+        action: AuditAction.LOGOUT,
+        entityName: 'User',
+        entityId: payload.sub,
+        changes: null,
+        ipAddress: context.ipAddress ?? null,
+        userAgent: context.userAgent ?? null,
+      });
     } catch {
       // Already invalid/expired - logout is idempotent either way.
     }

@@ -72,3 +72,4 @@ export * from '@/modules/sales/domain/entities/cart-item.entity';
 
 export * from '@/modules/notification/domain/entities/notification.entity';
 export * from '@/modules/notification/domain/entities/outbox-event.entity';
+export * from '@/modules/notification/domain/entities/staff-notification.entity';

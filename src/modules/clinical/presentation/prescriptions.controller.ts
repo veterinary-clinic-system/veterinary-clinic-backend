@@ -8,6 +8,8 @@ import { PrescriptionsService } from '@/modules/clinical/application/prescriptio
 import { CreateStandalonePrescriptionDto } from './dto/create-prescription.dto';
 import { QueryPrescriptionsDto } from './dto/query-prescriptions.dto';
 import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
+import { Audit } from '@/shared/common/decorators/audit.decorator';
+import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
 /**
  * Don thuoc va cap phat - SRS FR-11, BR-10.
@@ -69,6 +71,7 @@ export class PrescriptionsController {
 
   /** Xac nhan da soan du -> tru kho ca don trong mot transaction (BR-10). */
   @RequirePermissions(Permission.PRESCRIPTION_DISPENSE)
+  @Audit({ action: AuditAction.DISPENSE, entity: 'Prescription' })
   @Post(':id/dispense')
   dispense(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthenticatedUser) {
     return this.prescriptionsService.dispense(id, actor.userId);
@@ -79,6 +82,7 @@ export class PrescriptionsController {
    * nguoi ra y lenh do.
    */
   @RequirePermissions(Permission.PRESCRIPTION_CREATE)
+  @Audit({ action: AuditAction.CANCEL, entity: 'Prescription' })
   @Post(':id/cancel')
   cancel(@Param('id', ParseUUIDPipe) id: string) {
     return this.prescriptionsService.cancel(id);

@@ -40,6 +40,20 @@ services:
       - '3010:3000'
     volumes:
       - veterinary-clinic-uploads:/app/uploads
+    # NFR-03 (P10-T7). Goi cong NOI BO 3000 chu khong phai 3010: lenh nay chay BEN
+    # TRONG container, noi bien PORT khong con y nghia.
+    #
+    # `/health` tra 200 khi Postgres song, 503 khi chet - va chi Postgres moi lam no
+    # sap. Redis/MinIO/AI chet chi hien `down` trong phan hoi chu khong khien Docker
+    # giet container: mot dot dich vu AI cham khong phai ly do de khoi dong lai API.
+    healthcheck:
+      test: ['CMD-SHELL', 'node -e "fetch(''http://localhost:3000/api/v1/health'').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"']
+      interval: 30s
+      timeout: 10s
+      # Cho khoi dong 40s truoc khi tinh la that bai: lan chay dau con phai noi CSDL va
+      # dung xong do thi quan he cua TypeORM.
+      start_period: 40s
+      retries: 3
 
   veterinary-clinic-worker:
     build:
