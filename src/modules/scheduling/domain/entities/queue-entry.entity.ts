@@ -94,6 +94,13 @@ export class QueueEntry extends BaseEntity {
   @Column({ name: 'reason', type: 'text', nullable: true })
   reason: string | null;
 
+  /**
+   * Anh trieu chung le tan chup/nhan tu khach. Nam o day chu khong o `Appointment` vi
+   * luot cho chua gan bac si thi chua co lich hen - `assignDoctor` chep sang khi tao.
+   */
+  @Column({ name: 'photo_urls', type: 'text', array: true, default: [] })
+  photoUrls: string[];
+
   @Column({ name: 'note', type: 'text', nullable: true })
   note: string | null;
 

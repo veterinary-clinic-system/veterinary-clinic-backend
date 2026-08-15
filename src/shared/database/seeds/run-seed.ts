@@ -41,6 +41,7 @@ import {
   DiagnosisSeverity,
   MedicalRecordStatus,
 } from '@/shared/common/enums/medical-record-status.enum';
+import { DOCTOR_AVATAR_FILES, SPECIES_CATALOG } from './reference-data';
 
 config();
 
@@ -59,16 +60,40 @@ async function seed() {
   console.log('Connected. Seeding...');
 
   // ---------------------------------------------------------------- Species / Breeds
-  const dog = await dataSource.getRepository(Species).save({ speciesName: 'Chó' });
-  const cat = await dataSource.getRepository(Species).save({ speciesName: 'Mèo' });
+  //
+  // Danh muc loai/giong day du hon (phan hoi nghiem thu: "Phan du lieu ve cac loai,
+  // giong hoi it. Tao them du lieu."). Bieu mau dat lich va bieu mau tiep nhan khach
+  // vang lai deu doc thang tu day, nen hai loai + nam giong la khong du de dung that.
+  const speciesRepo = dataSource.getRepository(Species);
   const breedRepo = dataSource.getRepository(Breed);
-  const [poodle, corgi, golden, britishShorthair, persian] = await breedRepo.save([
-    { breedName: 'Poodle', speciesId: dog.id },
-    { breedName: 'Corgi', speciesId: dog.id },
-    { breedName: 'Golden Retriever', speciesId: dog.id },
-    { breedName: 'British Shorthair', speciesId: cat.id },
-    { breedName: 'Mèo Ba Tư (Persian)', speciesId: cat.id },
-  ]);
+
+  /** Tra loai/giong theo ten de phan seed ben duoi khong phu thuoc vao thu tu mang. */
+  const speciesByName = new Map<string, Species>();
+  const breedByName = new Map<string, Breed>();
+
+  for (const entry of SPECIES_CATALOG) {
+    const species = await speciesRepo.save({ speciesName: entry.name });
+    speciesByName.set(entry.name, species);
+    const saved = await breedRepo.save(
+      entry.breeds.map((breedName) => ({ breedName, speciesId: species.id })),
+    );
+    // Ten giong "Giong khac" lap lai o moi loai - khoa theo "Loai / Giong" cho chac.
+    saved.forEach((breed) => breedByName.set(`${entry.name}/${breed.breedName}`, breed));
+  }
+
+  const requireBreed = (key: string): Breed => {
+    const breed = breedByName.get(key);
+    if (!breed) throw new Error(`Seed thiếu giống "${key}"`);
+    return breed;
+  };
+
+  const dog = speciesByName.get('Chó')!;
+  const cat = speciesByName.get('Mèo')!;
+  const poodle = requireBreed('Chó/Poodle');
+  const corgi = requireBreed('Chó/Corgi');
+  const golden = requireBreed('Chó/Golden Retriever');
+  const britishShorthair = requireBreed('Mèo/British Shorthair');
+  const persian = requireBreed('Mèo/Mèo Ba Tư (Persian)');
 
   // ---------------------------------------------------------------------- Branches
   const branchRepo = dataSource.getRepository(Branch);
@@ -148,6 +173,9 @@ async function seed() {
   const doctorRepo = dataSource.getRepository(Doctor);
   const shiftRepo = dataSource.getRepository(DoctorShift);
 
+  // `avatarUrl` tro toi anh MINH HOA trong `veterinary-clinic-web/public/doctors/`
+  // (hinh ve phang, khong phai nguoi that). Xem README trong thu muc do de biet cach
+  // thay bang anh chan dung that cua phong kham.
   const doctorSeeds = [
     {
       phone: '0900000010',
@@ -155,6 +183,7 @@ async function seed() {
       branch: branch1,
       yearOfStart: 2015,
       specialization: [Specialization.GENERAL_PRACTICE, Specialization.SURGERY],
+      avatarUrl: DOCTOR_AVATAR_FILES[0],
     },
     {
       phone: '0900000011',
@@ -162,6 +191,7 @@ async function seed() {
       branch: branch1,
       yearOfStart: 2018,
       specialization: [Specialization.DERMATOLOGY, Specialization.NUTRITION],
+      avatarUrl: DOCTOR_AVATAR_FILES[1],
     },
     {
       phone: '0900000012',
@@ -169,6 +199,7 @@ async function seed() {
       branch: branch2,
       yearOfStart: 2012,
       specialization: [Specialization.INTERNAL_MEDICINE, Specialization.DIAGNOSTIC_IMAGING],
+      avatarUrl: DOCTOR_AVATAR_FILES[2],
     },
     {
       phone: '0900000013',
@@ -176,6 +207,23 @@ async function seed() {
       branch: branch2,
       yearOfStart: 2020,
       specialization: [Specialization.THERIOGENOLOGY, Specialization.DENTISTRY],
+      avatarUrl: DOCTOR_AVATAR_FILES[3],
+    },
+    {
+      phone: '0900000014',
+      fullName: 'BS. Hoàng Gia Huy',
+      branch: branch1,
+      yearOfStart: 2017,
+      specialization: [Specialization.INTERNAL_MEDICINE, Specialization.ANESTHESIOLOGY],
+      avatarUrl: DOCTOR_AVATAR_FILES[4],
+    },
+    {
+      phone: '0900000015',
+      fullName: 'BS. Ngô Thanh Mai',
+      branch: branch2,
+      yearOfStart: 2019,
+      specialization: [Specialization.GENERAL_PRACTICE, Specialization.DENTISTRY],
+      avatarUrl: DOCTOR_AVATAR_FILES[5],
     },
   ];
 
@@ -195,7 +243,7 @@ async function seed() {
       fullName: seedDoctor.fullName,
       yearOfStart: seedDoctor.yearOfStart,
       specialization: seedDoctor.specialization,
-      avatarUrl: null,
+      avatarUrl: seedDoctor.avatarUrl,
     });
     doctors.push(doctor);
 

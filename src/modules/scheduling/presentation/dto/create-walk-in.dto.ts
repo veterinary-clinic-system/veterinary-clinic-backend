@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsEnum,
   IsOptional,
@@ -28,6 +29,11 @@ export class CreateWalkInDto {
   @IsUUID()
   serviceId: string;
 
+  /**
+   * Bo trong = le tan khong chi dinh ai. Khi do he thong TU tim mot bac si con khung
+   * gio trong trong hom nay va xep luon; chi khi ca chi nhanh het cho thi luot moi
+   * nam lai o hang cho. Xem `QueueService.createWalkIn`.
+   */
   @IsOptional()
   @IsUUID()
   doctorId?: string;
@@ -66,4 +72,11 @@ export class CreateWalkInDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  /** Anh trieu chung - giong bieu mau dat lich cong khai. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(6)
+  @IsString({ each: true })
+  photoUrls?: string[];
 }

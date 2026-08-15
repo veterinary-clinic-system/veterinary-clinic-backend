@@ -76,6 +76,7 @@ describe('QueueService.findNextFreeStart', () => {
       null as never,
       availabilityService as never,
       null as never,
+      null as never,
     );
   }
 

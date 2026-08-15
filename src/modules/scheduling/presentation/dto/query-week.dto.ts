@@ -9,8 +9,13 @@ export class QueryWeekDto {
   @IsUUID()
   branchId: string;
 
+  /**
+   * Bo trong o goc nhin cong khai = luoi GOP cua ca chi nhanh ("de phong kham sap
+   * xep"). Man hinh nhan vien luon gui mot bac si cu the.
+   */
+  @IsOptional()
   @IsUUID()
-  doctorId: string;
+  doctorId?: string;
 
   @IsOptional()
   @IsDateString()

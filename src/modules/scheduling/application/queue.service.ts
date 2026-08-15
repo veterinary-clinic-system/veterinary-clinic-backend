@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { Between, DataSource, EntityManager, In, Repository } from 'typeorm';
 import { addMinutes, format } from 'date-fns';
 import { Service } from '@/modules/catalog/domain/entities/service.entity';
 import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
@@ -23,13 +23,15 @@ import {
   TERMINAL_QUEUE_STATUSES,
   isValidQueueStatusTransition,
 } from '@/shared/common/enums/queue-status.enum';
+import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user.interface';
 import { CheckInDto } from '@/modules/scheduling/presentation/dto/check-in.dto';
 import { CreateWalkInDto } from '@/modules/scheduling/presentation/dto/create-walk-in.dto';
 import { AssignDoctorDto } from '@/modules/scheduling/presentation/dto/assign-doctor.dto';
 import { UpdateQueueEntryDto } from '@/modules/scheduling/presentation/dto/update-queue-entry.dto';
 import { QueryQueueDto } from '@/modules/scheduling/presentation/dto/query-queue.dto';
-import { AvailabilityService, SlotStatus } from './availability.service';
+import { AppointmentsService } from './appointments.service';
+import { AvailabilityService, SlotStatus, slotsCovering } from './availability.service';
 import { PartyResolverService } from './party-resolver.service';
 import { mapAppointmentOverlapError } from '@/modules/scheduling/domain/appointment-overlap';
 
@@ -82,6 +84,9 @@ export class QueueService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly availabilityService: AvailabilityService,
     private readonly partyResolver: PartyResolverService,
+    // Duong doi lich DUY NHAT - `preemptForEmergency` phai di qua day de chu nuoi cua
+    // ca bi doi nhan duoc thong bao, thay vi UPDATE thang vao bang.
+    private readonly appointmentsService: AppointmentsService,
   ) {}
 
   // ---------------------------------------------------------------------------------
@@ -174,12 +179,22 @@ export class QueueService {
 
   /**
    * Khach den truc tiep. Luon tao luot cho truoc (khach da dung o quay roi - phai co
-   * so thu tu ngay); viec gan bac si la buoc rieng, co the lam ngay trong cung request
-   * neu le tan da chon san `doctorId`.
+   * so thu tu ngay); viec gan bac si la buoc rieng, co the lam ngay trong cung request.
    *
-   * Neu gan bac si that bai (bac si het khung gio trong hom nay), luot cho VAN duoc
-   * giu lai o trang thai WAITING chu khong roll back - khach da xep hang thi khong the
-   * bi "bien mat" chi vi mot bac si cu the ban.
+   * Phan hoi nghiem thu: "Khi khach den ma khong hen thi khi dien form nen chon luon
+   * thoi gian cho khach neu co bac si trong va thoi gian trong. Trong truong hop het
+   * bac si va thoi gian thi moi dua vao hang cho. Neu la cap cuu thi le tan se doi lich
+   * kham cua ca khac de bac si cap cuu."
+   *
+   * Nen thu tu o day la:
+   *   1. Le tan chi dinh `doctorId` -> gan dung nguoi do.
+   *   2. Khong chi dinh -> tim bac si con khung gio trong SOM NHAT hom nay va gan luon.
+   *   3. Ca chi nhanh het cho, ma ca nay la CAP CUU (do) -> doi lich mot ca nhe hon de
+   *      lay khung gio (`preemptForEmergency`).
+   *   4. Van khong duoc -> luot cho nam lai o WAITING, le tan gan tay sau.
+   *
+   * Gan that bai KHONG lam roll back luot cho - khach da xep hang thi khong the "bien
+   * mat" chi vi khong con bac si nao ranh.
    */
   async createWalkIn(dto: CreateWalkInDto, actor: AuthenticatedUser): Promise<QueueEntry> {
     const branch = await this.branchesRepository.findOne({ where: { id: dto.branchId } });
@@ -223,6 +238,7 @@ export class QueueService {
         commonSymptoms: dto.commonSymptoms ?? [],
         reason: dto.reason ?? null,
         note: dto.note ?? null,
+        photoUrls: dto.photoUrls ?? [],
         checkedInAt: new Date(),
         createdByUserId: actor.userId,
       });
@@ -233,7 +249,43 @@ export class QueueService {
       return this.assignDoctor(entry.id, { doctorId: dto.doctorId }, actor);
     }
 
-    return this.findOne(entry.id);
+    return this.autoAssign(entry.id, branch.id, service.durationMinutes, actor);
+  }
+
+  /**
+   * Tu xep khach vang lai vao khung gio trong som nhat cua BAT KY bac si nao con cho
+   * tai chi nhanh. Khong con cho thi luot van nam o hang cho - day la mot buoc "co
+   * gang", khong phai mot buoc bat buoc thanh cong.
+   */
+  private async autoAssign(
+    entryId: string,
+    branchId: string,
+    durationMinutes: number,
+    actor: AuthenticatedUser,
+  ): Promise<QueueEntry> {
+    const entry = await this.findOne(entryId);
+    const candidate = await this.findEarliestFreeDoctorSlot(branchId, durationMinutes);
+
+    if (candidate) {
+      try {
+        return await this.assignDoctor(
+          entryId,
+          { doctorId: candidate.doctorId, startAt: candidate.startAt.toISOString() },
+          actor,
+        );
+      } catch {
+        // Mot le tan khac vua chiem dung khung do - khong sao, luot cho van con.
+      }
+    }
+
+    // Ca cap cuu khong duoc phep ngoi doi het buoi vi lich da kin: doi mot ca nhe hon
+    // sang khung gio khac de lay cho. Chi lam khi KHONG con khung trong nao.
+    if (entry.priorityColor === PriorityColor.RED) {
+      const preempted = await this.preemptForEmergency(entry, branchId, durationMinutes, actor);
+      if (preempted) return preempted;
+    }
+
+    return this.findOne(entryId);
   }
 
   // ---------------------------------------------------------------------------------
@@ -310,7 +362,9 @@ export class QueueService {
               priorityColor: entry.priorityColor,
               commonSymptoms: entry.commonSymptoms,
               otherSymptoms: entry.reason,
-              photoUrls: [],
+              // Anh khach dua o quay di theo sang lich hen vua tao - xem ghi chu tren
+              // cot `photoUrls` cua `QueueEntry`.
+              photoUrls: entry.photoUrls ?? [],
             }),
           );
           await manager.update(QueueEntry, entry.id, { appointmentId: appointment.id });
@@ -545,6 +599,113 @@ export class QueueService {
   }
 
   /**
+   * Khung gio trong SOM NHAT hom nay tren toan bo bac si dang lam viec tai chi nhanh.
+   *
+   * Tra ve `null` thay vi nem loi: het cho khong phai la loi - do la truong hop binh
+   * thuong ma khach nam lai hang cho.
+   */
+  private async findEarliestFreeDoctorSlot(
+    branchId: string,
+    durationMinutes: number,
+  ): Promise<{ doctorId: string; startAt: Date } | null> {
+    const doctors = await this.doctorsRepository.find({ where: { branchId, active: true } });
+
+    let best: { doctorId: string; startAt: Date } | null = null;
+    for (const doctor of doctors) {
+      const startAt = await this.findNextFreeStart(doctor.id, branchId, durationMinutes).catch(
+        () => null,
+      );
+      if (!startAt) continue;
+      if (!best || startAt < best.startAt) {
+        best = { doctorId: doctor.id, startAt };
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Ca CAP CUU khi ca chi nhanh da kin lich: doi lich mot ca nhe hon de lay khung gio.
+   *
+   * Chon "nan nhan" la ca CON LAI SOM NHAT trong ngay co muc uu tien nhe hon do va
+   * chua duoc tiep nhan (con PENDING/CONFIRMED - khach chua den phong kham, doi lich
+   * cho ho la viec goi mot cuoc dien thoai chu khong phai duoi ai ra khoi phong).
+   * Ca do bi day sang khung trong ke tiep cua chinh bac si ay; neu bac si khong con
+   * khung nao thi bo qua va thu nan nhan khac.
+   *
+   * `AppointmentsService.update` la duong doi lich duy nhat - no tu bao cho chu nuoi.
+   */
+  private async preemptForEmergency(
+    entry: QueueEntry,
+    branchId: string,
+    durationMinutes: number,
+    actor: AuthenticatedUser,
+  ): Promise<QueueEntry | null> {
+    const now = new Date();
+    const endOfDay = new Date(`${format(now, 'yyyy-MM-dd')}T23:59:59.999`);
+
+    const victims = await this.appointmentsRepository.find({
+      where: {
+        branchId,
+        status: In([AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED]),
+        startAt: Between(now, endOfDay),
+      },
+      order: { startAt: 'ASC' },
+      relations: ['service'],
+    });
+
+    for (const victim of victims) {
+      // Khong bao gio doi lich mot ca cap cuu khac de nhuong cho ca cap cuu nay.
+      if (victim.priorityColor === PriorityColor.RED) continue;
+
+      const victimDuration = victim.service?.durationMinutes ?? 30;
+      const freedStart = victim.startAt;
+
+      // Cho ca bi doi phai co cho khac de di, neu khong thi day chi la doi cho hai nguoi
+      // cung kho. Khung hien tai cua ho dang la BOOKED tren luoi nen `findNextFreeStart`
+      // khong the tra ve chinh no - phep so sanh ben duoi chi la lop chan thu hai.
+      const newStart = await this.findNextFreeStart(
+        victim.doctorId,
+        branchId,
+        victimDuration,
+      ).catch(() => null);
+      if (!newStart || newStart.getTime() === freedStart.getTime()) continue;
+
+      await this.appointmentsService.update(
+        victim.id,
+        { startAt: newStart.toISOString() },
+        actor,
+      );
+
+      try {
+        return await this.assignDoctor(
+          entry.id,
+          { doctorId: victim.doctorId, startAt: freedStart.toISOString() },
+          actor,
+        );
+      } catch {
+        // Khung vua giai phong lai bi chiem. TRA ca nan nhan ve gio cu truoc khi thu
+        // nguoi khac: neu khong, ho da bi doi lich (va da nhan thong bao doi lich) ma
+        // ca cap cuu van khong dung duoc khung do - hai nguoi cung thiet, khong ai
+        // duoc gi. Tra ve that bai thi giu nguyen gio moi va di tiep - it nhat khong
+        // day them mot ca nua.
+        try {
+          await this.appointmentsService.update(
+            victim.id,
+            { startAt: freedStart.toISOString() },
+            actor,
+          );
+        } catch {
+          // Gio cu vua bi nguoi khac lay mat - ca nan nhan o lai gio moi. Khach da
+          // nhan duoc thong bao doi lich nen khong co gi "im lang" o day.
+        }
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Khung gio trong som nhat con lai HOM NAY cua bac si, du dai cho `durationMinutes`.
    *
    * Luoi slot la 30 phut nhung dich vu co the dai hon, nen phai kiem tra MOI slot ma
@@ -567,12 +728,15 @@ export class QueueService {
       // Khung gio da troi qua thi khong con dung duoc.
       if (slot.endAt.getTime() <= now.getTime()) continue;
 
-      const end = addMinutes(slot.startAt, durationMinutes);
-      const covered = day.slots.filter(
-        (other) => other.startAt < end && slot.startAt < other.endAt,
+      // `slotsCovering` doi ca kham nam GON tren luoi: dung mep, lien tuc, cham toi
+      // endAt. Phep loc tay truoc day chi so sanh `endAt` cua o cuoi nen mot dich vu
+      // dai co the nhay qua gio nghi trua roi dem tiep o ben kia.
+      const covered = slotsCovering(
+        day.slots,
+        slot.startAt,
+        addMinutes(slot.startAt, durationMinutes),
       );
-      const longEnough = covered.length > 0 && covered[covered.length - 1].endAt >= end;
-      if (longEnough && covered.every((other) => other.status === SlotStatus.FREE)) {
+      if (covered && covered.every((other) => other.status === SlotStatus.FREE)) {
         return slot.startAt;
       }
     }

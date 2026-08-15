@@ -26,6 +26,13 @@ export enum SlotStatus {
   BOOKED = 'BOOKED',
   BREAK = 'BREAK',
   OFF_SHIFT = 'OFF_SHIFT',
+  /**
+   * Khung gio nam TRUOC thoi diem som nhat con dat duoc (xem `domain/booking-window.ts`).
+   * Chi xuat hien o goc nhin cong khai: lich cua nhan vien van phai thay qua khu that
+   * su de tra cuu lich su. Tach khoi `OFF_SHIFT` de giao dien noi dung ly do vi sao o
+   * do bi khoa.
+   */
+  PAST = 'PAST',
 }
 
 export interface SlotInfo extends TimeRange {
@@ -60,6 +67,94 @@ export interface MonthOverview {
   /** 'yyyy-MM'. */
   month: string;
   days: MonthDaySummary[];
+}
+
+/**
+ * Do "tot" cua mot trang thai o khi gop luoi cua NHIEU bac si lai lam mot (che do
+ * "de phong kham sap xep"): con mot bac si ranh la o do van dat duoc.
+ */
+const MERGE_PRECEDENCE: SlotStatus[] = [
+  SlotStatus.FREE,
+  SlotStatus.BOOKED,
+  SlotStatus.BREAK,
+  SlotStatus.OFF_SHIFT,
+  SlotStatus.PAST,
+];
+
+/**
+ * Gop luoi slot cua nhieu bac si trong cung mot ngay thanh MOT luoi "chi nhanh".
+ *
+ * Dung cho lua chon "khong chon bac si cu the" o buoc dat lich: khach chi can biet
+ * khung gio nao con nguoi kham duoc, con viec ai kham do he thong xep.
+ *
+ * `appointmentId` bi bo di co y - o goc nhin gop, mot o "da dat" khong ung voi mot lich
+ * hen duy nhat nao ca.
+ */
+export function mergeDoctorDays(days: DayAvailability[]): DayAvailability | null {
+  if (days.length === 0) return null;
+
+  const byStart = new Map<string, SlotInfo>();
+  for (const day of days) {
+    for (const slot of day.slots) {
+      const current = byStart.get(slot.start);
+      const better =
+        !current ||
+        MERGE_PRECEDENCE.indexOf(slot.status) < MERGE_PRECEDENCE.indexOf(current.status);
+      if (better) {
+        byStart.set(slot.start, {
+          start: slot.start,
+          end: slot.end,
+          startAt: slot.startAt,
+          endAt: slot.endAt,
+          status: slot.status,
+        });
+      }
+    }
+  }
+
+  return {
+    date: days[0].date,
+    dayOfWeek: days[0].dayOfWeek,
+    isBranchOpen: days.some((day) => day.isBranchOpen),
+    slots: [...byStart.values()].sort((a, b) => a.start.localeCompare(b.start)),
+  };
+}
+
+/**
+ * Cac o cua luoi ma khoang [startAt, endAt) chiem, hoac `null` khi khoang do KHONG nam
+ * gon tren luoi.
+ *
+ * Luoi la 30 phut nhung dich vu co the dai hon (vi du "Phau thuat nho" 60 phut), nen
+ * mot lich hen thuong an nhieu o lien tiep. Ba dieu kien de coi la "nam gon":
+ *   1. Bat dau DUNG mep mot o - khong cho bat dau luc 17:05.
+ *   2. Cac o phu lien tuc, khong co khe ho - 10:30 + 60 phut khong duoc phep nhay qua
+ *      gio nghi trua 11:00-13:30 roi dem tiep tu 13:30.
+ *   3. O cuoi phai cham toi `endAt` - 17:00 + 60 phut vuot qua o cuoi 17:00-17:30 cua
+ *      ngay lam viec.
+ *
+ * Tra ve cac o de nguoi goi tu phan xu trang thai (BOOKED -> 409, BREAK/OFF_SHIFT ->
+ * 400); ham nay chi tra loi cau hoi "khoang gio nay co ton tai tren luoi khong".
+ */
+export function slotsCovering(
+  slots: SlotInfo[],
+  startAt: Date,
+  endAt: Date,
+): SlotInfo[] | null {
+  const covered = slots
+    .filter(
+      (slot) =>
+        slot.startAt.getTime() < endAt.getTime() && startAt.getTime() < slot.endAt.getTime(),
+    )
+    .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+
+  if (covered.length === 0) return null;
+  if (covered[0].startAt.getTime() !== startAt.getTime()) return null;
+  if (covered[covered.length - 1].endAt.getTime() < endAt.getTime()) return null;
+  for (let i = 1; i < covered.length; i++) {
+    if (covered[i].startAt.getTime() !== covered[i - 1].endAt.getTime()) return null;
+  }
+
+  return covered;
 }
 
 /** Trang thai lich hen van "con hieu luc" - dung cho so dem cua che do thang. */

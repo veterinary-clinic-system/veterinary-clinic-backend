@@ -46,8 +46,13 @@ export class CreateBookingDto {
   @IsUUID()
   branchId: string;
 
+  /**
+   * Bo trong = "de phong kham sap xep bac si". `AppointmentsService.createBooking` se
+   * chon mot bac si dang ranh dung khung gio do tai chi nhanh nay.
+   */
+  @IsOptional()
   @IsUUID()
-  doctorId: string;
+  doctorId?: string;
 
   @IsUUID()
   serviceId: string;

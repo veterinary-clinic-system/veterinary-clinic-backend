@@ -6,13 +6,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
-import { addMinutes } from 'date-fns';
+import { Between, DataSource, In, Repository } from 'typeorm';
+import { addMinutes, format } from 'date-fns';
 import { Service } from '@/modules/catalog/domain/entities/service.entity';
 import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
 import { Branch } from '@/modules/organization/domain/entities/branch.entity';
 import { Pet } from '@/modules/pets/domain/entities/pet.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
+import { DoctorBreak } from '@/modules/scheduling/domain/entities/doctor-break.entity';
 import {
   AppointmentStatus,
   SLOT_BLOCKING_STATUSES,
@@ -33,6 +34,7 @@ import { StaffNotificationType } from '@/shared/common/enums/staff-notification.
 import { PrescreeningService } from '@/modules/triage/application';
 import { CreateBookingDto } from '@/modules/scheduling/presentation/dto/create-booking.dto';
 import { UpdateAppointmentDto } from '@/modules/scheduling/presentation/dto/update-appointment.dto';
+import { DoctorAbsenceDto } from '@/modules/scheduling/presentation/dto/doctor-absence.dto';
 import {
   CancelAppointmentDto,
   MarkNoShowDto,
@@ -43,9 +45,15 @@ import {
   MonthOverview,
   SlotInfo,
   SlotStatus,
+  mergeDoctorDays,
+  slotsCovering,
 } from '@/modules/scheduling/application/availability.service';
 import { PartyResolverService } from '@/modules/scheduling/application/party-resolver.service';
 import { mapAppointmentOverlapError } from '@/modules/scheduling/domain/appointment-overlap';
+import {
+  SELF_BOOKING_TOO_SOON_MESSAGE,
+  earliestSelfBookableStart,
+} from '@/modules/scheduling/domain/booking-window';
 import { startOfWeek } from 'date-fns';
 
 const SORTABLE_COLUMNS = new Set(['startAt', 'endAt', 'status', 'priorityColor', 'createdAt']);
@@ -57,8 +65,13 @@ const SORTABLE_COLUMNS = new Set(['startAt', 'endAt', 'status', 'priorityColor',
 export interface SlotAppointmentDetail {
   id: string;
   petName: string;
+  /** Giong + loai cua thu cung - o lich phai doc duoc ma khong can mo chi tiet. */
+  petBreedName: string | null;
+  petSpeciesName: string | null;
   ownerName: string;
   ownerPhone: string;
+  /** Ten dich vu cua ca kham. */
+  serviceName: string | null;
   commonSymptoms: Appointment['commonSymptoms'];
   otherSymptoms: string | null;
   priorityColor: Appointment['priorityColor'];
@@ -71,8 +84,11 @@ export interface DayAvailabilityWithDetail extends Omit<DayAvailability, 'slots'
   slots: SlotWithDetail[];
 }
 
-/** Goc nhin cong khai: chi con free/busy, khong he lo lich hen cua nguoi khac. */
-function stripToFreeBusy(days: DayAvailability[]): DayAvailability[] {
+/**
+ * Goc nhin cong khai: chi con free/busy, khong he lo lich hen cua nguoi khac, va moi
+ * khung gio truoc `minStartAt` bi ha xuong `PAST` de giao dien lam mo chung.
+ */
+function stripToFreeBusy(days: DayAvailability[], minStartAt: Date): DayAvailability[] {
   return days.map((day) => ({
     ...day,
     slots: day.slots.map((slot) => ({
@@ -80,7 +96,8 @@ function stripToFreeBusy(days: DayAvailability[]): DayAvailability[] {
       end: slot.end,
       startAt: slot.startAt,
       endAt: slot.endAt,
-      status: slot.status,
+      status:
+        slot.startAt.getTime() < minStartAt.getTime() ? SlotStatus.PAST : slot.status,
     })),
   }));
 }
@@ -93,6 +110,8 @@ export class AppointmentsService {
     @InjectRepository(Doctor) private readonly doctorsRepository: Repository<Doctor>,
     @InjectRepository(Service) private readonly servicesRepository: Repository<Service>,
     @InjectRepository(Branch) private readonly branchesRepository: Repository<Branch>,
+    @InjectRepository(DoctorBreak)
+    private readonly doctorBreaksRepository: Repository<DoctorBreak>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly availabilityService: AvailabilityService,
     private readonly partyResolver: PartyResolverService,
@@ -115,11 +134,6 @@ export class AppointmentsService {
       throw new BadRequestException('Branch not found');
     }
 
-    const doctor = await this.doctorsRepository.findOne({ where: { id: dto.doctorId } });
-    if (!doctor || doctor.branchId !== dto.branchId) {
-      throw new BadRequestException('Selected doctor does not work at the selected branch');
-    }
-
     const service = await this.servicesRepository.findOne({
       where: { id: dto.serviceId, active: true },
     });
@@ -127,11 +141,26 @@ export class AppointmentsService {
       throw new BadRequestException('Selected service is not available');
     }
 
-    const owner = await this.partyResolver.resolveOwner(dto.phone, dto.ownerFullName, dto.email);
-    const pet = await this.partyResolver.resolvePet(dto, owner);
-
     const startAt = new Date(dto.startAt);
     const endAt = addMinutes(startAt, service.durationMinutes);
+
+    // Khach tu dat chi duoc dat tu NGAY MAI tro di. Le tan dat ho (`bookedByUserId` co
+    // gia tri) khong bi chan - khach co the dang dung ngay o quay.
+    if (bookedByUserId === null && startAt.getTime() < earliestSelfBookableStart().getTime()) {
+      throw new BadRequestException(SELF_BOOKING_TOO_SOON_MESSAGE);
+    }
+
+    // `doctorId` bo trong = "de phong kham sap xep": he thong tu chon mot bac si dang
+    // ranh dung khung gio do tai chi nhanh nay.
+    const doctor = dto.doctorId
+      ? await this.doctorsRepository.findOne({ where: { id: dto.doctorId } })
+      : await this.pickAvailableDoctor(dto.branchId, startAt, endAt);
+    if (!doctor || doctor.branchId !== dto.branchId) {
+      throw new BadRequestException('Selected doctor does not work at the selected branch');
+    }
+
+    const owner = await this.partyResolver.resolveOwner(dto.phone, dto.ownerFullName, dto.email);
+    const pet = await this.partyResolver.resolvePet(dto, owner);
 
     // Bao ngoai transaction: neu rang buoc EXCLUDE cua CSDL chan (truong hop hai
     // request lot qua duoc kiem tra o tang ung dung), doi loi tho 23P01 thanh 409
@@ -201,6 +230,51 @@ export class AppointmentsService {
     }
 
     return this.findOne(appointment.id);
+  }
+
+  /**
+   * Chon bac si cho lua chon "de phong kham sap xep" (khach khong chi dinh ai).
+   *
+   * Duyet cac bac si dang lam viec tai chi nhanh, giu lai nhung nguoi co khung gio do
+   * FREE tren luoi slot cua ho, roi lay nguoi it lich nhat trong ngay - de tai kham
+   * khong don het vao mot nguoi. Viec CHOT khung gio van do `assertSlotIsFree` lam ben
+   * trong transaction dang giu khoa tu van, nen mot bac si vua bi chiem cho o day chi
+   * dan toi 409 va khach chon lai gio, khong bao gio thanh dat trung.
+   */
+  private async pickAvailableDoctor(
+    branchId: string,
+    startAt: Date,
+    endAt: Date,
+  ): Promise<Doctor | null> {
+    const doctors = await this.doctorsRepository.find({ where: { branchId, active: true } });
+    if (doctors.length === 0) return null;
+
+    const candidates: { doctor: Doctor; load: number }[] = [];
+    for (const doctor of doctors) {
+      const day = await this.availabilityService.getDoctorDayAvailability(
+        doctor.id,
+        branchId,
+        startAt,
+      );
+      // Dich vu co the dai hon mot o 30 phut - `slotsCovering` doi ca kham nam gon
+      // tren luoi (dung mep, lien tuc, cham toi endAt), cung phep kiem tra ma
+      // `assertSlotIsFree` dung. Neu o day de lot thi lat sau khach nhan 400 o buoc
+      // chot chu khong phai mot bac si khac.
+      const covered = slotsCovering(day.slots, startAt, endAt);
+      if (!covered || !covered.every((slot) => slot.status === SlotStatus.FREE)) continue;
+
+      const load = day.slots.filter((slot) => slot.status === SlotStatus.BOOKED).length;
+      candidates.push({ doctor, load });
+    }
+
+    if (candidates.length === 0) {
+      throw new ConflictException(
+        'Không còn bác sĩ nào trống vào khung giờ này - vui lòng chọn giờ khác.',
+      );
+    }
+
+    candidates.sort((a, b) => a.load - b.load);
+    return candidates[0].doctor;
   }
 
   async findOne(id: string): Promise<Appointment> {
@@ -284,18 +358,58 @@ export class AppointmentsService {
    */
   async getWeekCalendar(
     branchId: string,
-    doctorId: string,
+    doctorId: string | undefined,
     weekOf: Date,
     includeDetail: boolean,
   ): Promise<DayAvailability[] | DayAvailabilityWithDetail[]> {
     const weekStart = startOfWeek(weekOf, { weekStartsOn: 1 });
-    const days = await this.availabilityService.getDoctorWeekAvailability(
-      doctorId,
-      branchId,
-      weekStart,
+
+    const days = doctorId
+      ? await this.availabilityService.getDoctorWeekAvailability(doctorId, branchId, weekStart)
+      : await this.getBranchWeekAvailability(branchId, weekStart);
+
+    // Che do gop khong co `appointmentId` tren tung o nen khong dinh kem chi tiet duoc -
+    // va man hinh nhan vien luon chon mot bac si cu the, nen truong hop nay khong xay ra.
+    return includeDetail && doctorId
+      ? this.attachAppointmentDetail(days)
+      : stripToFreeBusy(days, earliestSelfBookableStart());
+  }
+
+  /**
+   * Luoi slot GOP cua ca chi nhanh - phuc vu lua chon "de phong kham sap xep bac si" o
+   * buoc dat lich. Mot o con trong khi CO IT NHAT MOT bac si dang ranh o do.
+   */
+  private async getBranchWeekAvailability(
+    branchId: string,
+    weekStart: Date,
+  ): Promise<DayAvailability[]> {
+    const doctors = await this.doctorsRepository.find({ where: { branchId, active: true } });
+
+    if (doctors.length === 0) {
+      return Array.from({ length: 7 }, (_, offset) => {
+        const date = new Date(weekStart);
+        date.setDate(date.getDate() + offset);
+        return {
+          date: format(date, 'yyyy-MM-dd'),
+          dayOfWeek: date.getDay(),
+          isBranchOpen: false,
+          slots: [],
+        };
+      });
+    }
+
+    const perDoctor = await Promise.all(
+      doctors.map((doctor) =>
+        this.availabilityService.getDoctorWeekAvailability(doctor.id, branchId, weekStart),
+      ),
     );
 
-    return includeDetail ? this.attachAppointmentDetail(days) : stripToFreeBusy(days);
+    return Array.from({ length: 7 }, (_, dayIndex) => {
+      const sameDayAcrossDoctors = perDoctor
+        .map((week) => week[dayIndex])
+        .filter((day): day is DayAvailability => !!day);
+      return mergeDoctorDays(sameDayAcrossDoctors)!;
+    });
   }
 
   /**
@@ -341,7 +455,7 @@ export class AppointmentsService {
     if (appointmentIds.length > 0) {
       const appointments = await this.appointmentsRepository.find({
         where: appointmentIds.map((id) => ({ id })),
-        relations: ['pet', 'pet.owner'],
+        relations: ['pet', 'pet.owner', 'pet.breed', 'pet.breed.species', 'service', 'service.item'],
       });
       appointments.forEach((appointment) => byId.set(appointment.id, appointment));
     }
@@ -358,8 +472,11 @@ export class AppointmentsService {
           appointmentDetail: {
             id: appointment.id,
             petName: appointment.pet.name,
+            petBreedName: appointment.pet.breed?.breedName ?? null,
+            petSpeciesName: appointment.pet.breed?.species?.speciesName ?? null,
             ownerName: appointment.pet.owner.fullName,
             ownerPhone: appointment.pet.owner.phone,
+            serviceName: appointment.service?.item?.itemName ?? null,
             commonSymptoms: appointment.commonSymptoms,
             otherSymptoms: appointment.otherSymptoms,
             priorityColor: appointment.priorityColor,
@@ -573,6 +690,151 @@ export class AppointmentsService {
     return updated;
   }
 
+  /**
+   * BAC SI NGHI DOT XUAT - dong lich cua ho trong mot ngay va xu ly cac ca da dat.
+   *
+   * Phan hoi nghiem thu neu van de ma khong kem de xuat, nen cach xu ly o day la:
+   *   1. Ghi mot `DoctorBreak` phu tron ngay -> luoi slot cua bac si do lap tuc thanh
+   *      BREAK, khong ai dat them duoc nua.
+   *   2. Voi tung ca CHUA tiep nhan trong ngay (PENDING/CONFIRMED), tim mot bac si khac
+   *      CUNG chi nhanh dang trong DUNG khung gio do va chuyen sang. Khach giu nguyen
+   *      gio hen - chi doi nguoi kham, va `update()` tu gui thong bao cho ho.
+   *   3. Ca khong tim duoc nguoi thay thi GIU NGUYEN va duoc liet ke trong ket qua tra
+   *      ve, de le tan goi dien doi lich thu cong. CO Y khong tu huy: huy lich cua
+   *      khach ma khong hoi la quyet dinh cua phong kham, khong phai cua he thong.
+   *
+   * Ca DA tiep nhan (CHECKED_IN/IN_PROGRESS) khong dung toi - khach dang o phong kham
+   * roi, do la viec cua quay le tan.
+   */
+  async handleDoctorAbsence(
+    dto: DoctorAbsenceDto,
+    actor: AuthenticatedUser,
+  ): Promise<{
+    doctorBreakId: string;
+    total: number;
+    reassigned: { appointmentId: string; newDoctorId: string; newDoctorName: string }[];
+    unresolved: { appointmentId: string; startAt: Date; petName: string; ownerPhone: string }[];
+  }> {
+    const doctor = await this.doctorsRepository.findOne({ where: { id: dto.doctorId } });
+    if (!doctor) {
+      throw new BadRequestException('Không tìm thấy bác sĩ');
+    }
+
+    const dayStart = new Date(`${dto.date}T00:00:00`);
+    const dayEnd = new Date(`${dto.date}T23:59:59.999`);
+
+    const doctorBreak = await this.doctorBreaksRepository.save(
+      this.doctorBreaksRepository.create({
+        doctorId: doctor.id,
+        date: dto.date,
+        // Phu tron ngay lam viec - `AvailabilityService` chi so sanh chuoi 'HH:mm'.
+        startTime: '00:00',
+        endTime: '23:59',
+        reason: dto.reason?.trim() || 'Bác sĩ nghỉ đột xuất',
+      }),
+    );
+    await this.availabilityService.invalidateDoctorDay(doctor.id, doctor.branchId, dayStart);
+
+    const affected = await this.appointmentsRepository.find({
+      where: {
+        doctorId: doctor.id,
+        status: In([AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED]),
+        startAt: Between(dayStart, dayEnd),
+      },
+      relations: ['pet', 'pet.owner', 'service'],
+      order: { startAt: 'ASC' },
+    });
+
+    const reassigned: { appointmentId: string; newDoctorId: string; newDoctorName: string }[] = [];
+    const unresolved: {
+      appointmentId: string;
+      startAt: Date;
+      petName: string;
+      ownerPhone: string;
+    }[] = [];
+
+    for (const appointment of affected) {
+      const replacement = dto.reassign === false ? null : await this.findReplacementDoctor(appointment, doctor.id);
+
+      if (!replacement) {
+        unresolved.push({
+          appointmentId: appointment.id,
+          startAt: appointment.startAt,
+          petName: appointment.pet?.name ?? '',
+          ownerPhone: appointment.pet?.owner?.phone ?? '',
+        });
+        continue;
+      }
+
+      try {
+        // Di qua `update()` chu khong UPDATE thang: no giu nguyen kiem tra trung lich
+        // duoi khoa tu van VA bao cho chu nuoi ve viec doi bac si.
+        await this.update(appointment.id, { doctorId: replacement.id }, actor);
+        reassigned.push({
+          appointmentId: appointment.id,
+          newDoctorId: replacement.id,
+          newDoctorName: replacement.fullName,
+        });
+      } catch {
+        unresolved.push({
+          appointmentId: appointment.id,
+          startAt: appointment.startAt,
+          petName: appointment.pet?.name ?? '',
+          ownerPhone: appointment.pet?.owner?.phone ?? '',
+        });
+      }
+    }
+
+    if (unresolved.length > 0) {
+      await this.staffNotificationsService.notify(this.dataSource.manager, {
+        type: StaffNotificationType.APPOINTMENT_CANCELLED,
+        title: `Bác sĩ nghỉ ngày ${dto.date} - còn ${unresolved.length} lịch cần xử lý`,
+        body:
+          `${doctor.fullName} nghỉ ngày ${dto.date}. Đã chuyển được ${reassigned.length}/${affected.length} ` +
+          `ca sang bác sĩ khác; ${unresolved.length} ca chưa tìm được người thay, cần gọi khách để dời lịch.`,
+        link: `/staff/calendar?branchId=${doctor.branchId}&date=${dto.date}`,
+        branchId: doctor.branchId,
+        dedupeKey: `doctor-absence:${doctor.id}:${dto.date}`,
+      });
+    }
+
+    return { doctorBreakId: doctorBreak.id, total: affected.length, reassigned, unresolved };
+  }
+
+  /**
+   * Bac si cung chi nhanh dang TRONG dung khung gio cua ca nay. Uu tien nguoi it lich
+   * nhat trong ngay de cac ca bi doi khong don het vao mot nguoi.
+   */
+  private async findReplacementDoctor(
+    appointment: Appointment,
+    absentDoctorId: string,
+  ): Promise<Doctor | null> {
+    const candidates = await this.doctorsRepository.find({
+      where: { branchId: appointment.branchId, active: true },
+    });
+
+    const scored: { doctor: Doctor; load: number }[] = [];
+
+    for (const candidate of candidates) {
+      if (candidate.id === absentDoctorId) continue;
+      const day = await this.availabilityService.getDoctorDayAvailability(
+        candidate.id,
+        appointment.branchId,
+        appointment.startAt,
+      );
+      const covered = slotsCovering(day.slots, appointment.startAt, appointment.endAt);
+      if (!covered || !covered.every((slot) => slot.status === SlotStatus.FREE)) continue;
+
+      scored.push({
+        doctor: candidate,
+        load: day.slots.filter((slot) => slot.status === SlotStatus.BOOKED).length,
+      });
+    }
+
+    scored.sort((a, b) => a.load - b.load);
+    return scored[0]?.doctor ?? null;
+  }
+
   /** Section 4.1.4: "Optionally schedule a follow-up visit" - links back via parentAppointmentId. */
   async scheduleFollowUp(
     parentId: string,
@@ -657,25 +919,31 @@ export class AppointmentsService {
       branchId,
       startAt,
     );
-    const startHHmm = `${startAt.getHours().toString().padStart(2, '0')}:${startAt
-      .getMinutes()
-      .toString()
-      .padStart(2, '0')}`;
-    const matchingSlot = day.slots.find((slot) => slot.start === startHHmm);
 
-    if (
-      !matchingSlot ||
-      (matchingSlot.status !== SlotStatus.FREE && matchingSlot.status !== SlotStatus.BOOKED)
-    ) {
+    // MOI o ma ca kham cham vao deu phai con dung duoc, khong chi rieng o dau tien.
+    //
+    // Truoc day cho nay chi tim `slot.start === startHHmm` roi xet mot minh o do, nen
+    // mot dich vu 60 phut (luoi la 30 phut) chi bi kiem tra dung nua dau. Hau qua tai
+    // hien duoc: "Phau thuat nho" dat luc 17:00 tra ve 201 va ket thuc luc 18:00 trong
+    // khi o cuoi cua ngay lam viec la 17:00-17:30; dat luc 10:30 thi de len gio nghi
+    // trua 11:00-13:30. Rang buoc EXCLUDE cua CSDL khong bat duoc hai truong hop nay -
+    // no chi biet cac lich hen khac, khong biet ca lam viec.
+    const covered = slotsCovering(day.slots, startAt, endAt);
+    if (!covered) {
       throw new BadRequestException(
         "This time is outside the doctor's working hours or on a break",
       );
     }
-    if (
-      matchingSlot.status === SlotStatus.BOOKED &&
-      matchingSlot.appointmentId !== excludeAppointmentId
-    ) {
-      throw new ConflictException('This time slot was just booked - please pick another one');
+
+    for (const slot of covered) {
+      if (slot.status === SlotStatus.FREE) continue;
+      if (slot.status === SlotStatus.BOOKED) {
+        if (slot.appointmentId === excludeAppointmentId) continue;
+        throw new ConflictException('This time slot was just booked - please pick another one');
+      }
+      throw new BadRequestException(
+        "This time is outside the doctor's working hours or on a break",
+      );
     }
   }
 

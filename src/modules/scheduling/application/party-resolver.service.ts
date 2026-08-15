@@ -58,6 +58,27 @@ export class PartyResolverService {
   }
 
   /**
+   * Tra cuu chu nuoi theo so dien thoai cho BIEU MAU DAT LICH cong khai: khach go so
+   * dien thoai, neu he thong da co ho so thi ten duoc dien san.
+   *
+   * CO Y chi tra ve `fullName`. Day la mot cua cong khai nen moi truong tra them
+   * (email, dia chi, danh sach thu cung) deu la mot ro ri co the do tim bang cach thu
+   * lan luot so dien thoai. Danh sach thu cung chi hien cho nguoi DA DANG NHAP, qua
+   * `GET /pets/mine`. Cua nay con duoc bo throttle o tang controller.
+   */
+  async lookupOwnerForBooking(phone: string): Promise<{ found: boolean; fullName?: string }> {
+    const existing = await this.usersRepository.findOne({
+      where: { phone, role: Role.PET_OWNER },
+      select: { id: true, fullName: true, active: true },
+    });
+
+    if (!existing || !existing.active) {
+      return { found: false };
+    }
+    return { found: true, fullName: existing.fullName };
+  }
+
+  /**
    * Dung mot trong hai: `petId` (thu cung da co ho so) hoac `newPet` (lan dau den
    * kham). Ho so cu luon duoc kiem tra co thuc su thuoc ve chu nuoi vua giai quyet -
    * neu khong, mot nguoi doan duoc UUID co the gan lich hen len thu cung nguoi khac.

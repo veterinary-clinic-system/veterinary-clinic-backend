@@ -21,7 +21,10 @@ import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user
 import { PaginationQueryDto } from '@/shared/common/dto/pagination-query.dto';
 import { AppointmentStatus } from '@/shared/common/enums/appointment-status.enum';
 import { AppointmentsService } from '@/modules/scheduling/application/appointments.service';
+import { PartyResolverService } from '@/modules/scheduling/application/party-resolver.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { LookupOwnerDto } from './dto/lookup-owner.dto';
+import { DoctorAbsenceDto } from './dto/doctor-absence.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { CancelAppointmentDto, MarkNoShowDto } from './dto/cancel-appointment.dto';
 import { QueryWeekDto } from './dto/query-week.dto';
@@ -32,7 +35,10 @@ import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 @ApiTags('appointments')
 @Controller('appointments')
 export class AppointmentsController {
-  constructor(private readonly appointmentsService: AppointmentsService) {}
+  constructor(
+    private readonly appointmentsService: AppointmentsService,
+    private readonly partyResolver: PartyResolverService,
+  ) {}
 
   /** Guest or logged-in PetOwner self-booking (Section 4.1.2: "No login required to book"). */
   @Public()
@@ -48,6 +54,21 @@ export class AppointmentsController {
   @Post('staff')
   createStaffBooking(@Body() dto: CreateBookingDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.appointmentsService.createBooking(dto, actor.userId);
+  }
+
+  /**
+   * Tra cuu chu nuoi theo so dien thoai cho buoc "Thong tin" cua bieu mau dat lich:
+   * da co ho so thi ten duoc dien san, chua co thi khach tu nhap.
+   *
+   * Throttle chat hon cac cua cong khai khac (10 lan/phut): day la mot cua tra loi
+   * "so nay co trong he thong khong", nen no phai dat de quet.
+   */
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Get('owner-lookup')
+  lookupOwner(@Query() query: LookupOwnerDto) {
+    return this.partyResolver.lookupOwnerForBooking(query.phone);
   }
 
   /** Public free/busy widget for the booking form - never exposes appointment detail. */
@@ -177,6 +198,18 @@ export class AppointmentsController {
     @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.appointmentsService.markNoShow(id, dto, actor);
+  }
+
+  /**
+   * Bac si nghi dot xuat: dong lich ngay do va chuyen cac ca chua tiep nhan sang bac
+   * si khac dang trong. Ca nao khong tim duoc nguoi thay se nam trong `unresolved` de
+   * le tan goi khach doi lich - he thong khong tu huy lich cua ai.
+   */
+  @RequirePermissions(Permission.APPOINTMENT_UPDATE)
+  @Audit({ action: AuditAction.UPDATE, entity: 'Appointment' })
+  @Post('doctor-absence')
+  handleDoctorAbsence(@Body() dto: DoctorAbsenceDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.appointmentsService.handleDoctorAbsence(dto, actor);
   }
 
   @RequirePermissions(Permission.APPOINTMENT_CREATE)
