@@ -2,12 +2,6 @@ import { IsDateString, IsEnum, IsOptional, IsString, IsUUID } from 'class-valida
 import { AppointmentStatus } from '@/shared/common/enums/appointment-status.enum';
 import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 
-/**
- * Receptionist/Doctor adjustments to an existing booking (Section 4.1.2: "Receptionist
- * can adjust bookings and must notify the owner, using a priority color label").
- * Any change here that touches `startAt`/`doctorId`/`status` triggers a re-validation
- * of slot availability and an owner notification from AppointmentsService.
- */
 export class UpdateAppointmentDto {
   @IsOptional()
   @IsUUID()

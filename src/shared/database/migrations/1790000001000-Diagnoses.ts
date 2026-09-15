@@ -1,26 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Chan doan - SRS FR-09.
- *
- * BACKFILL - phan dang chu y nhat cua migration nay. Du lieu cu nam o hai cho:
- *   - `examinations.disease_groups: text[]` - danh sach nhom benh bac si chon
- *   - `examinations.diagnosis_text`        - mo ta tu do
- *
- * Quy tac chuyen doi:
- *   1. Moi phan tu cua `disease_groups` thanh mot `Diagnosis`, giu nguyen THU TU cu
- *      (`WITH ORDINALITY`); phan tu dau tien la `is_primary`.
- *   2. Neu `disease_groups` rong nhung co `diagnosis_text` thi tao MOT chan doan tu
- *      chinh chuoi do, `is_primary = true`.
- *   3. Ten nhom benh duoc doi chieu voi bang `diseases` de dien `disease_id` khi khop -
- *      bao cao P10 gom nhom theo khoa ngoai thay vi so chuoi.
- *
- * `severity` mac dinh MILD: du lieu cu khong he ghi muc do, va doan bua mot muc do
- * cho ho so benh an la viec khong duoc phep lam.
- *
- * Cot `examinations.disease_groups` KHONG bi xoa (xem P4-T8): giu lam du lieu lich su,
- * chi ngung ghi moi.
- */
 export class Diagnoses1790000001000 implements MigrationInterface {
   name = 'Diagnoses1790000001000';
 
@@ -51,15 +30,13 @@ export class Diagnoses1790000001000 implements MigrationInterface {
       CREATE INDEX IF NOT EXISTS "idx_diagnoses_medical_record"
       ON "diagnoses" ("medical_record_id")
     `);
-    // Dung MOT chan doan chinh cho moi ho so - rang buoc o tang CSDL chu khong chi o
-    // tang ung dung, vi bao cao P10 se dua vao no.
+
     await queryRunner.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_diagnoses_one_primary"
       ON "diagnoses" ("medical_record_id")
       WHERE "is_primary" AND "deleted_at" IS NULL
     `);
 
-    // -- 1 + 3. Tung phan tu cua disease_groups -----------------------------------------
     await queryRunner.query(`
       INSERT INTO "diagnoses"
         ("medical_record_id", "disease_id", "diagnosis_text", "is_primary", "created_at")
@@ -76,7 +53,6 @@ export class Diagnoses1790000001000 implements MigrationInterface {
          AND NOT EXISTS (SELECT 1 FROM "diagnoses" x WHERE x."medical_record_id" = m."id")
     `);
 
-    // -- 2. Khong co nhom benh nhung co mo ta tu do -------------------------------------
     await queryRunner.query(`
       INSERT INTO "diagnoses"
         ("medical_record_id", "diagnosis_text", "is_primary", "created_at")
@@ -90,8 +66,6 @@ export class Diagnoses1790000001000 implements MigrationInterface {
          AND NOT EXISTS (SELECT 1 FROM "diagnoses" x WHERE x."medical_record_id" = m."id")
     `);
 
-    // `diagnosis_text` cua phieu kham co ca nhom benh LAN mo ta: mo ta di vao `notes`
-    // cua chan doan chinh de khong mat chu nao.
     await queryRunner.query(`
       UPDATE "diagnoses" x
          SET "notes" = e."diagnosis_text"

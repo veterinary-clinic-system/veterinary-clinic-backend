@@ -14,18 +14,6 @@ import { IssueInventoryDto, ReceiveInventoryDto } from './dto/issue-inventory.dt
 import { Audit } from '@/shared/common/decorators/audit.decorator';
 import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
-/**
- * Kho - SRS FR-18.
- *
- * Phan quyen theo dung ba muc cua ma tran (P6-T8 acceptance):
- *   - `INVENTORY_VIEW`   : doc. STAFF ban hang chi co quyen nay, nen ho xem duoc ton
- *                          nhung khong nhap/xuat duoc gi.
- *   - `INVENTORY_IMPORT` : nhap kho, khai bao mat hang o chi nhanh.
- *   - `INVENTORY_EXPORT` : xuat kho va dieu chinh ton.
- *
- * Khong kem `@Roles`: quy uoc chung cua codebase - `role_permissions` la nguon su that
- * duy nhat, giu them mot danh sach vai tro o day la hai cho phai sua song song.
- */
 @ApiTags('catalog')
 @Controller('catalog/inventory')
 export class InventoryController {
@@ -40,33 +28,24 @@ export class InventoryController {
     return this.inventoryService.findAll(query);
   }
 
-  /**
-   * Bon nhom canh bao - FR-18-04.
-   *
-   * Dat TRUOC `:id/batches` khong quan trong o day (khong dung chung dang route), nhung
-   * van giu o dau nhom GET cho de doc.
-   */
   @RequirePermissions(Permission.INVENTORY_VIEW)
   @Get('alerts')
   alerts(@Query('branchId') branchId?: string) {
     return this.inventoryAlertsService.collect(branchId);
   }
 
-  /** Cac lo cua mot dong ton kho, sap theo han dung gan nhat truoc. */
   @RequirePermissions(Permission.INVENTORY_VIEW)
   @Get(':id/batches')
   findBatches(@Param('id', ParseUUIDPipe) id: string) {
     return this.inventoryService.findBatchesOf(id);
   }
 
-  /** Khai bao mat hang co mat o mot chi nhanh (kem ton ban dau neu co). */
   @RequirePermissions(Permission.INVENTORY_IMPORT)
   @Post()
   create(@Body() dto: CreateInventoryDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.inventoryService.create(dto, actor.userId);
   }
 
-  /** Nhap kho khong qua phieu nhap - hang mau, hang le, hang chuyen tu chi nhanh khac. */
   @RequirePermissions(Permission.INVENTORY_IMPORT)
   @Audit({ action: AuditAction.STOCK_ADJUSTMENT, entity: 'InventoryItem', snapshot: false })
   @Post('receive')
@@ -85,11 +64,6 @@ export class InventoryController {
     });
   }
 
-  /**
-   * Xuat kho thu cong (hang hong, het han, that lac, tra hang) - FEFO, BR-11.
-   *
-   * Ban le va cap thuoc KHONG di qua day: xem comment o `IssueInventoryDto`.
-   */
   @RequirePermissions(Permission.INVENTORY_EXPORT)
   @Audit({ action: AuditAction.STOCK_ADJUSTMENT, entity: 'InventoryItem', snapshot: false })
   @Post('issue')

@@ -1,22 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Danh muc vaccine - SRS FR-12, P9-T1.
- *
- * BA VIEC, va viec thu hai de bi bo quen nhat: `items.code` do trigger
- * `trg_assign_item_code` cap (xem `1791000002000-ItemCodeAndCategory.ts`), va ham do
- * lam viec bang mot CASE liet ke DU cac `itemType`. Them mot loai moi ma khong cap
- * nhat ham thi CASE tra NULL, va `items.code NOT NULL` se lam moi lenh tao vaccine that
- * bai - o tang CSDL, sau khi ung dung da build sach. Vi vay migration nay tao sequence
- * `item_code_vx_seq` va CREATE OR REPLACE lai ham voi day du sau tien to.
- *
- * `vaccine_species` la bang noi thay vi cot `uuid[]` tren `vaccines`: xem ghi chu o
- * `vaccine.entity.ts`. Khong co dong nao = vaccine dung cho moi loai.
- */
 export class Vaccines1796000001000 implements MigrationInterface {
   name = 'Vaccines1796000001000';
 
-  /** Phai khop `ItemType` - xem ghi chu dau lop. */
   private static readonly PREFIXES: Array<[itemType: string, prefix: string]> = [
     ['SERVICE', 'DV'],
     ['MEDICATION', 'TH'],
@@ -73,7 +59,6 @@ export class Vaccines1796000001000 implements MigrationInterface {
       )
     `);
 
-    // Quan he 1:1 voi `items` - cung quy uoc voi `medications` / `products`.
     await queryRunner.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_vaccines_item"
       ON "vaccines" ("item_id") WHERE "deleted_at" IS NULL
@@ -86,7 +71,7 @@ export class Vaccines1796000001000 implements MigrationInterface {
         PRIMARY KEY ("vaccine_id", "species_id")
       )
     `);
-    // Loc "vaccine nao dung duoc cho loai nay" di theo chieu species -> vaccine.
+    
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_vaccine_species_species"
       ON "vaccine_species" ("species_id")
@@ -98,9 +83,6 @@ export class Vaccines1796000001000 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "vaccines"`);
     await queryRunner.query(`DROP SEQUENCE IF EXISTS "item_code_vx_seq"`);
 
-    // Tra ham cap ma ve danh sach truoc P9. Khong bo qua buoc nay: de nguyen ham co
-    // nhac 'VACCINE' thi `nextval('item_code_vx_seq')` se tro toi mot sequence vua bi
-    // xoa, va moi lenh tao item se hong theo.
     const cases = Vaccines1796000001000.PREFIXES.filter(([itemType]) => itemType !== 'VACCINE')
       .map(
         ([itemType, prefix]) =>

@@ -15,7 +15,6 @@ export class NotificationsController {
     private readonly notificationsRepository: Repository<Notification>,
   ) {}
 
-  /** Delivery log for a single appointment's reminders/updates - lets staff audit the provider abstraction. */
   @Get()
   findByAppointment(@Query('appointmentId') appointmentId: string) {
     return this.notificationsRepository.find({

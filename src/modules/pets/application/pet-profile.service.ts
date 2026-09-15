@@ -16,7 +16,6 @@ import { LabTestStatus } from '@/shared/common/enums/lab-test-status.enum';
 import { PaymentMethod } from '@/shared/common/enums/payment-method.enum';
 import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 
-/** Mot lich hen cua thu cung - khoi "Appointment" cua ho so (FR-04-03). */
 export interface PetAppointmentRow {
   appointmentId: string;
   startAt: Date;
@@ -28,7 +27,6 @@ export interface PetAppointmentRow {
   serviceName: string | null;
 }
 
-/** Mot chan doan rut gon, nhung trong benh su - xem `DIAGNOSES_JSON_SUBQUERY`. */
 export interface MedicalHistoryDiagnosis {
   id: string;
   diagnosisText: string;
@@ -37,7 +35,6 @@ export interface MedicalHistoryDiagnosis {
   diseaseName: string | null;
 }
 
-/** Mot ho so benh an - khoi "Medical History". */
 export interface PetMedicalHistoryRow {
   medicalRecordId: string;
   appointmentId: string;
@@ -52,13 +49,6 @@ export interface PetMedicalHistoryRow {
   weightKg: number | null;
 }
 
-/**
- * Cac chan doan cua mot ho so, gom san thanh mang JSON trong CSDL.
- *
- * `json_agg` tra ve `NULL` (khong phai `[]`) khi khong co hang nao - da boc
- * `COALESCE` de tang goi luon nhan duoc mot mang. Sap xep theo `is_primary DESC` de
- * chan doan chinh luon dung dau, giao dien khong phai tu tim.
- */
 const DIAGNOSES_JSON_SUBQUERY = `(
   SELECT COALESCE(
            json_agg(
@@ -79,7 +69,6 @@ const DIAGNOSES_JSON_SUBQUERY = `(
      AND diag."deleted_at" IS NULL
 )`;
 
-/** Mot don thuoc kem cac dong thuoc - khoi "Prescription". */
 export interface PetPrescriptionRow {
   prescriptionId: string;
   medicalRecordId: string;
@@ -96,7 +85,6 @@ export interface PetPrescriptionRow {
   }[];
 }
 
-/** Mot chi dinh xet nghiem - khoi "Laboratory". */
 export interface PetLabTestRow {
   labTestId: string;
   medicalRecordId: string;
@@ -107,7 +95,6 @@ export interface PetLabTestRow {
   resultFileUrls: string[];
 }
 
-/** Mot hoa don cua thu cung - khoi "Invoice". */
 export interface PetInvoiceRow {
   invoiceId: string;
   appointmentId: string;
@@ -118,19 +105,6 @@ export interface PetInvoiceRow {
   totalAmount: number;
 }
 
-/**
- * Cac khoi du lieu cua trang ho so thu cung (FR-04-03 / muc 12.4 SRS).
- *
- * Tach khoi `PetsService` co chu dich: `PetsService` la CRUD + tim kiem cua thu cung,
- * con day la cac truy van CHI DOC gom du lieu tu clinical/billing/scheduling de dung
- * mot trang. Gop chung se bien `PetsService` thanh noi chua moi thu.
- *
- * Moi truy van deu bat dau bang `assertPetExists` de mot id sai tra ve 404 thay vi mot
- * mang rong (rat de bi doc nham thanh "thu cung nay chua tung kham").
- *
- * Khoi "Vaccination" khong co o day: he thong chua co bang tiem chung (Phase 9). Giao
- * dien dung tab do voi trang thai rong va ghi chu phase, KHONG goi API gia.
- */
 @Injectable()
 export class PetProfileService {
   constructor(
@@ -177,15 +151,6 @@ export class PetProfileService {
     }));
   }
 
-  /**
-   * Benh su cua thu cung. Tu P4-T8, moi dong la mot HO SO BENH AN (khong con la mot
-   * phieu kham), va chan doan doc tu bang `diagnoses` chu khong tu
-   * `examinations.disease_groups`.
-   *
-   * `diagnoses` duoc gom thanh mang JSON ngay trong SQL thay vi ban ra roi nap tung
-   * ho so: mot con vat kham lau nam co hang chuc ho so, moi ho so vai chan doan - lam
-   * theo kieu N+1 la vai chuc luot di ve CSDL cho mot lan mo tab.
-   */
   async findMedicalHistory(petId: string): Promise<PetMedicalHistoryRow[]> {
     await this.assertPetExists(petId);
 
@@ -228,19 +193,14 @@ export class PetProfileService {
   async findPrescriptions(petId: string): Promise<PetPrescriptionRow[]> {
     await this.assertPetExists(petId);
 
-    // Loc thang tren `medicalRecord.pet_id` (cot denormalise) thay vi join nguoc qua
-    // `appointments` - it hon mot bang trong ke hoach truy van.
     const prescriptions = await this.prescriptionsRepository
       .createQueryBuilder('prescription')
       .innerJoinAndSelect('prescription.medicalRecord', 'medicalRecord')
       .leftJoinAndSelect('medicalRecord.doctor', 'doctor')
-      // `leftJoin` chu khong `innerJoin`: mot ho so DRAFT co the da co don thuoc ma
-      // chua ghi sinh hieu - `innerJoin` se lam don thuoc do bien mat khoi ho so.
+
       .leftJoinAndSelect('medicalRecord.examination', 'examination')
       .leftJoinAndSelect('prescription.items', 'item')
-      // `PrescriptionItem.medication` va `Medication.item` khai bao `eager: true`, nhung
-      // QueryBuilder KHONG tu nap quan he eager (chi `repository.find()` moi lam) - phai
-      // join tay, neu khong ten thuoc se rong.
+
       .leftJoinAndSelect('item.medication', 'medication')
       .leftJoinAndSelect('medication.item', 'medicationItem')
       .where('medicalRecord.pet_id = :petId', { petId })
@@ -250,13 +210,13 @@ export class PetProfileService {
     return prescriptions.map((prescription) => ({
       prescriptionId: prescription.id,
       medicalRecordId: prescription.medicalRecordId,
-      // Ho so chua ghi sinh hieu thi chua co `examinedAt` - lay ngay mo ho so.
+      
       examinedAt: prescription.medicalRecord.examination?.examinedAt ?? prescription.createdAt,
       doctorName: prescription.medicalRecord.doctor?.fullName ?? null,
       notes: prescription.notes,
       items: (prescription.items ?? []).map((item) => ({
         id: item.id,
-        // `medication` va `medication.item` deu la quan he eager nen co san o day.
+        
         medicationName: item.medication?.item?.itemName ?? '—',
         unit: item.medication?.unit ?? '',
         dosage: item.dosage,
@@ -287,10 +247,6 @@ export class PetProfileService {
     }));
   }
 
-  /**
-   * Tong tien lay tu SUM cac dong hoa don (anh chup gia luc lap hoa don) chu khong
-   * JOIN sang bang gia hien tai - hoa don la chung tu bat bien (Phan V.4 #4).
-   */
   async findInvoices(petId: string): Promise<PetInvoiceRow[]> {
     await this.assertPetExists(petId);
 

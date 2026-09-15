@@ -2,15 +2,6 @@ import { ConflictException } from '@nestjs/common';
 
 import { isAppointmentOverlapError, mapAppointmentOverlapError } from './appointment-overlap';
 
-/**
- * Rang buoc EXCLUDE `appointment_no_overlap` (migration 1785000000000) la lop chan
- * trung lich CUOI CUNG - no chan duoc ca truong hop hai request chen vao cung mot khe
- * thoi gian giua luc doc va luc INSERT.
- *
- * Test o day khoa chat phan DICH loi: chi dung cap ma loi + ten rang buoc moi thanh
- * 409. Neu ai do doi ten rang buoc trong migration ma quen sua o day, luong se lang
- * le tro lai thanh 500 - nen phai co test giu.
- */
 describe('appointment-overlap', () => {
   const overlapError = { code: '23P01', constraint: 'appointment_no_overlap' };
 

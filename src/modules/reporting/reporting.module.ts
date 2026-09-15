@@ -8,20 +8,10 @@ import { ReportsService } from '@/modules/reporting/application/reports.service'
 import { DashboardService } from '@/modules/reporting/application/dashboard.service';
 import { OperationalReportsService } from '@/modules/reporting/application/operational-reports.service';
 
-/**
- * Reporting/analytics module - entirely read-only aggregation queries over entities
- * other modules write to (billing's Invoice/InvoiceItem, clinical's Diagnosis,
- * prescreening's PreScreeningResult, plus their Appointment/Doctor/Item relations), so
- * this only needs `TypeOrmModule.forFeature` registrations, never those modules'
- * services. `InvoiceItem` is the entry point for every revenue query (not `Invoice`)
- * since revenue is a sum of billed line items, not a single invoice total.
- */
 @Module({
   imports: [TypeOrmModule.forFeature([InvoiceItem, Diagnosis, PreScreeningResult])],
   controllers: [ReportsController],
-  // `DashboardService` va `OperationalReportsService` khong khai entity nao o
-  // `forFeature`: ca hai chi dung `DataSource` de chay SQL tho - xem ghi chu dau chung
-  // ve ly do khong di qua QueryBuilder.
+
   providers: [ReportsService, DashboardService, OperationalReportsService],
   exports: [ReportsService, DashboardService, OperationalReportsService],
 })

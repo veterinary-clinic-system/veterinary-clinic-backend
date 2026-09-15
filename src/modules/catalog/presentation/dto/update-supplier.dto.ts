@@ -1,6 +1,5 @@
 import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength, Matches } from 'class-validator';
 
-/** `PATCH /catalog/suppliers/:id`. `supplierCode` khong sua duoc - nó là danh tính. */
 export class UpdateSupplierDto {
   @IsOptional()
   @IsString()

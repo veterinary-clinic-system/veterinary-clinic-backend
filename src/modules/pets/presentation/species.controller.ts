@@ -7,7 +7,6 @@ import { SpeciesService } from '@/modules/pets/application/species.service';
 import { CreateBreedDto } from './dto/create-breed.dto';
 import { CreateSpeciesDto } from './dto/create-species.dto';
 
-/** Small reference catalog (Species -> Breed) needed by the pet-creation form's dropdowns. */
 @ApiTags('species')
 @Controller('species')
 export class SpeciesController {

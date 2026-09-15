@@ -6,7 +6,6 @@ import { Species } from '@/modules/pets/domain/entities/species.entity';
 import { CreateBreedDto } from '@/modules/pets/presentation/dto/create-breed.dto';
 import { CreateSpeciesDto } from '@/modules/pets/presentation/dto/create-species.dto';
 
-/** Species/Breed are the two-level reference catalog backing the pet-creation form's dropdowns. */
 @Injectable()
 export class SpeciesService {
   constructor(
@@ -14,7 +13,6 @@ export class SpeciesService {
     @InjectRepository(Breed) private readonly breedsRepository: Repository<Breed>,
   ) {}
 
-  /** Breeds eager-loaded so the web app can build the dependent Species -> Breed dropdown pair. */
   async findAll(): Promise<Species[]> {
     return this.speciesRepository.find({
       relations: ['breeds'],

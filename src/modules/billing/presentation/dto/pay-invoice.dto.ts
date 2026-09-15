@@ -5,18 +5,11 @@ export class PayInvoiceDto {
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod;
 
-  /**
-   * So tien cua LAN tra nay. Bo trong = tra het phan con lai (hanh vi truoc P8-T2, giu
-   * nguyen de man hinh hoa don cu khong phai doi).
-   *
-   * Tra du bi tu choi 409 chu khong lam tron - xem `PaymentsService.record`.
-   */
   @IsOptional()
   @IsInt()
   @Min(1)
   amount?: number;
 
-  /** Ma giao dich ben ngoai (UNC chuyen khoan, ma VNPay) - de ke toan doi soat. */
   @IsOptional()
   @IsString()
   @MaxLength(128)

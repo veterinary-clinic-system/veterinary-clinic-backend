@@ -7,13 +7,6 @@ import { CreateVaccineDto } from './dto/create-vaccine.dto';
 import { UpdateVaccineDto } from './dto/update-vaccine.dto';
 import { QueryVaccinesDto } from './dto/query-vaccines.dto';
 
-/**
- * Danh muc vaccine - SRS FR-12 (P9-T1).
- *
- * KHONG `@Public()` nhu `medications`/`services`: danh muc dich vu va thuoc hien tren
- * trang gioi thieu cong khai, con danh muc vaccine chi phuc vu bac si trong luc kham.
- * Mo cong khai o day la mo rong be mat khong ai can toi.
- */
 @ApiTags('catalog')
 @Controller('catalog/vaccines')
 export class VaccinesController {

@@ -1,18 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Ket qua xet nghiem co cau truc - SRS FR-13-02, P9-T5.
- *
- * KHONG DONG TOI `result_text` VA `result_file_urls`. Day la diem quan trong nhat cua
- * migration nay: ket qua cu dang chu tu do phai o nguyen cho, hien song song voi bang
- * chi so (acceptance P9-T5). Khong co buoc "chuyen doi du lieu cu sang dang co cau
- * truc" - mot doan chu tu do khong tach nguoc ra thanh (chi so, gia tri, don vi) mot
- * cach dang tin cay, va doan sai o du lieu y te thi te hon la de nguyen.
- *
- * Chi muc `idx_laboratory_results_parameter` phuc vu truy van xu huong cua P9-T6
- * (`.../trends?parameter=WBC`) - no loc theo ten chi so tren toan bo lich su cua mot
- * thu cung, khong the di theo chi muc cua `lab_test_order_id`.
- */
 export class LaboratoryResults1796000005000 implements MigrationInterface {
   name = 'LaboratoryResults1796000005000';
 
@@ -61,8 +48,7 @@ export class LaboratoryResults1796000005000 implements MigrationInterface {
       CREATE INDEX IF NOT EXISTS "idx_laboratory_results_parameter"
       ON "laboratory_results" ("parameter")
     `);
-    // Mot yeu cau xet nghiem khong duoc co hai dong cung mot chi so: hai dong "WBC" thi
-    // bieu do xu huong se co hai diem tai cung mot moc va khong biet tin cai nao.
+
     await queryRunner.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_laboratory_results_order_parameter"
       ON "laboratory_results" ("lab_test_order_id", "parameter") WHERE "deleted_at" IS NULL

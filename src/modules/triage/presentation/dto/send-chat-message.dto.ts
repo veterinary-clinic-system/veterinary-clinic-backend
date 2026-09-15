@@ -1,4 +1,5 @@
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsIn, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 class ChatHistoryEntryDto {
   @IsIn(['user', 'assistant'])
@@ -17,5 +18,8 @@ export class SendChatMessageDto {
   message: string;
 
   @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ChatHistoryEntryDto)
   history?: ChatHistoryEntryDto[];
 }

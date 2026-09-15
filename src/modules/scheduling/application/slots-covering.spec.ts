@@ -1,9 +1,5 @@
 import { SlotInfo, SlotStatus, slotsCovering } from './availability.service';
 
-/**
- * Luoi cua mot ngay lam viec thuc te: 07:00-11:00 roi nghi trua toi 13:30, ket thuc
- * luc 17:30. Dung 30 phut mot o giong `DEFAULT_SLOT_MINUTES`.
- */
 function grid(date = '2026-08-17'): SlotInfo[] {
   const blocks: [string, string][] = [
     ['07:00', '11:00'],
@@ -49,23 +45,14 @@ describe('slotsCovering', () => {
     expect(covered?.map((slot) => slot.start)).toEqual(['09:00', '09:30']);
   });
 
-  /**
-   * Lo hong da tai hien duoc tren API that: "Phau thuat nho" (60 phut) dat luc 17:00
-   * tra ve 201 va ket thuc luc 18:00, trong khi o cuoi cua ngay la 17:00-17:30.
-   */
   it('tu choi ca vuot qua o cuoi cua ngay lam viec', () => {
     expect(slotsCovering(grid(), at('17:00'), at('18:00'))).toBeNull();
   });
 
-  /** Lo hong thu hai: 10:30 + 60 phut de len gio nghi trua 11:00-13:30. */
   it('tu choi ca dam vao gio nghi trua', () => {
     expect(slotsCovering(grid(), at('10:30'), at('11:30'))).toBeNull();
   });
 
-  /**
-   * Kiem tra "o cuoi cham toi endAt" mot minh la chua du: mot ca dai co the nhay QUA
-   * khe ho nghi trua roi dem tiep cac o buoi chieu cho du.
-   */
   it('tu choi ca nhay qua khe ho giua hai ca lam viec', () => {
     expect(slotsCovering(grid(), at('10:30'), at('14:30'))).toBeNull();
   });

@@ -58,7 +58,6 @@ export class ExaminationsController {
     return this.examinationsService.updateLabTest(labTestId, dto);
   }
 
-  /** Section 4.1.4: "print/export the exam record and prescription as PDF" - pdfkit only. */
   @RequirePermissions(Permission.MEDICAL_RECORD_VIEW)
   @Get(':id/pdf')
   async exportPdf(

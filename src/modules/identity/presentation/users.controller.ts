@@ -27,12 +27,6 @@ import { CreateDoctorShiftDto } from './dto/create-doctor-shift.dto';
 import { UpdateDoctorShiftDto } from './dto/update-doctor-shift.dto';
 import { CreateDoctorBreakDto } from './dto/create-doctor-break.dto';
 
-/**
- * Route declaration order matters: Nest/Express matches routes per HTTP method in
- * declaration order, and a `:id`-shaped segment happily matches literal strings like
- * "doctors", "me" or "pet-owners". Every literal-path route below is declared before
- * the generic `:id` route sharing its segment count, per method.
- */
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
@@ -45,8 +39,6 @@ export class UsersController {
     return this.usersService.create(dto);
   }
 
-  // -- Doctors: public directory ----------------------------------------------------
-
   @Public()
   @Get('doctors')
   findPublicDoctors(@Query('branchId') branchId?: string) {
@@ -58,8 +50,6 @@ export class UsersController {
   findPublicDoctor(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.findPublicDoctorById(id);
   }
-
-  // -- Doctor shifts ------------------------------------------------------------------
 
   @Roles(Role.ADMIN, Role.RECEPTIONIST, Role.DOCTOR)
   @RequirePermissions(Permission.APPOINTMENT_VIEW)
@@ -92,8 +82,6 @@ export class UsersController {
     return this.usersService.deleteDoctorShift(shiftId);
   }
 
-  // -- Doctor breaks --------------------------------------------------------------
-
   @Roles(Role.ADMIN, Role.RECEPTIONIST, Role.DOCTOR)
   @RequirePermissions(Permission.APPOINTMENT_VIEW)
   @Get('doctors/:id/breaks')
@@ -115,19 +103,12 @@ export class UsersController {
     return this.usersService.deleteDoctorBreak(breakId);
   }
 
-  // -- Doctors: admin edit ----------------------------------------------------------
-
   @Roles(Role.ADMIN)
   @RequirePermissions(Permission.EMPLOYEE_MANAGE)
   @Patch('doctors/:id')
   updateDoctor(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateDoctorDto) {
     return this.usersService.updateDoctor(id, dto);
   }
-
-  // -- Current user (any authenticated role) -----------------------------------------
-  // Hai route duoi co y KHONG gan `@RequirePermissions`: moi tai khoan deu phai xem va
-  // doi duoc thong tin cua CHINH MINH, ke ca khi bi go het quyen nghiep vu. Chung chi
-  // doc/ghi theo `actor.userId` nen khong co be mat de lam dung.
 
   @Get('me')
   getMe(@CurrentUser() actor: AuthenticatedUser) {
@@ -140,16 +121,12 @@ export class UsersController {
     return { message: 'Password updated successfully' };
   }
 
-  // -- Pet owners (receptionist customer lookup) --------------------------------------
-
   @Roles(Role.ADMIN, Role.RECEPTIONIST)
   @RequirePermissions(Permission.CUSTOMER_VIEW)
   @Get('pet-owners')
   searchPetOwners(@Query() pagination: PaginationQueryDto, @Query('search') search?: string) {
     return this.usersService.searchPetOwners({ ...pagination, search });
   }
-
-  // -- Users: admin CRUD (generic `:id` routes declared last) -------------------------
 
   @Roles(Role.ADMIN)
   @RequirePermissions(Permission.EMPLOYEE_MANAGE)

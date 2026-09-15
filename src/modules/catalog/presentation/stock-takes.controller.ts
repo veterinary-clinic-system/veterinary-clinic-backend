@@ -14,14 +14,6 @@ import { QueryStockTakesDto } from './dto/query-stock-takes.dto';
 import { Audit } from '@/shared/common/decorators/audit.decorator';
 import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
-/**
- * Kiem ke - SRS FR-18-03.
- *
- * TAO phieu cung doi `INVENTORY_EXPORT` chu khong chi `INVENTORY_VIEW`: phieu kiem ke
- * chup so ton he thong ngay luc tao, va so do chinh la moc de dieu chinh ton sau nay.
- * Cho nguoi chi co quyen xem tao phieu thi ho quyet dinh duoc moc so sanh cua mot lan
- * dieu chinh ma ho khong duoc phep thuc hien.
- */
 @ApiTags('catalog')
 @Controller('catalog/stock-takes')
 export class StockTakesController {

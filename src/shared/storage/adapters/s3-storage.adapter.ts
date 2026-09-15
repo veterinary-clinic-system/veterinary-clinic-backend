@@ -5,14 +5,6 @@ import { FileCategory } from '@/shared/storage/file-category.enum';
 import { normalizeForStorage } from '@/shared/storage/image-normalizer';
 import { StorageProvider, StoredFile } from '@/shared/storage/ports/storage.port';
 
-/**
- * Adapter luu tru tuong thich S3. Dung chung cho MinIO (dev/demo), AWS S3 va
- * Cloudflare R2 - ca ba deu noi giao thuc S3, chi khac endpoint.
- *
- * `forcePathStyle` bat buoc phai bat voi MinIO: MinIO dung dang duong dan
- * `http://host:9000/bucket/key`, trong khi AWS mac dinh dung dang ten mien con
- * `https://bucket.s3.amazonaws.com/key`.
- */
 @Injectable()
 export class S3StorageAdapter implements StorageProvider, OnModuleInit {
   private client: S3Client;

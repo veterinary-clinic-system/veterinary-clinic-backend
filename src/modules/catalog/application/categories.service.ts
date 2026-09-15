@@ -12,7 +12,6 @@ import { ItemType } from '@/shared/common/enums/item-type.enum';
 import { CreateCategoryDto } from '@/modules/catalog/presentation/dto/create-category.dto';
 import { UpdateCategoryDto } from '@/modules/catalog/presentation/dto/update-category.dto';
 
-/** Mot nut cua cay danh muc tra ve cho giao dien. */
 export interface CategoryTreeNode extends Category {
   children: CategoryTreeNode[];
 }
@@ -42,13 +41,6 @@ export class CategoriesService {
     return this.categoriesRepository.save(category);
   }
 
-  /**
-   * Tra ve DANG CAY, khong phai danh sach phang (acceptance FR-16).
-   *
-   * Nap toan bo bang mot lan roi dung cay trong bo nho, thay vi truy van de quy: danh
-   * muc cua mot phong kham la hang chuc dong chu khong phai hang van, va mot truy van
-   * phang doc mot lan van re hon mot `WITH RECURSIVE` cong nhieu vong di ve.
-   */
   async findTree(itemType?: ItemType, includeInactive = false): Promise<CategoryTreeNode[]> {
     const all = await this.categoriesRepository.find({
       where: {
@@ -64,8 +56,7 @@ export class CategoriesService {
 
     const roots: CategoryTreeNode[] = [];
     for (const node of byId.values()) {
-      // Danh muc co cha nhung cha bi loc ra (khac itemType, hoac dang inactive khi
-      // `includeInactive=false`) duoc coi la goc - de no khong bien mat khoi cay.
+
       const parent = node.parentId ? byId.get(node.parentId) : undefined;
       if (parent) {
         parent.children.push(node);
@@ -106,11 +97,6 @@ export class CategoriesService {
     return this.loadOrThrow(id);
   }
 
-  /**
-   * Xoa mem. Chan khi danh muc con con hoac con hang ben trong (acceptance FR-16):
-   * xoa mot danh muc dang chua hang se lam ca nhom hang do bien mat khoi bo loc ma
-   * khong ai biet - nguoi dung phai chuyen hang di truoc, mot cach co y thuc.
-   */
   async remove(id: string): Promise<void> {
     await this.loadOrThrow(id);
 
@@ -147,11 +133,6 @@ export class CategoriesService {
     }
   }
 
-  /**
-   * Chan chu trinh: dat A lam con cua B trong khi B dang la hau due cua A se tao mot
-   * vong kin, va moi lan duyet cay sau do se lap vo tan. Chi muc CSDL khong bat duoc
-   * viec nay (`chk_categories_not_self_parent` chi chan vong do dai 1).
-   */
   private async assertNotDescendant(id: string, candidateParentId: string): Promise<void> {
     const seen = new Set<string>([id]);
     let cursor: string | null = candidateParentId;
@@ -171,10 +152,6 @@ export class CategoriesService {
     }
   }
 
-  /**
-   * Chi muc `uq_categories_code` la chot chan cuoi, nhung de no bat thi nguoi dung nhan
-   * mot loi 500 kho hieu thay vi biet ma nao dang bi trung.
-   */
   private async assertCodeIsFree(code: string, excludeId: string | null): Promise<void> {
     const existing = await this.categoriesRepository.findOne({
       where: excludeId ? { code, id: Not(excludeId), deletedAt: IsNull() } : { code },

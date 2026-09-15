@@ -16,11 +16,10 @@ import { QueryLabQueueDto } from '@/modules/clinical/presentation/dto/query-lab-
 
 const ORDER_RELATIONS = ['results', 'technician'];
 
-/** Mot diem tren duong xu huong cua mot chi so - P9-T6. */
 export interface LabTrendPoint {
   labTestOrderId: string;
   testName: string;
-  /** Moc do duoc: `resultDate` neu co, khong thi thoi diem chi dinh. */
+  
   measuredAt: string;
   value: number;
   unit: string | null;
@@ -29,15 +28,13 @@ export interface LabTrendPoint {
   flag: LabResultFlag;
 }
 
-/** Chuoi thoi gian cua mot chi so cua mot thu cung. */
 export interface LabTrendSeries {
   parameter: string;
-  /** Don vi cua diem gan nhat - dung de dat nhan truc tung. */
+  
   unit: string | null;
   points: LabTrendPoint[];
 }
 
-/** Mot dong trong hang cho xet nghiem - P9-T7. */
 export interface LabQueueRow {
   labTestOrderId: string;
   testName: string;
@@ -52,27 +49,6 @@ export interface LabQueueRow {
   resultCount: number;
 }
 
-/**
- * Xet nghiem co cau truc - SRS FR-13 (P9-T5, T6, T7).
- *
- * NGOAI LE CO CHU DICH CUA BR-08. BR-08 noi ho so benh an da `COMPLETED` thi khong sua
- * duoc, va toan bo `MedicalRecordsService` thuc thi dieu do. Service NAY co tinh khong
- * kiem tra trang thai ho so khi luu ket qua xet nghiem, va do la mot quyet dinh chu
- * khong phai mot cho bo sot:
- *
- *   Ket qua xet nghiem VE MUON la truong hop BINH THUONG, khong phai ngoai le. Sinh hoa
- *   ve sau vai gio, mau gui ngoai vien ve sau vai ngay - trong khi bac si phai chot ho
- *   so va cho khach ra ve ngay trong buoi. Neu bat ho so con mo de cho ket qua thi hoac
- *   la ho so bi treo hang loat, hoac la ket qua ve roi khong co cho nao de ghi vao.
- *
- *   Cai BR-08 that su bao ve la KET LUAN CHUYEN MON cua bac si (chan doan, dieu tri,
- *   don thuoc) - nhung thu do van khoa cung. Ghi mot con so do duoc vao ho so khong sua
- *   ket luan nao ca; no BO SUNG bang chung, va bac si doc lai se thay ca hai.
- *
- * `parameter` duoc CHUAN HOA VE CHU HOA + cat khoang trang thua truoc khi luu: P9-T6 gom
- * nhom xu huong theo chinh chuoi nay, va "WBC" voi "wbc" go tu hai may khac nhau se ve
- * ra hai duong roi rac thay vi mot duong lien tuc.
- */
 @Injectable()
 export class LaboratoriesService {
   constructor(
@@ -81,19 +57,6 @@ export class LaboratoriesService {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  // -------------------------------------------------------------- Tra ket qua
-
-  /**
-   * Luu (thay the) bang chi so cua mot yeu cau xet nghiem - FR-13-02.
-   *
-   * MOT TRANSACTION: xoa bang cu roi ghi bang moi. Loi giua chung se de lai mot ket qua
-   * xet nghiem RONG tren mot ho so da `COMPLETED` - mat du lieu y te that, khong phuc
-   * hoi duoc tu dau ca.
-   *
-   * Dua yeu cau ve `COMPLETED` va dong dau `resultDate` ngay trong cung lenh: bat ky
-   * thuat vien nho bam them mot nut "danh dau da xong" nghia la som muon se co nhung
-   * yeu cau co ket qua day du nhung van nam mai trong hang cho.
-   */
   async saveResults(
     labTestOrderId: string,
     dto: SaveLaboratoryResultsDto,
@@ -123,8 +86,7 @@ export class LaboratoriesService {
           status: LabTestStatus.COMPLETED,
           resultDate: dto.resultDate ? new Date(dto.resultDate) : (order.resultDate ?? new Date()),
           technicianUserId: actor.userId,
-          // `undefined` giu nguyen gia tri cu - ket qua dinh tinh cua lan truoc khong bi
-          // xoa chi vi lan nay ky thuat vien khong nhac toi no.
+
           ...(dto.resultText !== undefined ? { resultText: dto.resultText } : {}),
         },
       );
@@ -132,8 +94,6 @@ export class LaboratoriesService {
 
     return this.findOrder(labTestOrderId);
   }
-
-  // ----------------------------------------------------------------------- Doc
 
   async findOrder(id: string): Promise<LabTestOrder> {
     const order = await this.ordersRepository.findOne({
@@ -147,7 +107,6 @@ export class LaboratoriesService {
     return order;
   }
 
-  /** Cac yeu cau xet nghiem cua mot ho so benh an, kem bang chi so. */
   async findByMedicalRecord(medicalRecordId: string): Promise<LabTestOrder[]> {
     return this.ordersRepository.find({
       where: { medicalRecordId },
@@ -156,7 +115,6 @@ export class LaboratoriesService {
     });
   }
 
-  /** Toan bo lich su xet nghiem cua mot thu cung - tab Xet nghiem (P9-T6). */
   async findByPet(petId: string): Promise<LabTestOrder[]> {
     return this.ordersRepository
       .createQueryBuilder('order')
@@ -169,16 +127,6 @@ export class LaboratoriesService {
       .getMany();
   }
 
-  /**
-   * Chuoi thoi gian cua mot chi so - FR-13-02, acceptance P9-T6.
-   *
-   * Sap theo `COALESCE(result_date, created_at)` TANG dan: bieu do doc tu trai sang
-   * phai. Khac moi danh sach khac trong he thong (moi nhat truoc) va do la co y.
-   *
-   * Thu cung chua xet nghiem lan nao tra ve `points: []` chu khong phai 404: giao dien
-   * can phan biet "chua co du lieu" (hien empty state) voi "khong tim thay thu cung"
-   * (hien loi), va ca hai deu tra 404 thi khong phan biet duoc.
-   */
   async findTrends(petId: string, parameter: string): Promise<LabTrendSeries> {
     const normalized = this.normalizeParameter(parameter);
 
@@ -212,7 +160,6 @@ export class LaboratoriesService {
     };
   }
 
-  /** Cac ten chi so da tung do cho mot thu cung - de giao dien dung o chon chi so. */
   async findParameters(petId: string): Promise<string[]> {
     const rows: { parameter: string }[] = await this.dataSource.query(
       `
@@ -231,12 +178,6 @@ export class LaboratoriesService {
     return rows.map((row) => row.parameter);
   }
 
-  /**
-   * Hang cho xet nghiem - acceptance P9-T7.
-   *
-   * Cu nhat len TRUOC (`ASC`), cung quy uoc voi hang cho quay thuoc o P7: viec cho lau
-   * nhat phai duoc lam truoc.
-   */
   async findQueue(query: QueryLabQueueDto): Promise<LabQueueRow[]> {
     return this.dataSource.query(
       `
@@ -271,8 +212,6 @@ export class LaboratoriesService {
     );
   }
 
-  // ------------------------------------------------------------------ Ben trong
-
   private toResultColumns(labTestOrderId: string, dto: LaboratoryResultDto) {
     const referenceMin = dto.referenceMin ?? null;
     const referenceMax = dto.referenceMax ?? null;
@@ -289,19 +228,13 @@ export class LaboratoriesService {
       unit: dto.unit ?? null,
       referenceMin,
       referenceMax,
-      // Bac si truyen `flag` = ghi de; bo trong = he thong tinh. Ca hai nhanh deu ghi
-      // `flagOverridden` tuong ung de lan luu sau khong xoa mat quyet dinh cua nguoi.
+
       flag: dto.flag ?? computeLabResultFlag(dto.value, { referenceMin, referenceMax }),
       flagOverridden: dto.flag !== undefined,
       note: dto.note ?? null,
     };
   }
 
-  /**
-   * Chi muc unique `(lab_test_order_id, parameter)` cung chan trung o CSDL, nhung bao
-   * bang mot loi 400 co ten chi so thi ky thuat vien sua duoc ngay; de CSDL bao thi
-   * nguoi dung nhan mot thong bao rang buoc khong doc duoc.
-   */
   private assertNoDuplicateParameters(results: readonly LaboratoryResultDto[]): void {
     const seen = new Set<string>();
     for (const result of results) {
@@ -315,7 +248,6 @@ export class LaboratoriesService {
     }
   }
 
-  /** Xem ghi chu dau lop ve ly do chuan hoa. */
   private normalizeParameter(parameter: string): string {
     return parameter.trim().replace(/\s+/g, ' ').toUpperCase();
   }

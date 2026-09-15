@@ -20,14 +20,6 @@ import { CategoriesService } from '@/modules/catalog/application/categories.serv
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
-/**
- * SRS FR-16 - danh muc hang hoa.
- *
- * Doc la `@Public()` giong cac route danh muc khac (`/catalog/items`,
- * `/catalog/services`): trang gia cong khai va man hinh dat lich deu can loc theo danh
- * muc ma khong co token. Ghi doi `CATALOG_MANAGE` (ADMIN, MANAGER, PHARMACIST theo ma
- * tran hien tai).
- */
 @ApiTags('catalog')
 @Controller('catalog/categories')
 export class CategoriesController {
@@ -39,7 +31,6 @@ export class CategoriesController {
     return this.categoriesService.create(dto);
   }
 
-  /** Tra ve DANG CAY (acceptance FR-16), khong phai danh sach phang. */
   @Public()
   @Get()
   findTree(

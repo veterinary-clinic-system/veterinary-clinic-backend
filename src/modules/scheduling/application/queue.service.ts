@@ -46,10 +46,6 @@ const QUEUE_DETAIL_RELATIONS = [
   'appointment',
 ];
 
-/**
- * Thu tu goi vao phong: DO truoc, XANH DUONG sau cung. Luot cho khong ghi muc uu tien
- * xep sau moi muc uu tien da ghi (do dai mang), roi moi den so thu tu.
- */
 const PRIORITY_RANK_SQL = `CASE queue.priority_color
     WHEN 'RED' THEN 0
     WHEN 'ORANGE' THEN 1
@@ -59,20 +55,6 @@ const PRIORITY_RANK_SQL = `CASE queue.priority_color
     ELSE 5
   END`;
 
-/**
- * Hang cho tai quay le tan. Bon thao tac cua Section "Nhan vien co the":
- *   1. Xac nhan khach da den      -> `checkIn`
- *   2. Tao luot kham khong dat lich -> `createWalkIn`
- *   3. Dua vao hang cho           -> ca hai ham tren deu tao mot `QueueEntry`
- *   4. Gan bac si                 -> `assignDoctor`
- *
- * Quy uoc quan trong: mot luot cho CHUA gan bac si thi KHONG co `Appointment`. Bang
- * `appointments` bat buoc phai co `doctor_id` va bi rang buoc EXCLUDE
- * `appointment_no_overlap` khoa chat theo (bac si, khung gio) - nen khong the tao mot
- * lich hen "treo" cho khach vang lai. Lich hen chi ra doi tai buoc gan bac si, va luc
- * do khung gio duoc chon tu chinh luoi slot cua bac si do nen khong bao gio de len
- * mot lich hen da dat truoc.
- */
 @Injectable()
 export class QueueService {
   constructor(
@@ -84,20 +66,10 @@ export class QueueService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly availabilityService: AvailabilityService,
     private readonly partyResolver: PartyResolverService,
-    // Duong doi lich DUY NHAT - `preemptForEmergency` phai di qua day de chu nuoi cua
-    // ca bi doi nhan duoc thong bao, thay vi UPDATE thang vao bang.
+
     private readonly appointmentsService: AppointmentsService,
   ) {}
 
-  // ---------------------------------------------------------------------------------
-  // 1. Xac nhan khach da den (check-in)
-  // ---------------------------------------------------------------------------------
-
-  /**
-   * Khach co lich hen buoc vao phong kham: lich hen chuyen sang CHECKED_IN va mot luot
-   * cho duoc mo. Bac si da co san tren lich hen nen luot cho vao thang trang thai
-   * ASSIGNED, khong phai doi phan cong.
-   */
   async checkIn(dto: CheckInDto, actor: AuthenticatedUser): Promise<QueueEntry> {
     const appointment = await this.appointmentsRepository.findOne({
       where: { id: dto.appointmentId },
@@ -121,10 +93,6 @@ export class QueueService {
       );
     }
 
-    // Con vat co the dang o trong hang cho vi mot ly do khac (vi du le tan da mo mot
-    // luot vang lai cho no truoc khi nhan ra la khach co dat lich). Chi muc duy nhat
-    // `uq_queue_entries_one_active_per_pet` se chan o tang CSDL, nhung bat o day de
-    // le tan nhan duoc thong bao hieu duoc thay vi loi 500.
     const petInQueue = await this.queueRepository.findOne({
       where: { petId: appointment.petId, status: In(ACTIVE_QUEUE_STATUSES) },
     });
@@ -173,29 +141,6 @@ export class QueueService {
     return this.findOne(entry.id);
   }
 
-  // ---------------------------------------------------------------------------------
-  // 2. Tao luot kham khong dat lich (walk-in) + 3. Dua vao hang cho
-  // ---------------------------------------------------------------------------------
-
-  /**
-   * Khach den truc tiep. Luon tao luot cho truoc (khach da dung o quay roi - phai co
-   * so thu tu ngay); viec gan bac si la buoc rieng, co the lam ngay trong cung request.
-   *
-   * Phan hoi nghiem thu: "Khi khach den ma khong hen thi khi dien form nen chon luon
-   * thoi gian cho khach neu co bac si trong va thoi gian trong. Trong truong hop het
-   * bac si va thoi gian thi moi dua vao hang cho. Neu la cap cuu thi le tan se doi lich
-   * kham cua ca khac de bac si cap cuu."
-   *
-   * Nen thu tu o day la:
-   *   1. Le tan chi dinh `doctorId` -> gan dung nguoi do.
-   *   2. Khong chi dinh -> tim bac si con khung gio trong SOM NHAT hom nay va gan luon.
-   *   3. Ca chi nhanh het cho, ma ca nay la CAP CUU (do) -> doi lich mot ca nhe hon de
-   *      lay khung gio (`preemptForEmergency`).
-   *   4. Van khong duoc -> luot cho nam lai o WAITING, le tan gan tay sau.
-   *
-   * Gan that bai KHONG lam roll back luot cho - khach da xep hang thi khong the "bien
-   * mat" chi vi khong con bac si nao ranh.
-   */
   async createWalkIn(dto: CreateWalkInDto, actor: AuthenticatedUser): Promise<QueueEntry> {
     const branch = await this.branchesRepository.findOne({ where: { id: dto.branchId } });
     if (!branch) {
@@ -252,11 +197,6 @@ export class QueueService {
     return this.autoAssign(entry.id, branch.id, service.durationMinutes, actor);
   }
 
-  /**
-   * Tu xep khach vang lai vao khung gio trong som nhat cua BAT KY bac si nao con cho
-   * tai chi nhanh. Khong con cho thi luot van nam o hang cho - day la mot buoc "co
-   * gang", khong phai mot buoc bat buoc thanh cong.
-   */
   private async autoAssign(
     entryId: string,
     branchId: string,
@@ -274,12 +214,10 @@ export class QueueService {
           actor,
         );
       } catch {
-        // Mot le tan khac vua chiem dung khung do - khong sao, luot cho van con.
+        
       }
     }
 
-    // Ca cap cuu khong duoc phep ngoi doi het buoi vi lich da kin: doi mot ca nhe hon
-    // sang khung gio khac de lay cho. Chi lam khi KHONG con khung trong nao.
     if (entry.priorityColor === PriorityColor.RED) {
       const preempted = await this.preemptForEmergency(entry, branchId, durationMinutes, actor);
       if (preempted) return preempted;
@@ -288,20 +226,6 @@ export class QueueService {
     return this.findOne(entryId);
   }
 
-  // ---------------------------------------------------------------------------------
-  // 4. Gan bac si
-  // ---------------------------------------------------------------------------------
-
-  /**
-   * Gan/doi bac si phu trach mot luot cho.
-   *
-   * Hai truong hop:
-   *   - Luot cho DA co lich hen (khach dat truoc): doi bac si cua lich hen do sang bac
-   *     si moi, tai dung khung gio cu neu con trong, khong thi khung trong som nhat.
-   *   - Luot cho CHUA co lich hen (khach vang lai): tao lich hen moi tai khung trong
-   *     som nhat con lai trong ngay cua bac si, trang thai CHECKED_IN (khach dang o
-   *     phong kham chu khong phai vua dat lich).
-   */
   async assignDoctor(
     id: string,
     dto: AssignDoctorDto,
@@ -333,9 +257,7 @@ export class QueueService {
 
     await mapAppointmentOverlapError(() =>
       this.dataSource.transaction(async (manager) => {
-        // Cung khoa tu van theo bac si ma AppointmentsService dung - hai le tan gan
-        // cung mot bac si cho hai khach cung luc khong the cung di qua buoc kiem tra
-        // "khung gio con trong khong".
+
         await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [doctor.id]);
         await this.assertSlotIsFree(manager, doctor.id, startAt, endAt, entry.appointmentId);
 
@@ -356,14 +278,12 @@ export class QueueService {
               bookedByUserId: actor.userId,
               startAt,
               endAt,
-              // Khach vang lai da co mat tai phong kham - lich hen sinh ra o day
-              // khong bao gio di qua PENDING/CONFIRMED.
+
               status: AppointmentStatus.CHECKED_IN,
               priorityColor: entry.priorityColor,
               commonSymptoms: entry.commonSymptoms,
               otherSymptoms: entry.reason,
-              // Anh khach dua o quay di theo sang lich hen vua tao - xem ghi chu tren
-              // cot `photoUrls` cua `QueueEntry`.
+
               photoUrls: entry.photoUrls ?? [],
             }),
           );
@@ -372,14 +292,12 @@ export class QueueService {
 
         await manager.update(QueueEntry, entry.id, {
           doctorId: doctor.id,
-          // Chi day WAITING -> ASSIGNED. Doi bac si cho mot ca DANG kham (IN_ROOM)
-          // khong duoc keo nguoc trang thai ve ASSIGNED.
+
           ...(entry.status === QueueStatus.WAITING ? { status: QueueStatus.ASSIGNED } : {}),
         });
       }),
     );
 
-    // Bac si cu (neu co) va bac si moi deu doi lich trong ngay -> xoa ca hai cache.
     if (entry.doctorId && entry.doctorId !== doctor.id) {
       await this.availabilityService.invalidateDoctorDay(entry.doctorId, entry.branchId, startAt);
     }
@@ -388,22 +306,6 @@ export class QueueService {
     return this.findOne(id);
   }
 
-  // ---------------------------------------------------------------------------------
-  // Van hanh hang cho
-  // ---------------------------------------------------------------------------------
-
-  /**
-   * Day trang thai luot cho, va dong bo trang thai lich hen di kem:
-   *   IN_ROOM   -> lich hen IN_PROGRESS (bac si bat dau kham)
-   *   DONE      -> KHONG dong lich hen. Lich hen chi thanh COMPLETED khi bac si ghi
-   *                phieu kham - dong no o day se lam phieu kham khong ghi duoc nua.
-   *   CANCELLED -> lich hen CANCELLED, kem luu vet (FR-05-04)
-   *
-   * Truoc P3, huy luot cho day lich hen sang NO_SHOW. Da sua thanh CANCELLED: khach
-   * DA buoc vao phong kham roi moi bo ve thi khong phai la "khong den". Gop chung hai
-   * viec lam bao cao ty le vang mat cua P10 sai, va FR-06-03 doi hai thao tac tach
-   * bach - "khong den" gio la `POST /appointments/:id/no-show` rieng.
-   */
   async update(
     id: string,
     dto: UpdateQueueEntryDto,
@@ -418,8 +320,7 @@ export class QueueService {
     }
 
     const now = new Date();
-    // Ly do huy lan sang tan lich hen (FR-05-04) nen phai co gia tri ngay ca khi le tan
-    // bam huy ma khong go gi - de trong thi bao cao huy cua P10 lai la mot con so tron.
+
     const cancelReason = dto.reason?.trim() || 'Khách bỏ về trước khi được khám';
 
     const patch = {
@@ -428,12 +329,10 @@ export class QueueService {
       ...(dto.note !== undefined ? { note: dto.note } : {}),
       ...(dto.status === QueueStatus.IN_ROOM ? { calledAt: now } : {}),
       ...(dto.status && TERMINAL_QUEUE_STATUSES.has(dto.status) ? { finishedAt: now } : {}),
-      // Luot cho giu ban sao ly do de man hinh hang cho hien duoc ma khong phai JOIN
-      // sang lich hen (luot cho cua khach vang lai chua chac da co lich hen).
+
       ...(dto.status === QueueStatus.CANCELLED ? { cancelReason } : {}),
     };
-    // `manager.update` voi mot object rong nem loi - mot PATCH khong doi gi thi chi
-    // don gian tra ve nguyen trang.
+
     if (Object.keys(patch).length === 0) {
       return entry;
     }
@@ -469,10 +368,6 @@ export class QueueService {
     return this.findOne(id);
   }
 
-  /**
-   * Hang cho cua mot ngay. Sap xep theo muc uu tien truoc, roi so thu tu - dung thu tu
-   * ma man hinh quay le tan can goi khach.
-   */
   async list(query: QueryQueueDto): Promise<QueueEntry[]> {
     const qb = this.queueRepository
       .createQueryBuilder('queue')
@@ -509,17 +404,6 @@ export class QueueService {
     return entry;
   }
 
-  // ---------------------------------------------------------------------------------
-  // Helper rieng
-  // ---------------------------------------------------------------------------------
-
-  /**
-   * So thu tu ke tiep cua (chi nhanh, ngay), danh lai tu 1 moi ngay.
-   *
-   * `pg_advisory_xact_lock` tren cap khoa nay lam hai request cung chi nhanh phai xep
-   * hang o day - neu khong, hai khach den cung luc se cung doc ra MAX() giong nhau va
-   * nhan cung mot so thu tu.
-   */
   private async nextTicketNumber(
     manager: EntityManager,
     branchId: string,
@@ -531,7 +415,7 @@ export class QueueService {
     const row = await manager
       .createQueryBuilder(QueueEntry, 'queue')
       .select('COALESCE(MAX(queue.ticket_number), 0)', 'max')
-      // `withDeleted` de mot luot cho bi xoa mem khong lam so thu tu bi cap lai.
+      
       .withDeleted()
       .where('queue.branchId = :branchId', { branchId })
       .andWhere('queue.queueDate = :queueDate', { queueDate })
@@ -540,13 +424,6 @@ export class QueueService {
     return Number(row?.max ?? 0) + 1;
   }
 
-  /**
-   * Khung gio se dat cho lich hen khi gan bac si, theo thu tu uu tien:
-   *   1. Gio le tan chi dinh tay (`dto.startAt`).
-   *   2. Gio SAN CO cua lich hen (khach dat truoc, chi doi bac si) - neu bac si moi
-   *      dang ranh dung khung do thi giu nguyen, khong lam khach phai doi them.
-   *   3. Khung trong som nhat con lai trong ngay cua bac si moi.
-   */
   private async resolveAssignmentStart(
     entry: QueueEntry,
     doctorId: string,
@@ -573,7 +450,6 @@ export class QueueService {
     return this.findNextFreeStart(doctorId, entry.branchId, durationMinutes);
   }
 
-  /** Doc nhanh ngoai transaction, chi de CHON gio - viec chot van do assertSlotIsFree lam. */
   private async isRangeFreeForDoctor(
     doctorId: string,
     startAt: Date,
@@ -598,12 +474,6 @@ export class QueueService {
     return !(await qb.getExists());
   }
 
-  /**
-   * Khung gio trong SOM NHAT hom nay tren toan bo bac si dang lam viec tai chi nhanh.
-   *
-   * Tra ve `null` thay vi nem loi: het cho khong phai la loi - do la truong hop binh
-   * thuong ma khach nam lai hang cho.
-   */
   private async findEarliestFreeDoctorSlot(
     branchId: string,
     durationMinutes: number,
@@ -623,17 +493,6 @@ export class QueueService {
     return best;
   }
 
-  /**
-   * Ca CAP CUU khi ca chi nhanh da kin lich: doi lich mot ca nhe hon de lay khung gio.
-   *
-   * Chon "nan nhan" la ca CON LAI SOM NHAT trong ngay co muc uu tien nhe hon do va
-   * chua duoc tiep nhan (con PENDING/CONFIRMED - khach chua den phong kham, doi lich
-   * cho ho la viec goi mot cuoc dien thoai chu khong phai duoi ai ra khoi phong).
-   * Ca do bi day sang khung trong ke tiep cua chinh bac si ay; neu bac si khong con
-   * khung nao thi bo qua va thu nan nhan khac.
-   *
-   * `AppointmentsService.update` la duong doi lich duy nhat - no tu bao cho chu nuoi.
-   */
   private async preemptForEmergency(
     entry: QueueEntry,
     branchId: string,
@@ -654,15 +513,12 @@ export class QueueService {
     });
 
     for (const victim of victims) {
-      // Khong bao gio doi lich mot ca cap cuu khac de nhuong cho ca cap cuu nay.
+      
       if (victim.priorityColor === PriorityColor.RED) continue;
 
       const victimDuration = victim.service?.durationMinutes ?? 30;
       const freedStart = victim.startAt;
 
-      // Cho ca bi doi phai co cho khac de di, neu khong thi day chi la doi cho hai nguoi
-      // cung kho. Khung hien tai cua ho dang la BOOKED tren luoi nen `findNextFreeStart`
-      // khong the tra ve chinh no - phep so sanh ben duoi chi la lop chan thu hai.
       const newStart = await this.findNextFreeStart(
         victim.doctorId,
         branchId,
@@ -683,11 +539,7 @@ export class QueueService {
           actor,
         );
       } catch {
-        // Khung vua giai phong lai bi chiem. TRA ca nan nhan ve gio cu truoc khi thu
-        // nguoi khac: neu khong, ho da bi doi lich (va da nhan thong bao doi lich) ma
-        // ca cap cuu van khong dung duoc khung do - hai nguoi cung thiet, khong ai
-        // duoc gi. Tra ve that bai thi giu nguyen gio moi va di tiep - it nhat khong
-        // day them mot ca nua.
+
         try {
           await this.appointmentsService.update(
             victim.id,
@@ -695,8 +547,7 @@ export class QueueService {
             actor,
           );
         } catch {
-          // Gio cu vua bi nguoi khac lay mat - ca nan nhan o lai gio moi. Khach da
-          // nhan duoc thong bao doi lich nen khong co gi "im lang" o day.
+
         }
         continue;
       }
@@ -705,12 +556,6 @@ export class QueueService {
     return null;
   }
 
-  /**
-   * Khung gio trong som nhat con lai HOM NAY cua bac si, du dai cho `durationMinutes`.
-   *
-   * Luoi slot la 30 phut nhung dich vu co the dai hon, nen phai kiem tra MOI slot ma
-   * khoang [start, start+duration) cham vao deu con trong - khong chi rieng slot dau.
-   */
   private async findNextFreeStart(
     doctorId: string,
     branchId: string,
@@ -725,12 +570,9 @@ export class QueueService {
 
     for (const slot of day.slots) {
       if (slot.status !== SlotStatus.FREE) continue;
-      // Khung gio da troi qua thi khong con dung duoc.
+      
       if (slot.endAt.getTime() <= now.getTime()) continue;
 
-      // `slotsCovering` doi ca kham nam GON tren luoi: dung mep, lien tuc, cham toi
-      // endAt. Phep loc tay truoc day chi so sanh `endAt` cua o cuoi nen mot dich vu
-      // dai co the nhay qua gio nghi trua roi dem tiep o ben kia.
       const covered = slotsCovering(
         day.slots,
         slot.startAt,
@@ -746,12 +588,6 @@ export class QueueService {
     );
   }
 
-  /**
-   * Ban sao cua kiem tra trung lich trong `AppointmentsService`, chay TRONG transaction
-   * dang giu khoa tu van. Chi kiem tra bang `appointments` - luoi slot da duoc
-   * `findNextFreeStart` xet roi, va khi le tan tu chi dinh `startAt` thi day la co y
-   * xep them ngoai luoi (vi du ca cap cuu chen giua hai ca).
-   */
   private async assertSlotIsFree(
     manager: EntityManager,
     doctorId: string,

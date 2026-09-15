@@ -1,27 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Ma nghiep vu va danh muc cho `items` - SRS FR-14 (Service.Code), FR-15
- * (Medicine.Code), FR-16 (Product.Category), NFR-02 (tim kiem nhanh).
- *
- * DAT O `items`, KHONG NHAN BAN XUONG BANG CON. FR-14 doi `Service.Code` va FR-15 doi
- * `Medicine.Code`; hai cot ma o hai bang con nghia la o tim kiem "nhap ma hang" phai
- * UNION hai bang va khong the co mot chi muc duy nhat phuc vu no. Mot cot tren `items`
- * la du cho ca ba loai.
- *
- * MOT SEQUENCE CHO MOI TIEN TO, khong dung chung mot bo dem: dung chung thi dich vu
- * thu hai trong he thong co the mang ma DV0007 chi vi da co 6 loai thuoc duoc tao
- * truoc - doc len nghe nhu he thong mat du lieu. Tien to:
- *   SERVICE -> DV   MEDICATION -> TH   LAB_TEST -> XN   PRODUCT -> SP   OTHER -> HH
- *
- * Cap ma bang TRIGGER chu khong phai cot DEFAULT: tien to phu thuoc `itemType` cua
- * chinh dong dang chen, ma mot bieu thuc DEFAULT khong nhin thay duoc cac cot khac.
- * (Khac `pets.pet_code` - o do moi dong deu cung mot tien to nen DEFAULT la du.)
- *
- * Backfill chay TRUOC khi gan trigger va co ORDER BY `created_at`: neu de trigger tu
- * cap khi duyet, Postgres di theo thu tu vat ly cua bang va item cu co the nhan ma lon
- * hon item moi.
- */
 export class ItemCodeAndCategory1791000002000 implements MigrationInterface {
   name = 'ItemCodeAndCategory1791000002000';
 
@@ -44,8 +22,6 @@ export class ItemCodeAndCategory1791000002000 implements MigrationInterface {
       const sequence = `item_code_${prefix.toLowerCase()}_seq`;
       await queryRunner.query(`CREATE SEQUENCE IF NOT EXISTS "${sequence}" START 1`);
 
-      // So sanh qua ::text thay vi literal enum - khong phu thuoc vao viec gia tri
-      // 'PRODUCT' da duoc ALTER TYPE o migration truoc hay chua.
       await queryRunner.query(`
         UPDATE "items" i
            SET "code" = '${prefix}' || LPAD(s."seq"::text, 4, '0')
@@ -87,7 +63,6 @@ export class ItemCodeAndCategory1791000002000 implements MigrationInterface {
 
     await queryRunner.query(`ALTER TABLE "items" ALTER COLUMN "code" SET NOT NULL`);
 
-    // Partial unique - item xoa mem khong giu cho ma (cung quy uoc voi uq_pets_pet_code).
     await queryRunner.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_items_code"
       ON "items" ("code") WHERE "deleted_at" IS NULL

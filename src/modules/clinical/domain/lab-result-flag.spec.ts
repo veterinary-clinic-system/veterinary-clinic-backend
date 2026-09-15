@@ -1,10 +1,6 @@
 import { LabResultFlag } from '@/shared/common/enums/lab-result-flag.enum';
 import { computeLabResultFlag, isValidReferenceRange } from './lab-result-flag.util';
 
-/**
- * Test cho phep gan co bat thuong - acceptance P9-T5: "Nhap WBC = 25 voi khoang 6-17
- * -> flag = HIGH tu dong".
- */
 describe('lab-result-flag.util', () => {
   describe('computeLabResultFlag', () => {
     const wbc = { referenceMin: 6, referenceMax: 17 };
@@ -22,8 +18,7 @@ describe('lab-result-flag.util', () => {
     });
 
     it('nam dung tren bien van la NORMAL', () => {
-      // Khoang tham chieu in tren phieu may la khoang DONG. Coi bien la bat thuong se to
-      // do moi ket qua nam dung o dau khoang.
+
       expect(computeLabResultFlag(6, wbc)).toBe(LabResultFlag.NORMAL);
       expect(computeLabResultFlag(17, wbc)).toBe(LabResultFlag.NORMAL);
     });
@@ -44,7 +39,7 @@ describe('lab-result-flag.util', () => {
     });
 
     it('khong bao gio tu sinh ra CRITICAL', () => {
-      // `CRITICAL` la phan doan lam sang, chi den tu viec ghi de bang tay.
+      
       const flags = [-100, 0, 6, 17, 25, 10_000].map((value) => computeLabResultFlag(value, wbc));
       expect(flags).not.toContain(LabResultFlag.CRITICAL);
     });

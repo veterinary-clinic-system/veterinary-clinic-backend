@@ -58,19 +58,15 @@ import { startOfWeek } from 'date-fns';
 
 const SORTABLE_COLUMNS = new Set(['startAt', 'endAt', 'status', 'priorityColor', 'createdAt']);
 
-// Exported (not just declared) because `declaration: true` (tsconfig) requires every
-// type reachable from a public method's inferred return type to be nameable in the
-// emitted .d.ts - AppointmentsController's calendar endpoints return this shape
-// straight through from AppointmentsService.getWeekCalendar without a manual annotation.
 export interface SlotAppointmentDetail {
   id: string;
   petName: string;
-  /** Giong + loai cua thu cung - o lich phai doc duoc ma khong can mo chi tiet. */
+  
   petBreedName: string | null;
   petSpeciesName: string | null;
   ownerName: string;
   ownerPhone: string;
-  /** Ten dich vu cua ca kham. */
+  
   serviceName: string | null;
   commonSymptoms: Appointment['commonSymptoms'];
   otherSymptoms: string | null;
@@ -84,10 +80,6 @@ export interface DayAvailabilityWithDetail extends Omit<DayAvailability, 'slots'
   slots: SlotWithDetail[];
 }
 
-/**
- * Goc nhin cong khai: chi con free/busy, khong he lo lich hen cua nguoi khac, va moi
- * khung gio truoc `minStartAt` bi ha xuong `PAST` de giao dien lam mo chung.
- */
 function stripToFreeBusy(days: DayAvailability[], minStartAt: Date): DayAvailability[] {
   return days.map((day) => ({
     ...day,
@@ -121,13 +113,6 @@ export class AppointmentsService {
     private readonly prescreeningService: PrescreeningService,
   ) {}
 
-  /**
-   * Guest/PetOwner self-booking, or a Receptionist booking on an owner's behalf
-   * (`bookedByUserId` set in that case) - Section 4.1.2. Branch is validated before
-   * doctor (the doctor must staff that branch), the slot is re-validated server-side
-   * against AvailabilityService, and the insert is guarded by a per-doctor Postgres
-   * advisory lock so two concurrent requests can never double-book the same slot.
-   */
   async createBooking(dto: CreateBookingDto, bookedByUserId: string | null): Promise<Appointment> {
     const branch = await this.branchesRepository.findOne({ where: { id: dto.branchId } });
     if (!branch) {
@@ -144,14 +129,10 @@ export class AppointmentsService {
     const startAt = new Date(dto.startAt);
     const endAt = addMinutes(startAt, service.durationMinutes);
 
-    // Khach tu dat chi duoc dat tu NGAY MAI tro di. Le tan dat ho (`bookedByUserId` co
-    // gia tri) khong bi chan - khach co the dang dung ngay o quay.
     if (bookedByUserId === null && startAt.getTime() < earliestSelfBookableStart().getTime()) {
       throw new BadRequestException(SELF_BOOKING_TOO_SOON_MESSAGE);
     }
 
-    // `doctorId` bo trong = "de phong kham sap xep": he thong tu chon mot bac si dang
-    // ranh dung khung gio do tai chi nhanh nay.
     const doctor = dto.doctorId
       ? await this.doctorsRepository.findOne({ where: { id: dto.doctorId } })
       : await this.pickAvailableDoctor(dto.branchId, startAt, endAt);
@@ -162,9 +143,6 @@ export class AppointmentsService {
     const owner = await this.partyResolver.resolveOwner(dto.phone, dto.ownerFullName, dto.email);
     const pet = await this.partyResolver.resolvePet(dto, owner);
 
-    // Bao ngoai transaction: neu rang buoc EXCLUDE cua CSDL chan (truong hop hai
-    // request lot qua duoc kiem tra o tang ung dung), doi loi tho 23P01 thanh 409
-    // thay vi de no thanh 500. Xem domain/appointment-overlap.ts.
     const appointment = await mapAppointmentOverlapError(() =>
       this.dataSource.transaction(async (manager) => {
         await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [doctor.id]);
@@ -187,11 +165,6 @@ export class AppointmentsService {
         });
         const saved = await manager.save(entity);
 
-        // Transactional Outbox (Phan IV.2): su kien nhac lich duoc ghi trong CUNG
-        // transaction voi lich hen. Neu transaction rollback thi su kien cung mat -
-        // khong bao gio co chuyen khach nhan tin nhan ve mot lich hen khong ton tai.
-        // Nguoc lai, khi lich hen da commit thi su kien chac chan co mat va worker
-        // se gui, ke ca khi api chet ngay sau do.
         await this.outboxService.record(manager, {
           type: 'APPOINTMENT_CREATED',
           dedupeKey: `appt:${saved.id}:created`,
@@ -232,15 +205,6 @@ export class AppointmentsService {
     return this.findOne(appointment.id);
   }
 
-  /**
-   * Chon bac si cho lua chon "de phong kham sap xep" (khach khong chi dinh ai).
-   *
-   * Duyet cac bac si dang lam viec tai chi nhanh, giu lai nhung nguoi co khung gio do
-   * FREE tren luoi slot cua ho, roi lay nguoi it lich nhat trong ngay - de tai kham
-   * khong don het vao mot nguoi. Viec CHOT khung gio van do `assertSlotIsFree` lam ben
-   * trong transaction dang giu khoa tu van, nen mot bac si vua bi chiem cho o day chi
-   * dan toi 409 va khach chon lai gio, khong bao gio thanh dat trung.
-   */
   private async pickAvailableDoctor(
     branchId: string,
     startAt: Date,
@@ -256,10 +220,7 @@ export class AppointmentsService {
         branchId,
         startAt,
       );
-      // Dich vu co the dai hon mot o 30 phut - `slotsCovering` doi ca kham nam gon
-      // tren luoi (dung mep, lien tuc, cham toi endAt), cung phep kiem tra ma
-      // `assertSlotIsFree` dung. Neu o day de lot thi lat sau khach nhan 400 o buoc
-      // chot chu khong phai mot bac si khac.
+
       const covered = slotsCovering(day.slots, startAt, endAt);
       if (!covered || !covered.every((slot) => slot.status === SlotStatus.FREE)) continue;
 
@@ -280,8 +241,7 @@ export class AppointmentsService {
   async findOne(id: string): Promise<Appointment> {
     const appointment = await this.appointmentsRepository.findOne({
       where: { id },
-      // `cancelledBy` de man hinh chi tiet hien duoc "Da huy boi ..." (FR-05-04) ma
-      // khong phai goi them mot request tra ten nguoi dung.
+
       relations: ['pet', 'pet.owner', 'doctor', 'branch', 'service', 'service.item', 'cancelledBy'],
     });
     if (!appointment) {
@@ -290,7 +250,6 @@ export class AppointmentsService {
     return appointment;
   }
 
-  /** PetOwner viewing their own history; guards against viewing someone else's appointment. */
   async findOneForOwner(id: string, actor: AuthenticatedUser): Promise<Appointment> {
     const appointment = await this.findOne(id);
     if (appointment.pet.ownerId !== actor.userId) {
@@ -307,13 +266,12 @@ export class AppointmentsService {
     });
   }
 
-  /** Staff list view backing the Table basic component (Section 7.3). */
   async listForStaff(
     query: PaginationQueryDto & {
       branchId?: string;
       doctorId?: string;
       status?: AppointmentStatus;
-      /** 'yyyy-MM-dd' - lich hen BAT DAU trong ngay do (theo mui gio cua may chu). */
+      
       date?: string;
     },
   ): Promise<PaginatedResultDto<Appointment>> {
@@ -332,15 +290,13 @@ export class AppointmentsService {
       qb.andWhere('appointment.doctorId = :doctorId', { doctorId: query.doctorId });
     if (query.status) qb.andWhere('appointment.status = :status', { status: query.status });
     if (query.date) {
-      // So sanh tren nua khoang [ngay, ngay+1) thay vi CAST(start_at AS date) = ... de
-      // con dung duoc chi muc tren (doctor_id, start_at).
+
       qb.andWhere(
         "appointment.startAt >= CAST(:date AS date) AND appointment.startAt < CAST(:date AS date) + INTERVAL '1 day'",
         { date: query.date },
       );
     }
 
-    // sortBy is caller-controlled input - never interpolate it unchecked into raw SQL.
     const sortColumn = SORTABLE_COLUMNS.has(query.sortBy ?? '') ? query.sortBy! : 'startAt';
     qb.orderBy(`appointment.${sortColumn}`, query.sortOrder ?? 'DESC')
       .skip((query.page - 1) * query.limit)
@@ -350,12 +306,6 @@ export class AppointmentsService {
     return new PaginatedResultDto(data, total, query.page, query.limit);
   }
 
-  /**
-   * Backs the calendar.png-style week view (Section 5.2). `includeDetail` must be false
-   * for the public/PetOwner booking widget and true only for Doctor/Receptionist/Admin -
-   * Section 4.2: "PetOwner and Guest... only ever see which slots are free, never
-   * another person's appointment details."
-   */
   async getWeekCalendar(
     branchId: string,
     doctorId: string | undefined,
@@ -368,17 +318,11 @@ export class AppointmentsService {
       ? await this.availabilityService.getDoctorWeekAvailability(doctorId, branchId, weekStart)
       : await this.getBranchWeekAvailability(branchId, weekStart);
 
-    // Che do gop khong co `appointmentId` tren tung o nen khong dinh kem chi tiet duoc -
-    // va man hinh nhan vien luon chon mot bac si cu the, nen truong hop nay khong xay ra.
     return includeDetail && doctorId
       ? this.attachAppointmentDetail(days)
       : stripToFreeBusy(days, earliestSelfBookableStart());
   }
 
-  /**
-   * Luoi slot GOP cua ca chi nhanh - phuc vu lua chon "de phong kham sap xep bac si" o
-   * buoc dat lich. Mot o con trong khi CO IT NHAT MOT bac si dang ranh o do.
-   */
   private async getBranchWeekAvailability(
     branchId: string,
     weekStart: Date,
@@ -412,10 +356,6 @@ export class AppointmentsService {
     });
   }
 
-  /**
-   * Che do NGAY cua lich lam viec (FR-05-03). Cung du lieu voi mot cot cua che do tuan -
-   * dung lai `getDoctorDayAvailability` thay vi dung mot duong tinh toan thu hai.
-   */
   async getDayCalendar(
     branchId: string,
     doctorId: string,
@@ -426,10 +366,6 @@ export class AppointmentsService {
     return withDetail;
   }
 
-  /**
-   * Che do THANG (FR-05-03) - chi so lieu tong hop moi ngay, khong co luoi slot.
-   * Xem ghi chu trong `AvailabilityService.getMonthOverview` ve ly do.
-   */
   async getMonthCalendar(
     branchId: string,
     doctorId: string | undefined,
@@ -438,11 +374,6 @@ export class AppointmentsService {
     return this.availabilityService.getMonthOverview(branchId, doctorId, monthOf);
   }
 
-  /**
-   * Gan chi tiet lich hen vao cac o da duoc dat. Chi danh cho Doctor/Receptionist/Admin -
-   * Section 4.2: "PetOwner and Guest... only ever see which slots are free, never another
-   * person's appointment details."
-   */
   private async attachAppointmentDetail(
     days: DayAvailability[],
   ): Promise<DayAvailabilityWithDetail[]> {
@@ -494,19 +425,12 @@ export class AppointmentsService {
   ): Promise<Appointment> {
     const appointment = await this.findOne(id);
 
-    // FR-05-04: huy lich va danh vang phai di qua endpoint rieng de bat buoc co ly do.
-    // Neu de PATCH lam duoc luon thi luu vet se thieu bat cu luc nao ai do dung nham
-    // cua - va do la dung trang thai ma FR-05-04 sinh ra de xoa bo.
     if (dto.status === AppointmentStatus.CANCELLED || dto.status === AppointmentStatus.NO_SHOW) {
       throw new ConflictException(
         'Hủy lịch hoặc đánh dấu khách không đến phải thực hiện qua thao tác riêng để ghi lại lý do.',
       );
     }
 
-    // Lich hen da ket thuc (COMPLETED/CANCELLED/NO_SHOW) la su kien lich su, khong
-    // the doi status hay doi lich nua - truoc day thieu kiem tra nay nen PATCH co
-    // the dua mot lich COMPLETED lui ve PENDING, hoac nhay thang PENDING -> COMPLETED
-    // (van hop le - xem NON_TERMINAL_ORDER) nhung khong the "mo lai" mot lich da xong.
     if (dto.status && !isValidAppointmentStatusTransition(appointment.status, dto.status)) {
       throw new ConflictException(
         `Khong the chuyen lich hen tu trang thai "${appointment.status}" sang "${dto.status}"`,
@@ -535,9 +459,6 @@ export class AppointmentsService {
       const startAt = dto.startAt ? new Date(dto.startAt) : appointment.startAt;
       const endAt = addMinutes(startAt, service?.durationMinutes ?? 30);
 
-      // Everything is written as one partial update (reschedule fields + status/color/notes)
-      // inside the same transaction/lock, so a trailing full-entity save can't clobber the
-      // just-written startAt/doctorId with the stale in-memory `appointment` snapshot.
       await this.dataSource.transaction(async (manager) => {
         await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [doctorId]);
         await this.assertSlotIsFree(doctorId, appointment.branchId, startAt, endAt, appointment.id);
@@ -564,7 +485,7 @@ export class AppointmentsService {
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
       });
       if (dto.status) {
-        // A status change (e.g. CANCELLED) can free up or occupy the slot even without a reschedule.
+        
         await this.availabilityService.invalidateDoctorDay(
           appointment.doctorId,
           appointment.branchId,
@@ -578,31 +499,17 @@ export class AppointmentsService {
     return updated;
   }
 
-  /**
-   * Huy lich hen - FR-05-04 doi ghi lai nguoi huy, thoi diem va ly do.
-   *
-   * Khong con di qua `update()`: mot `PATCH { status: CANCELLED }` khong mang theo ly
-   * do, va de no lam duong huy thu hai co nghia la luu vet se thieu bat ky luc nao ai
-   * do dung nham cua. `update()` gio tu choi thang hai trang thai nay.
-   */
   async cancel(
     id: string,
     dto: CancelAppointmentDto,
     actor: AuthenticatedUser,
   ): Promise<Appointment> {
     if (actor.role === Role.PET_OWNER) {
-      await this.findOneForOwner(id, actor); // throws ForbiddenException if not their own
+      await this.findOneForOwner(id, actor); 
     }
     return this.finishAbnormally(id, AppointmentStatus.CANCELLED, dto.reason, actor);
   }
 
-  /**
-   * Danh dau khach KHONG DEN - FR-06-03, thao tac doc lap voi viec huy lich.
-   *
-   * Chi ap dung cho lich CHUA tiep nhan. Khach da check-in roi bo ve giua chung la
-   * chuyen khac han (huy luot cho - xem `QueueService.update`), gop chung se lam bao
-   * cao ty le vang mat cua P10 sai.
-   */
   async markNoShow(id: string, dto: MarkNoShowDto, actor: AuthenticatedUser): Promise<Appointment> {
     const appointment = await this.findOne(id);
     if (
@@ -622,11 +529,6 @@ export class AppointmentsService {
     );
   }
 
-  /**
-   * Duong di duy nhat dua mot lich hen sang CANCELLED/NO_SHOW. Doi trang thai va ghi
-   * ba truong luu vet trong CUNG mot lenh UPDATE - khong the co lich da huy ma khong
-   * biet ai huy.
-   */
   private async finishAbnormally(
     id: string,
     status: AppointmentStatus.CANCELLED | AppointmentStatus.NO_SHOW,
@@ -635,10 +537,6 @@ export class AppointmentsService {
   ): Promise<Appointment> {
     const appointment = await this.findOne(id);
 
-    // Kiem tra trang thai ket thuc TRUOC `isValidAppointmentStatusTransition`: ham do
-    // coi `from === to` la hop le (de PATCH chi doi ghi chu van gui kem status hien
-    // tai duoc), nen neu chi dua vao no thi huy lai mot lich DA huy se di lot va ghi
-    // de len luu vet cu - mat ca nguoi huy lan ly do that su.
     if (TERMINAL_APPOINTMENT_STATUSES.has(appointment.status)) {
       throw new ConflictException(
         `Lịch hẹn đã ở trạng thái kết thúc ("${appointment.status}") - không thể thực hiện lại thao tác này.`,
@@ -658,7 +556,6 @@ export class AppointmentsService {
       cancelReason: reason,
     });
 
-    // Khung gio duoc tra lai cho bac si ngay khi lich thoat khoi SLOT_BLOCKING_STATUSES.
     await this.availabilityService.invalidateDoctorDay(
       appointment.doctorId,
       appointment.branchId,
@@ -668,10 +565,6 @@ export class AppointmentsService {
     const updated = await this.findOne(id);
     await this.notifyOwnerOfUpdate(updated, actor);
 
-    // Bao cho le tan va quan ly - bang muc 18 SRS (P10-T5). CHI khi HUY, khong khi
-    // NO_SHOW: "khach khong den" la ket qua duoc ghi nhan sau gio hen, khong con viec
-    // gi de ai xu ly ngay; con mot lich bi huy thi con khung gio vua trong ra va co
-    // the con khach dang cho duoc xep vao do.
     if (status === AppointmentStatus.CANCELLED) {
       await this.staffNotificationsService.notify(this.dataSource.manager, {
         type: StaffNotificationType.APPOINTMENT_CANCELLED,
@@ -681,8 +574,7 @@ export class AppointmentsService {
           `lúc ${updated.startAt.toLocaleString('vi-VN')} đã bị hủy. Lý do: ${reason}`,
         link: `/staff/appointments/${id}`,
         branchId: updated.branchId,
-        // Mot lich chi huy duoc dung mot lan (`TERMINAL_APPOINTMENT_STATUSES` chan lan
-        // hai), nen id la du de khoa - khong can gan them moc thoi gian.
+
         dedupeKey: `appt-cancelled:${id}`,
       });
     }
@@ -690,22 +582,6 @@ export class AppointmentsService {
     return updated;
   }
 
-  /**
-   * BAC SI NGHI DOT XUAT - dong lich cua ho trong mot ngay va xu ly cac ca da dat.
-   *
-   * Phan hoi nghiem thu neu van de ma khong kem de xuat, nen cach xu ly o day la:
-   *   1. Ghi mot `DoctorBreak` phu tron ngay -> luoi slot cua bac si do lap tuc thanh
-   *      BREAK, khong ai dat them duoc nua.
-   *   2. Voi tung ca CHUA tiep nhan trong ngay (PENDING/CONFIRMED), tim mot bac si khac
-   *      CUNG chi nhanh dang trong DUNG khung gio do va chuyen sang. Khach giu nguyen
-   *      gio hen - chi doi nguoi kham, va `update()` tu gui thong bao cho ho.
-   *   3. Ca khong tim duoc nguoi thay thi GIU NGUYEN va duoc liet ke trong ket qua tra
-   *      ve, de le tan goi dien doi lich thu cong. CO Y khong tu huy: huy lich cua
-   *      khach ma khong hoi la quyet dinh cua phong kham, khong phai cua he thong.
-   *
-   * Ca DA tiep nhan (CHECKED_IN/IN_PROGRESS) khong dung toi - khach dang o phong kham
-   * roi, do la viec cua quay le tan.
-   */
   async handleDoctorAbsence(
     dto: DoctorAbsenceDto,
     actor: AuthenticatedUser,
@@ -727,7 +603,7 @@ export class AppointmentsService {
       this.doctorBreaksRepository.create({
         doctorId: doctor.id,
         date: dto.date,
-        // Phu tron ngay lam viec - `AvailabilityService` chi so sanh chuoi 'HH:mm'.
+        
         startTime: '00:00',
         endTime: '23:59',
         reason: dto.reason?.trim() || 'Bác sĩ nghỉ đột xuất',
@@ -767,8 +643,7 @@ export class AppointmentsService {
       }
 
       try {
-        // Di qua `update()` chu khong UPDATE thang: no giu nguyen kiem tra trung lich
-        // duoi khoa tu van VA bao cho chu nuoi ve viec doi bac si.
+
         await this.update(appointment.id, { doctorId: replacement.id }, actor);
         reassigned.push({
           appointmentId: appointment.id,
@@ -801,10 +676,6 @@ export class AppointmentsService {
     return { doctorBreakId: doctorBreak.id, total: affected.length, reassigned, unresolved };
   }
 
-  /**
-   * Bac si cung chi nhanh dang TRONG dung khung gio cua ca nay. Uu tien nguoi it lich
-   * nhat trong ngay de cac ca bi doi khong don het vao mot nguoi.
-   */
   private async findReplacementDoctor(
     appointment: Appointment,
     absentDoctorId: string,
@@ -835,7 +706,6 @@ export class AppointmentsService {
     return scored[0]?.doctor ?? null;
   }
 
-  /** Section 4.1.4: "Optionally schedule a follow-up visit" - links back via parentAppointmentId. */
   async scheduleFollowUp(
     parentId: string,
     dto: Pick<CreateBookingDto, 'doctorId' | 'branchId' | 'serviceId' | 'startAt'>,
@@ -885,17 +755,7 @@ export class AppointmentsService {
     endAt: Date,
     excludeAppointmentId?: string,
   ): Promise<void> {
-    // KHONG DAT DUOC LICH TRONG QUA KHU - SRS muc 16 (P10-T8).
-    //
-    // Thieu cho nay cho toi P10: mot POST voi `startAt` nam nam 2020 tra ve 201 va tao
-    // that mot lich hen. Khong phep kiem tra nao khac bat duoc no - `@IsDateString()`
-    // chi kiem dinh dang, con luoi khung gio thi chi hoi "gio nay co trong ca lam viec
-    // khong", ma 16:00 cua mot ngay nam 2020 thi van la 16:00. Hau qua khong chi la mot
-    // ban ghi rac: bao cao ty le vang mat cua P10-T4 dem cac lich "da den han" nen mot
-    // lich qua khu khong ai den se tinh vao mau so ngay lap tuc.
-    //
-    // Dat o day chu khong o DTO de moi duong tao lich deu di qua - `createBooking`,
-    // `scheduleFollowUp` va moi lan doi gio ve sau.
+
     if (startAt.getTime() < Date.now()) {
       throw new BadRequestException('Không thể đặt lịch hẹn vào thời điểm trong quá khứ');
     }
@@ -920,14 +780,6 @@ export class AppointmentsService {
       startAt,
     );
 
-    // MOI o ma ca kham cham vao deu phai con dung duoc, khong chi rieng o dau tien.
-    //
-    // Truoc day cho nay chi tim `slot.start === startHHmm` roi xet mot minh o do, nen
-    // mot dich vu 60 phut (luoi la 30 phut) chi bi kiem tra dung nua dau. Hau qua tai
-    // hien duoc: "Phau thuat nho" dat luc 17:00 tra ve 201 va ket thuc luc 18:00 trong
-    // khi o cuoi cua ngay lam viec la 17:00-17:30; dat luc 10:30 thi de len gio nghi
-    // trua 11:00-13:30. Rang buoc EXCLUDE cua CSDL khong bat duoc hai truong hop nay -
-    // no chi biet cac lich hen khac, khong biet ca lam viec.
     const covered = slotsCovering(day.slots, startAt, endAt);
     if (!covered) {
       throw new BadRequestException(
@@ -951,7 +803,7 @@ export class AppointmentsService {
     appointment: Appointment,
     actor: AuthenticatedUser,
   ): Promise<void> {
-    if (actor.role === Role.PET_OWNER) return; // owner updating their own booking doesn't need a self-notification
+    if (actor.role === Role.PET_OWNER) return; 
 
     const label = appointment.priorityColor ? ` Mức độ ưu tiên: ${appointment.priorityColor}.` : '';
     const message =

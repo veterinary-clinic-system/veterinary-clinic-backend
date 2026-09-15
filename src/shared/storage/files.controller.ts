@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Controller,
   Inject,
-  ParseEnumPipe,
   Post,
   Query,
   UploadedFile,
@@ -29,11 +28,6 @@ export class FilesController {
     private readonly storage: StorageProvider,
   ) {}
 
-  /**
-   * Public because Section 4's booking flow lets a Guest attach symptom photos before
-   * an account exists. Rate-limited via Throttle + capped size/mime-type to bound abuse
-   * of an unauthenticated upload endpoint.
-   */
   @Public()
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post('upload')
@@ -44,9 +38,11 @@ export class FilesController {
     }),
   )
   async upload(
-    @Query('category', new ParseEnumPipe(FileCategory)) category: FileCategory,
+    @Query('category') category: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
+    const fileCategory = parseFileCategory(category);
+
     if (!file) {
       throw new BadRequestException('No file was uploaded');
     }
@@ -54,6 +50,19 @@ export class FilesController {
       throw new BadRequestException(`Unsupported file type: ${file.mimetype}`);
     }
 
-    return this.storage.save(category, file);
+    return this.storage.save(fileCategory, file);
   }
+}
+
+function parseFileCategory(value: string | undefined): FileCategory {
+  const normalized = value?.trim();
+  const categories = Object.values(FileCategory);
+
+  if (!normalized || !categories.includes(normalized as FileCategory)) {
+    throw new BadRequestException(
+      `Invalid upload category. Expected one of: ${categories.join(', ')}`,
+    );
+  }
+
+  return normalized as FileCategory;
 }

@@ -9,13 +9,6 @@ import {
 } from '@/modules/triage/application/ports/ai-prediction.port';
 import { AiClientService } from '@/modules/triage/infrastructure/ai-client/ai-client.service';
 
-/**
- * Adapter that (moi truong that): goi apps/veterinary-clinic-ai qua HTTP.
- *
- * Toan bo viec doi ten truong snake_case -> camelCase dung o day. Nho vay khi apps/veterinary-clinic-ai
- * doi hinh dang phan hoi (rat de xay ra moi lan retrain / doi kien truc model), chi
- * file nay phai sua - tang application va domain khong biet gi.
- */
 @Injectable()
 export class HttpAiPredictionAdapter implements AiPredictionProvider {
   constructor(private readonly client: AiClientService) {}
@@ -39,8 +32,7 @@ export class HttpAiPredictionAdapter implements AiPredictionProvider {
       cvConfidence: response.cv_confidence,
       overallConfidence: response.overall_confidence,
       raw: response as unknown as Record<string, unknown>,
-      // apps/veterinary-clinic-ai chua tra ve model_version; mac dinh 'unknown' de ban ghi van hop le,
-      // se thay bang gia tri that khi apps/veterinary-clinic-ai bo sung truong nay vao phan hoi.
+
       modelVersion: (response as unknown as { model_version?: string }).model_version ?? 'unknown',
     };
   }

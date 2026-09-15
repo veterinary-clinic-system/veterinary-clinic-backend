@@ -25,14 +25,6 @@ import { QueryStockTakesDto } from '@/modules/catalog/presentation/dto/query-sto
 const SORTABLE_COLUMNS = new Set(['takenDate', 'createdAt', 'confirmedAt']);
 const DETAIL_RELATIONS = ['items', 'items.item', 'branch'];
 
-/**
- * Kiem ke - SRS FR-18-03.
- *
- * Luong: tao phieu (chup so ton hien tai) -> nhap so dem -> xac nhan.
- *
- * Service nay KHONG tu tinh ton. Xac nhan phieu goi `InventoryService.adjust` cho tung
- * dong co chenh lech, va do la duong duy nhat ton thay doi - dung luat so mot cua kho.
- */
 @Injectable()
 export class StockTakesService {
   constructor(
@@ -44,12 +36,6 @@ export class StockTakesService {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  /**
-   * Tao phieu va CHUP so ton ngay tai day.
-   *
-   * Chup trong cung transaction voi viec tao phieu: neu chup roi moi luu o mot buoc
-   * khac, mot lan ban hang xen giua se lam so chup khong ung voi bat ky thoi diem nao.
-   */
   async create(dto: CreateStockTakeDto, createdByUserId?: string): Promise<StockTake> {
     const branch = await this.branchesRepository.findOne({ where: { id: dto.branchId } });
     if (!branch) {
@@ -130,7 +116,6 @@ export class StockTakesService {
     return stockTake;
   }
 
-  /** Nhap so dem cho nhieu dong. Chi lam duoc khi phieu con `DRAFT`. */
   async submitCounts(id: string, dto: SubmitStockTakeCountsDto): Promise<StockTake> {
     const stockTake = await this.findOne(id);
     this.assertDraft(stockTake);
@@ -155,16 +140,6 @@ export class StockTakesService {
     return this.findOne(id);
   }
 
-  /**
-   * Xac nhan phieu - dieu chinh ton cho tung dong co chenh lech.
-   *
-   * Ca phieu nam trong MOT transaction: xac nhan nua chung se de lai mot phieu
-   * `CONFIRMED` ma chi mot phan mat hang duoc dieu chinh, va khong con cach nao biet
-   * phan nao da xong.
-   *
-   * Dong chua dem (`countedQuantity IS NULL`) bi BO QUA, khong coi la thieu toan bo -
-   * xem comment o migration `StockTakes1792000004000`.
-   */
   async confirm(
     id: string,
     dto: ConfirmStockTakeDto,
@@ -229,13 +204,6 @@ export class StockTakesService {
     return this.findOne(id);
   }
 
-  /**
-   * Acceptance P6-T6: phieu da xac nhan khong sua duoc.
-   *
-   * Cung ap dung cho phieu da huy. Ly do khac nhau nhung ket qua giong nhau: phieu
-   * `CONFIRMED` da sinh cac dong so cai bat bien, sua no se lam so cai va chung tu noi
-   * nhau; phieu `CANCELLED` thi khong con la chung tu nua.
-   */
   private assertDraft(stockTake: StockTake): void {
     if (stockTake.status !== StockTakeStatus.DRAFT) {
       throw new ConflictException(

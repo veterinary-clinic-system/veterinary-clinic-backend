@@ -7,21 +7,6 @@ import { LogNotificationProvider } from './log-notification.provider';
 import { SmsNotificationProvider } from './sms-notification.provider';
 import { ZaloNotificationProvider } from './zalo-notification.provider';
 
-/**
- * Resolves a channel to its provider. `NOTIFICATION_PROVIDER=log` (the default) routes
- * every channel through the console/DB logger regardless of which channel was
- * requested, which is what makes local dev safe-by-default per Section 5.3.
- *
- * KENH EMAIL (P10-T6) BAT/TAT BANG BIEN MOI TRUONG, khong sua ma: khong co `SMTP_HOST`
- * thi mot yeu cau gui qua `EMAIL` roi ve `LogNotificationProvider`. Nho vay may dev cua
- * ai cung chay duoc ngay sau khi `git clone` - khong ai phai dung mot may chu SMTP chi
- * de mo trang chu len (acceptance P10-T6).
- *
- * Chu y cai roi ve nay CHI ap dung cho viec THIEU CAU HINH. Da cau hinh SMTP roi ma gui
- * loi thi `EmailNotificationProvider` bao that bai that su - va outbox se thu lai. Nuot
- * mot loi gui that thanh mot dong log se lam he thong bao "da gui" cho thu khong bao gio
- * den noi.
- */
 @Injectable()
 export class NotificationProviderRegistry {
   private readonly logger = new Logger(NotificationProviderRegistry.name);

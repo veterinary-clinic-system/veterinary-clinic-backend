@@ -10,17 +10,11 @@ import { QueryLabQueueDto } from './dto/query-lab-queue.dto';
 import { Audit } from '@/shared/common/decorators/audit.decorator';
 import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
-/**
- * Xet nghiem co cau truc - SRS FR-13 (P9-T5, T6, T7).
- *
- * `queue` dat truoc cac route co tham so - cung ly do voi `vaccinations/due`.
- */
 @ApiTags('laboratories')
 @Controller('laboratories')
 export class LaboratoriesController {
   constructor(private readonly laboratoriesService: LaboratoriesService) {}
 
-  /** Hang cho xet nghiem - viec cho lau nhat len truoc. */
   @RequirePermissions(Permission.LABORATORY_VIEW)
   @Get('queue')
   findQueue(@Query() query: QueryLabQueueDto) {
@@ -33,7 +27,6 @@ export class LaboratoriesController {
     return this.laboratoriesService.findParameters(petId);
   }
 
-  /** Chuoi thoi gian cua mot chi so - bieu do xu huong (P9-T6). */
   @RequirePermissions(Permission.LABORATORY_VIEW)
   @Get('by-pet/:petId/trends')
   findTrends(@Param('petId', ParseUUIDPipe) petId: string, @Query('parameter') parameter: string) {
@@ -58,10 +51,6 @@ export class LaboratoriesController {
     return this.laboratoriesService.findOrder(id);
   }
 
-  /**
-   * Ky thuat vien tra ket qua. `LABORATORY_RESULT_ENTER` chu khong phai
-   * `MEDICAL_RECORD_UPDATE` - xem ghi chu o `Permission.LABORATORY_RESULT_ENTER`.
-   */
   @RequirePermissions(Permission.LABORATORY_RESULT_ENTER)
   @Audit({ action: AuditAction.UPDATE, entity: 'LabTestOrder' })
   @Put('orders/:id/results')

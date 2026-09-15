@@ -1,10 +1,5 @@
 import { IsArray, IsNumber, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 
-/**
- * Doctor's exam-entry form (Section 4.1.4: "record actual symptoms, vital signs, and
- * the formal diagnosis"). One Examination per Appointment - service throws
- * ConflictException if one already exists, directing the caller to PATCH instead.
- */
 export class CreateExaminationDto {
   @IsUUID()
   appointmentId: string;

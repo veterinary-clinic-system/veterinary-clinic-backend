@@ -1,8 +1,8 @@
-/** Channels implemented by the NotificationProvider abstraction (Section 5.3). */
+
 export enum NotificationChannel {
   SMS = 'SMS',
   ZALO = 'ZALO',
-  /** Thu dien tu - P10-T6. Bat/tat bang bien moi truong, xem `notification.config.ts`. */
+  
   EMAIL = 'EMAIL',
 }
 

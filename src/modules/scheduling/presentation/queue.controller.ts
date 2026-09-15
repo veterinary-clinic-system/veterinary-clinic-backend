@@ -11,13 +11,6 @@ import { AssignDoctorDto } from './dto/assign-doctor.dto';
 import { UpdateQueueEntryDto } from './dto/update-queue-entry.dto';
 import { QueryQueueDto } from './dto/query-queue.dto';
 
-/**
- * Quay le tan - hang cho trong ngay.
- *
- * Bac si duoc XEM hang cho (de biet ai dang doi minh) va duoc doi trang thai luot cho
- * (goi khach vao phong / bao da kham xong), nhung viec TIEP NHAN khach - check-in,
- * mo luot vang lai, phan cong bac si - la thao tac cua le tan/quan tri.
- */
 @ApiTags('queue')
 @Controller('queue')
 export class QueueController {
@@ -35,21 +28,18 @@ export class QueueController {
     return this.queueService.findOne(id);
   }
 
-  /** Xac nhan khach da den (lich hen dat truoc). */
   @RequirePermissions(Permission.QUEUE_MANAGE)
   @Post('check-in')
   checkIn(@Body() dto: CheckInDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.queueService.checkIn(dto, actor);
   }
 
-  /** Tao luot kham khong dat lich va dua thang vao hang cho. */
   @RequirePermissions(Permission.QUEUE_MANAGE)
   @Post('walk-in')
   createWalkIn(@Body() dto: CreateWalkInDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.queueService.createWalkIn(dto, actor);
   }
 
-  /** Gan (hoac doi) bac si phu trach mot luot cho. */
   @RequirePermissions(Permission.QUEUE_MANAGE)
   @Patch(':id/assign')
   assignDoctor(

@@ -5,14 +5,6 @@ import {
   isValidPrescriptionStatusTransition,
 } from './prescription-status.enum';
 
-/**
- * Ma tran 4x4 day du cua luat chuyen trang thai don thuoc.
- *
- * Cung cach viet voi `queue-status.enum.spec.ts` va co cung ly do: luat duoc goi o dung
- * mot cho (`PrescriptionsService.transitionTo`) nhung quyet dinh toan bo hanh vi cua
- * quay thuoc, va mot o sai o day nghia la don co the bi cap phat hai lan - tuc la kho
- * bi tru doi. Them mot trang thai moi ma quen sua luat se lam bang nay do ngay.
- */
 describe('isValidPrescriptionStatusTransition', () => {
   const ALL = [
     PrescriptionStatus.PRESCRIBED,
@@ -21,7 +13,6 @@ describe('isValidPrescriptionStatusTransition', () => {
     PrescriptionStatus.CANCELLED,
   ];
 
-  // Hang = trang thai hien tai, cot = trang thai muon chuyen sang.
   const MATRIX: Record<PrescriptionStatus, Record<PrescriptionStatus, boolean>> = {
     [PrescriptionStatus.PRESCRIBED]: {
       [PrescriptionStatus.PRESCRIBED]: true,
@@ -30,14 +21,14 @@ describe('isValidPrescriptionStatusTransition', () => {
       [PrescriptionStatus.CANCELLED]: true,
     },
     [PrescriptionStatus.DISPENSING]: {
-      // Lui ve PRESCRIBED: khong. Don da co nguoi nhan o quay thuoc.
+      
       [PrescriptionStatus.PRESCRIBED]: false,
       [PrescriptionStatus.DISPENSING]: true,
       [PrescriptionStatus.DISPENSED]: true,
       [PrescriptionStatus.CANCELLED]: true,
     },
     [PrescriptionStatus.DISPENSED]: {
-      // Da giao thuoc va da ghi so cai kho - khong mo lai duoc bang bat cu duong nao.
+      
       [PrescriptionStatus.PRESCRIBED]: false,
       [PrescriptionStatus.DISPENSING]: false,
       [PrescriptionStatus.DISPENSED]: true,

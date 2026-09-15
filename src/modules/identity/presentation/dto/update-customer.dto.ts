@@ -8,13 +8,12 @@ import {
   MinLength,
 } from 'class-validator';
 
-/**
- * `phone` va `role` khong duoc khai bao o day co chu dich (giong `UpdateUserDto`):
- * so dien thoai la dinh danh dang nhap va la khoa tra cuu cua khach tai quay, doi no
- * la thao tac "tao ho so moi". `ValidationPipe({ whitelist: true })` toan cuc da loai
- * bo moi truong thua ma client co gang gui kem.
- */
 export class UpdateCustomerDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  avatarUrl?: string;
+
   @IsOptional()
   @IsString({ message: 'Vui lòng nhập họ tên khách hàng' })
   @MinLength(2, { message: 'Họ tên phải có ít nhất 2 ký tự' })

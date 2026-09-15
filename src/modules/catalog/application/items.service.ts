@@ -7,11 +7,6 @@ import { QueryItemsDto } from '@/modules/catalog/presentation/dto/query-items.dt
 
 const SORTABLE_COLUMNS = new Set(['itemName', 'unitPrice', 'itemType', 'createdAt', 'updatedAt']);
 
-/**
- * Generic read side of the shared `Item` catalog - the public price-list endpoint
- * (`GET /catalog/items`) and the read other backend modules use when they need current
- * prices without caring whether a row is a Service, Medication, lab test, etc.
- */
 @Injectable()
 export class ItemsService {
   constructor(@InjectRepository(Item) private readonly itemsRepository: Repository<Item>) {}

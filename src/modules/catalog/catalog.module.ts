@@ -48,22 +48,6 @@ import { SuppliersService } from '@/modules/catalog/application/suppliers.servic
 import { VaccinesController } from '@/modules/catalog/presentation/vaccines.controller';
 import { VaccinesService } from '@/modules/catalog/application/vaccines.service';
 
-/**
- * Catalog module - the system of record for the clinic's price list (Services +
- * Medications, each backed 1:1 by an Item), per-branch stock (InventoryItem), and the
- * Disease reference catalog used by the AI/prescreening pipeline and doctors.
- * `Branch` is only ever read here (to validate `branchId` on inventory writes) - it is
- * owned by another module.
- *
- * Tu P6 module nay con giu ca nghiep vu kho: lo hang, so cai xuat-nhap, don dat hang,
- * phieu nhap, kiem ke va canh bao ton. Chung nam chung o day chu khong tach thanh module
- * `inventory` rieng vi tat ca deu xoay quanh `Item` - tach ra thi ranh gioi module se
- * cat ngang mot cum khoa ngoai dai, va moi truy van kho se phai di qua barrel de lay ten
- * mat hang.
- *
- * `NotificationModule` duoc import de `InventoryAlertsService` dung `OutboxService` -
- * canh bao ton kho di qua outbox nhu moi su kien khac, khong gui thang.
- */
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -85,9 +69,7 @@ import { VaccinesService } from '@/modules/catalog/application/vaccines.service'
       StockTakeItem,
       Disease,
       Branch,
-      // Chi DOC: `VaccinesService` loc vaccine theo loai cua thu cung (P9-T1). Hai
-      // bang nay thuoc `pets`, catalog khong bao gio ghi vao chung - cung quy uoc voi
-      // `Branch` o tren.
+
       Pet,
       Species,
     ]),

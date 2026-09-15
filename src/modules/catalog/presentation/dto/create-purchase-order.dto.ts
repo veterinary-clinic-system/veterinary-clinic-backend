@@ -21,20 +21,12 @@ export class CreatePurchaseOrderItemDto {
   @Min(1)
   quantity: number;
 
-  /** Gia nhap thoa thuan, tinh bang DONG. */
   @Type(() => Number)
   @IsInt()
   @Min(0)
   unitCost: number;
 }
 
-/**
- * `POST /catalog/purchase-orders` - SRS UC-05.
- *
- * KHONG co `totalAmount`: tong tien la gia tri phai sinh tu cac dong, service tinh lay.
- * Nhan tu client thi som muon se co don co tong khong khop cac dong.
- * KHONG co `status`: don moi luon la `DRAFT`.
- */
 export class CreatePurchaseOrderDto {
   @IsUUID()
   supplierId: string;
@@ -42,7 +34,6 @@ export class CreatePurchaseOrderDto {
   @IsUUID()
   branchId: string;
 
-  /** `YYYY-MM-DD`. Bo trong thi lay ngay hom nay. */
   @IsOptional()
   @IsISO8601()
   orderDate?: string;

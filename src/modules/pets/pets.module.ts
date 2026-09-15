@@ -21,9 +21,7 @@ import { SpeciesService } from '@/modules/pets/application/species.service';
       Pet,
       Species,
       Breed,
-      // Read-only reads into other modules' tables (owner lookups, medical-record
-      // timeline, cac khoi cua trang ho so thu cung FR-04-03) - not calling into their
-      // services, same pattern as SchedulingModule.
+
       User,
       Appointment,
       MedicalRecord,

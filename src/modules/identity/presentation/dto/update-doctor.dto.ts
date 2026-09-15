@@ -2,7 +2,6 @@ import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID } from 'class-validator';
 import { Specialization } from '@/shared/common/enums/specialization.enum';
 
-/** Admin edit of a Doctor's clinical profile (`PATCH /users/doctors/:id`). */
 export class UpdateDoctorDto {
   @IsOptional()
   @IsString()

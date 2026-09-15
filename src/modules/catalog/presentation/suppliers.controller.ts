@@ -19,10 +19,6 @@ import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { QuerySuppliersDto } from './dto/query-suppliers.dto';
 
-/**
- * SRS FR-17 - nha cung cap. Toan bo la route noi bo: thong tin lien he va ma so thue
- * cua doi tac khong phai thu de cong khai.
- */
 @ApiTags('catalog')
 @Controller('catalog/suppliers')
 export class SuppliersController {

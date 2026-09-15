@@ -25,17 +25,12 @@ import { OperatingHourDto } from './dto/operating-hour.dto';
 export class BranchesController {
   constructor(private readonly branchesService: BranchesService) {}
 
-  /** Public listing - active branches only. `GET /branches/admin` below is the staff view. */
   @Public()
   @Get()
   findAllPublic() {
     return this.branchesService.findAllPublic();
   }
 
-  /**
-   * Declared before `GET :id` (and uses a literal path Nest/Express matches before the
-   * generic wildcard) so a request to `/branches/admin` isn't swallowed by `:id`.
-   */
   @Roles(Role.ADMIN)
   @RequirePermissions(Permission.BRANCH_MANAGE)
   @Get('admin')
@@ -63,7 +58,6 @@ export class BranchesController {
     return this.branchesService.update(id, dto);
   }
 
-  /** Body is a raw JSON array, so `ParseArrayPipe` (not a wrapper DTO) validates each item. */
   @Roles(Role.ADMIN)
   @RequirePermissions(Permission.BRANCH_MANAGE)
   @Put(':id/opening-hours')

@@ -21,13 +21,6 @@ import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import { QueryPurchaseOrdersDto } from './dto/query-purchase-orders.dto';
 
-/**
- * Don dat hang - SRS UC-05, muc 15.
- *
- * Dat hang duoc coi la mot hanh vi NHAP kho (`INVENTORY_IMPORT`) du chua co hang nao
- * vao kho: no la buoc dau cua cung mot quy trinh, va nguoi duoc phep nhap hang cung la
- * nguoi duoc phep dat hang.
- */
 @ApiTags('catalog')
 @Controller('catalog/purchase-orders')
 export class PurchaseOrdersController {

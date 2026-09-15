@@ -15,13 +15,6 @@ import {
 import { CommonSymptom } from '@/shared/common/enums/common-symptom.enum';
 import { CreatePetInlineDto } from './create-pet-inline.dto';
 
-/**
- * The public booking form (Guest or logged-in PetOwner). Branch must be chosen before
- * doctor - enforced in AppointmentsService by validating `doctorId` belongs to
- * `branchId`, not just at the DTO level. Exactly one of `petId` (existing pet, e.g. from
- * a returning owner or the pet-profile "book appointment" shortcut) or `newPet` (first
- * booking for this pet) must be supplied.
- */
 export class CreateBookingDto {
   @IsPhoneNumber('VN')
   phone: string;
@@ -46,10 +39,6 @@ export class CreateBookingDto {
   @IsUUID()
   branchId: string;
 
-  /**
-   * Bo trong = "de phong kham sap xep bac si". `AppointmentsService.createBooking` se
-   * chon mot bac si dang ranh dung khung gio do tai chi nhanh nay.
-   */
   @IsOptional()
   @IsUUID()
   doctorId?: string;

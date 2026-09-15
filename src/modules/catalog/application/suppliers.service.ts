@@ -9,13 +9,6 @@ import { QuerySuppliersDto } from '@/modules/catalog/presentation/dto/query-supp
 
 const SORTABLE_COLUMNS = new Set(['name', 'supplierCode', 'createdAt', 'updatedAt']);
 
-/**
- * Nha cung cap - SRS FR-17.
- *
- * Chua co kiem tra "ngung hoat dong nha cung cap con don nhap do -> 409": bang
- * `purchase_orders` ra doi o P6. Khi do them mot `assertNoOpenPurchaseOrders` vao
- * `update()` khi `active` chuyen sang false.
- */
 @Injectable()
 export class SuppliersService {
   constructor(
@@ -23,8 +16,7 @@ export class SuppliersService {
   ) {}
 
   async create(dto: CreateSupplierDto): Promise<Supplier> {
-    // `supplier_code` do cot DEFAULT cua CSDL cap. TypeORM khong gui cot nao khong co
-    // trong doi tuong nen DEFAULT duoc ap dung; `reload` de lay lai ma vua sinh.
+
     const supplier = this.suppliersRepository.create({
       name: dto.name,
       phone: dto.phone ?? null,
@@ -86,7 +78,6 @@ export class SuppliersService {
     return this.findOne(id);
   }
 
-  /** Xoa mem - lich su nhap hang cu van phai tra cuu duoc ten nha cung cap. */
   async remove(id: string): Promise<void> {
     await this.findOne(id);
     await this.suppliersRepository.softDelete(id);

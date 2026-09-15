@@ -7,17 +7,6 @@ import {
   PaymentResult,
 } from '@/modules/billing/application/ports/payment.port';
 
-/**
- * Adapter VNPay - tao URL chuyen huong sang cong thanh toan.
- *
- * CANH BAO: phan ky HMAC-SHA512 duoi day duoc viet theo dac ta cong khai cua VNPay
- * nhung CHUA duoc doi chieu voi moi truong sandbox that (chua co ma TmnCode/HashSecret).
- * Phai chay thu tren sandbox VNPay truoc khi dung that. Ham `verifyReturn` de doi
- * soat ket qua tra ve cung nam o day de logic ky/xac minh khong bi tach roi.
- *
- * Luu y: `settled: false` - tien CHUA vao tai khoan tai thoi diem tao URL. Hoa don chi
- * duoc danh dau da thanh toan khi VNPay goi lai IPN va chu ky duoc xac minh.
- */
 @Injectable()
 export class VnpayPaymentAdapter implements PaymentProvider {
   constructor(private readonly configService: ConfigService) {}
@@ -38,7 +27,7 @@ export class VnpayPaymentAdapter implements PaymentProvider {
       vnp_Version: '2.1.0',
       vnp_Command: 'pay',
       vnp_TmnCode: tmnCode,
-      // VNPay yeu cau so tien nhan 100 va la so nguyen.
+      
       vnp_Amount: String(request.amount * 100),
       vnp_CurrCode: 'VND',
       vnp_TxnRef: request.invoiceCode ?? request.invoiceId,
@@ -59,11 +48,6 @@ export class VnpayPaymentAdapter implements PaymentProvider {
     });
   }
 
-  /**
-   * Xac minh chu ky tren tham so VNPay tra ve (ca return-url lan IPN).
-   * So sanh chu ky la buoc BAT BUOC: neu bo qua, bat ky ai cung co the goi return-url
-   * voi trang thai thanh cong gia de danh dau hoa don da thanh toan.
-   */
   verifyReturn(query: Record<string, string>): boolean {
     const hashSecret = this.configService.get<string>('payment.vnpay.hashSecret');
     if (!hashSecret) return false;
@@ -78,7 +62,6 @@ export class VnpayPaymentAdapter implements PaymentProvider {
   }
 }
 
-/** VNPay yeu cau tham so duoc sap xep theo thu tu alphabet truoc khi ky. */
 function sortedEncodedPairs(params: Record<string, string>): string {
   return Object.keys(params)
     .sort()
@@ -96,7 +79,6 @@ function buildSignedQuery(params: Record<string, string>, hashSecret: string): s
   return `${data}&vnp_SecureHash=${secureHash}`;
 }
 
-/** VNPay dung dinh dang yyyyMMddHHmmss theo gio Viet Nam. */
 function formatVnpDate(date: Date): string {
   const vn = new Date(date.getTime() + 7 * 60 * 60 * 1000);
   const p = (n: number) => String(n).padStart(2, '0');

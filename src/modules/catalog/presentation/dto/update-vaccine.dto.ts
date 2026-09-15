@@ -13,14 +13,6 @@ import {
 } from 'class-validator';
 import { ParseOptionalBoolean } from './transforms';
 
-/**
- * PATCH /catalog/vaccines/:id - moi truong tuy chon.
- *
- * `active` duoc ap len CA HAI dong (`items` va `vaccines`), cung quy uoc voi
- * `UpdateMedicationDto`. Truyen `null` cho cac truong nullable de xoa trang chung;
- * `speciesIds` la THAY THE toan bo danh sach chu khong phai them vao - mang rong nghia
- * la "dung cho moi loai", khong phai "khong doi".
- */
 export class UpdateVaccineDto {
   @IsOptional()
   @IsString()

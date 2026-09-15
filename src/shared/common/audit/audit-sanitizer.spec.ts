@@ -1,14 +1,5 @@
 import { REDACTED, diffAuditSnapshots, sanitizeAuditPayload } from './audit-sanitizer';
 
-/**
- * Test cho bo loc truong nhay cam cua nhat ky kiem toan - SRS muc 14, acceptance P10-T1:
- * *"`passwordHash` khong xuat hien trong bat ky dong audit nao - viet test khang dinh
- * dieu nay"*.
- *
- * `describe('khong ro mat khau')` la test ma acceptance goi dich danh. Dung noi long no
- * khi refactor: no la thu duy nhat chung minh mot cach may kiem chung duoc rang nhat ky
- * kiem toan khong tro thanh mot bang mat khau.
- */
 describe('audit-sanitizer', () => {
   describe('khong ro mat khau', () => {
     it('che `passwordHash` doc tu entity User', () => {
@@ -23,7 +14,7 @@ describe('audit-sanitizer', () => {
 
       expect(sanitized.passwordHash).toBe(REDACTED);
       expect(JSON.stringify(sanitized)).not.toContain('$2b$12$');
-      // Cac truong con lai phai con nguyen - che het thi nhat ky vo dung.
+      
       expect(sanitized.phone).toBe('0900000001');
       expect(sanitized.fullName).toBe('Nguyen Van A');
     });
@@ -68,8 +59,7 @@ describe('audit-sanitizer', () => {
     });
 
     it('bang khac biet cung khong lam ro mat khau', () => {
-      // Duong nguy hiem nhat: hai ban chup deu da duoc che, nhung neu `diff` chay tren
-      // du lieu THO thi mat khau se quay lai qua cua sau nay.
+
       const before = sanitizeAuditPayload({ id: 'u-1', passwordHash: 'hash-cu' }) as Record<
         string,
         unknown
@@ -83,9 +73,7 @@ describe('audit-sanitizer', () => {
 
       expect(JSON.stringify(diff)).not.toContain('hash-cu');
       expect(JSON.stringify(diff)).not.toContain('hash-moi');
-      // Hai ban chup deu thanh `[REDACTED]` nen doi mat khau khong con la mot "thay doi"
-      // nhin thay duoc o day. Dung nhu mong muon: nhat ky ghi rang co lenh sua nguoi
-      // dung (mot dong `UPDATE` tren `User`), khong ghi mat khau moi la gi.
+
       expect(diff.passwordHash).toBeUndefined();
     });
   });

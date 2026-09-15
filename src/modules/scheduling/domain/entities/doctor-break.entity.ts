@@ -2,13 +2,6 @@ import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
 import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
 
-/**
- * Not in diagram.jpg - added to represent one-off unavailability (a single day's
- * lunch overrun, a sick day, vacation) that carves time out of an otherwise
- * recurring DoctorShift, per the "doesn't overlap the doctor's break time" rule
- * in prompt.md Section 5.1. `date` + start/end let this be a single afternoon off
- * or, when startTime/endTime span the whole working day, a full day off.
- */
 @Entity({ name: 'doctor_breaks' })
 @Index(['doctor', 'date'])
 export class DoctorBreak extends BaseEntity {

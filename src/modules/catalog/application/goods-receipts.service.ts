@@ -31,22 +31,6 @@ import { QueryGoodsReceiptsDto } from '@/modules/catalog/presentation/dto/query-
 const SORTABLE_COLUMNS = new Set(['receivedDate', 'totalAmount', 'createdAt']);
 const DETAIL_RELATIONS = ['items', 'items.item', 'supplier', 'branch', 'purchaseOrder'];
 
-/**
- * Nhan hang vao kho - SRS UC-05, BR-13.
- *
- * TOAN BO MOT PHIEU NAM TRONG MOT TRANSACTION. Day khong phai su can than thua: nhap
- * kho duoc mot nua roi loi la tinh huong TE NHAT co the xay ra voi du lieu kho - ton
- * tang cho vai dong, so cai co vai dong, so da nhan cua don thi lech, va khong ai biet
- * phai sua tu dau. Thu tu trong transaction:
- *
- *   1. Kiem tra moi dong (mat hang ton tai, khong nhan vuot so dat)  <- fail nhanh o day
- *   2. Luu phieu + cac dong
- *   3. `InventoryService.receive` tung dong (tang lo + so tong + ghi so cai)
- *   4. Cong `receivedQuantity` cua don, roi tinh lai trang thai don
- *
- * Buoc 1 lam TRUOC khi ghi bat cu thu gi, de truong hop bi tu choi thuong gap nhat
- * (nhan vuot so dat) khong phai dua vao rollback.
- */
 @Injectable()
 export class GoodsReceiptsService {
   constructor(
@@ -181,8 +165,6 @@ export class GoodsReceiptsService {
     return receipt;
   }
 
-  // ------------------------------------------------------------------ Ben trong
-
   private async loadOpenPurchaseOrder(
     em: EntityManager,
     purchaseOrderId: string,
@@ -217,20 +199,11 @@ export class GoodsReceiptsService {
     return new Map(lines.map((line) => [line.id, line]));
   }
 
-  /**
-   * CHOT HUONG cho tinh huong "nhan vuot so dat" ma P6-T5 doi phai chon mot: CAM, tra
-   * 409. Ly do: nhan nhieu hon so dat nghia la hoac don ghi sai, hoac nha cung cap giao
-   * nham - ca hai deu phai sua chung tu truoc, khong duoc am tham nhan vao kho roi de
-   * lai mot don co so nhan lon hon so dat (khong con doi soat cong no duoc). Muon nhan
-   * them that thi sua don (khi con DRAFT) hoac lap mot phieu nhap khong theo don.
-   *
-   * Rang buoc nay duoc lap lai o CSDL: `chk_purchase_order_items_received_not_exceeding`.
-   */
   private assertNotOverReceiving(
     lines: readonly CreateGoodsReceiptItemDto[],
     orderLines: Map<string, PurchaseOrderItem>,
   ): void {
-    /** Cong don trong PHAM VI mot phieu - hai dong cung tro ve mot dong don van phai cong lai. */
+    
     const receivingByOrderLine = new Map<string, number>();
 
     for (const line of lines) {

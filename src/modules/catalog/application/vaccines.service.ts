@@ -15,14 +15,6 @@ const ITEM_SORT_COLUMNS = new Set(['itemName', 'unitPrice']);
 const VACCINE_SORT_COLUMNS = new Set(['diseasePrevented', 'createdAt', 'updatedAt']);
 const DETAIL_RELATIONS = ['item', 'item.category', 'supplier', 'speciesApplicable'];
 
-/**
- * Danh muc vaccine - SRS FR-12 (P9-T1).
- *
- * Cung khuon voi `MedicationsService`/`ProductsService`: mot dong `items` (mang gia va
- * ma nghiep vu) + mot dong `vaccines` (mang phac do), tao trong CUNG transaction. Nho
- * the vaccine di thang vao kho, POS va hoa don ma khong doan nao phai biet no la
- * vaccine.
- */
 @Injectable()
 export class VaccinesService {
   constructor(
@@ -70,13 +62,6 @@ export class VaccinesService {
     return this.findOne(vaccineId);
   }
 
-  /**
-   * Danh sach vaccine, loc duoc theo loai - acceptance P9-T1.
-   *
-   * Dieu kien loc la "khai dich danh loai nay HOAC khong khai loai nao": vaccine dung
-   * cho moi loai (dai) khong khai dong nao trong `vaccine_species`, va no phai hien ra
-   * khi bac si dang kham cho. Xem `QueryVaccinesDto`.
-   */
   async findAll(query: QueryVaccinesDto): Promise<PaginatedResultDto<Vaccine>> {
     const speciesId = await this.resolveSpeciesFilter(query);
 
@@ -138,7 +123,7 @@ export class VaccinesService {
     );
 
     await this.dataSource.transaction(async (manager) => {
-      // `Pick` chu khong `Partial<Item>` - xem ghi chu trong `medications.service.ts`.
+      
       const itemUpdates: Partial<
         Pick<Item, 'itemName' | 'describe' | 'unitPrice' | 'categoryId' | 'active'>
       > = {};
@@ -181,8 +166,7 @@ export class VaccinesService {
       }
 
       if (dto.speciesIds !== undefined) {
-        // Danh sach loai la THAY THE toan bo. `save` tren entity co quan he ManyToMany
-        // la cach duy nhat TypeORM dong bo bang noi - `manager.update` bo qua quan he.
+
         const species = await this.resolveSpecies(manager, dto.speciesIds);
         const entity = await manager.findOneOrFail(Vaccine, {
           where: { id },
@@ -196,13 +180,6 @@ export class VaccinesService {
     return this.findOne(id);
   }
 
-  // ------------------------------------------------------------------ Ben trong
-
-  /**
-   * Phac do nhieu mui ma khong co khoang cach giua cac mui la mot ho so khong dung
-   * duoc: `VaccinationsService` se khong tinh noi `nextDueDate` cho mui thu hai, va
-   * loi do chi lo ra vao luc bac si dang tiem.
-   */
   private assertScheduleCoherent(doseCount: number, intervalDays: number | null): void {
     if (doseCount > 1 && !intervalDays) {
       throw new BadRequestException(
@@ -211,7 +188,6 @@ export class VaccinesService {
     }
   }
 
-  /** `petId` tien hon cho man hinh kham; quy ve `speciesId` de chi co mot duong loc. */
   private async resolveSpeciesFilter(query: QueryVaccinesDto): Promise<string | undefined> {
     if (query.speciesId) {
       return query.speciesId;

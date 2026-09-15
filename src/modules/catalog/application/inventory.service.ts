@@ -34,7 +34,6 @@ import { QueryInventoryTransactionsDto } from '@/modules/catalog/presentation/dt
 const SORTABLE_COLUMNS = new Set(['inventoryQuantity', 'createdAt', 'updatedAt']);
 const TRANSACTION_SORTABLE_COLUMNS = new Set(['createdAt', 'quantityChange']);
 
-/** Ma lo mac dinh khi kiem ke phat hien THUA ma khong biet so thua thuoc lo nao. */
 const ADJUSTMENT_BATCH_PREFIX = 'KK';
 
 export interface ReceiveStockParams {
@@ -46,7 +45,7 @@ export interface ReceiveStockParams {
   costPrice?: number;
   supplierId?: string | null;
   goodsReceiptId?: string | null;
-  /** Mac dinh `PURCHASE`. Chi `PURCHASE` va `RETURN` hop le o day. */
+  
   type?: InventoryTransactionType;
   referenceType?: InventoryReferenceType;
   referenceId?: string | null;
@@ -58,7 +57,7 @@ export interface IssueStockParams {
   itemId: string;
   branchId: string;
   quantity: number;
-  /** Phai la mot loai lam GIAM ton - xem `ISSUE_TRANSACTION_TYPES`. */
+  
   type: InventoryTransactionType;
   referenceType?: InventoryReferenceType;
   referenceId?: string | null;
@@ -69,41 +68,17 @@ export interface IssueStockParams {
 export interface AdjustStockParams {
   itemId: string;
   branchId: string;
-  /** Am hoac duong, khac 0. */
+  
   quantityChange: number;
-  /** Lo cu the. Bo trong thi xem comment cua `resolveAdjustmentBatch`. */
+  
   batchId?: string | null;
-  /** BAT BUOC ve nghiep vu: mot dieu chinh khong ly do la mot lo hong khong truy duoc. */
+  
   note: string;
   referenceType?: InventoryReferenceType;
   referenceId?: string | null;
   performedByUserId?: string | null;
 }
 
-/**
- * =====================================================================================
- * LUAT SO MOT CUA KHO: MOI THAY DOI TON KHO PHAI DI QUA SERVICE NAY.
- *
- * Khong module nao, khong migration nao, khong script nao duoc `UPDATE inventory_items`
- * hay `UPDATE inventory_batches` truc tiep. Ly do la quyet dinh (B) o `phase-06`:
- * `inventory_items.inventory_quantity` la BAN CACHE cua `SUM(batches.quantity)`, va no
- * chi dung khi hai bang duoc ghi trong CUNG mot transaction, kem mot dong so cai. Mot
- * cho ghi tat thoi la ton kho lech am tham - POS va cap phat thuoc se dua tren so sai
- * ma khong ai biet cho toi ky kiem ke.
- *
- * Ba bao dam cua service nay:
- *   1. Transaction + `pg_advisory_xact_lock` theo cap `(itemId, branchId)` - hai lenh
- *      xuat song song tren cung mot mat hang khong bao gio ra ton am (cung mau voi
- *      `BillingService.generateForAppointment`).
- *   2. Moi thay doi sinh dung mot dong `InventoryTransaction` cho moi lo bi cham toi.
- *   3. `SUM(quantity_change) = inventory_quantity` - bat bien nay duoc test khang dinh
- *      o `domain/inventory-allocation.spec.ts` va la cai giup P10 bao cao kho tin cay.
- *
- * MOI ham nghiep vu deu nhan `manager` tuy chon: P6-T5 (nhan hang) va P8 (POS) phai goi
- * nhieu lan trong CUNG mot transaction cua ho. Truyen `manager` vao thi lenh chay chung
- * transaction; bo trong thi service tu mo transaction rieng.
- * =====================================================================================
- */
 @Injectable()
 export class InventoryService {
   constructor(
@@ -118,48 +93,18 @@ export class InventoryService {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  // ---------------------------------------------------------------------- Nghiep vu
-
-  /**
-   * Nhap hang vao kho - BR-13.
-   *
-   * Nhap lai dung ma lo da co thi CONG DON vao lo do chu khong tao lo thu hai (rang
-   * buoc unique `(inventory_item_id, batch_no)` cung chan viec do o CSDL). Khi ay
-   * `costPrice` duoc tinh BINH QUAN GIA QUYEN theo so luong: neu khong, gia von cua
-   * phan hang nhap dot sau se bien mat va bao cao loi nhuan se lech.
-   *
-   * Han dung phai khop: cung ma lo ma khac han la dau hieu nhap sai ma lo, khong phai
-   * mot tinh huong hop le - tra 409 de nguoi nhap kiem tra lai vo hop.
-   */
   async receive(params: ReceiveStockParams, manager?: EntityManager): Promise<InventoryBatch> {
     return this.run(manager, (em) => this.receiveIn(em, params));
   }
 
-  /**
-   * Xuat kho theo FEFO - BR-11.
-   *
-   * Khong nhan `batchId`: NGUOI GOI khong duoc chon lo. Chon lo la quyet dinh cua kho
-   * (het han som nhat truoc), va cho POS chon lo nghia la som muon se co lo nam lai
-   * toi luc phai huy.
-   *
-   * @throws {ConflictException} khi khong du hang - va khi do KHONG co gi bi thay doi.
-   */
   async issue(params: IssueStockParams, manager?: EntityManager): Promise<BatchAllocation[]> {
     return this.run(manager, (em) => this.issueIn(em, params));
   }
 
-  /** Dieu chinh ton (kiem ke, hang hong, that lac). Loai giao dich luon la `ADJUSTMENT`. */
   async adjust(params: AdjustStockParams, manager?: EntityManager): Promise<InventoryItem> {
     return this.run(manager, (em) => this.adjustIn(em, params));
   }
 
-  /**
-   * So THUC SU dung duoc - da loai lo het han (BR-11).
-   *
-   * Khac `inventoryItem.inventoryQuantity`: so tong con tinh ca hang het han (no van
-   * nam trong kho, van phai huy va van phai bao cao), con so nay la cai POS va man
-   * hinh cap thuoc duoc phep ban.
-   */
   async getAvailable(itemId: string, branchId: string, manager?: EntityManager): Promise<number> {
     const em = manager ?? this.dataSource.manager;
     const inventoryItem = await em.findOne(InventoryItem, { where: { itemId, branchId } });
@@ -169,8 +114,6 @@ export class InventoryService {
     const batches = await this.loadBatches(em, inventoryItem.id);
     return availableQuantity(batches, toDateOnly(new Date()));
   }
-
-  // ------------------------------------------------------------------------- Doc
 
   async findAll(query: QueryInventoryDto): Promise<PaginatedResultDto<InventoryItem>> {
     const qb = this.inventoryRepository
@@ -189,8 +132,7 @@ export class InventoryService {
       });
     }
     if (query.lowStock) {
-      // "Sap het" doc nguong tu ho so san pham/thuoc/vaccine cua chinh item do. LEFT JOIN
-      // ca ba vi mot item chi la mot trong ba - COALESCE lay cai nao co.
+
       qb.leftJoin('products', 'product', 'product.item_id = item.id AND product.deleted_at IS NULL')
         .leftJoin(
           'medications',
@@ -212,7 +154,6 @@ export class InventoryService {
     return new PaginatedResultDto(data, total, query.page, query.limit);
   }
 
-  /** Cac lo cua mot dong ton kho, sap theo han dung - man hinh kho hien theo thu tu nay. */
   async findBatchesOf(inventoryItemId: string): Promise<InventoryBatch[]> {
     const inventoryItem = await this.inventoryRepository.findOne({
       where: { id: inventoryItemId },
@@ -226,7 +167,6 @@ export class InventoryService {
     });
   }
 
-  /** So cai - loc theo item / loai / chi nhanh / khoang ngay, co phan trang (P6-T8). */
   async findTransactions(
     query: QueryInventoryTransactionsDto,
   ): Promise<PaginatedResultDto<InventoryTransaction>> {
@@ -269,15 +209,6 @@ export class InventoryService {
     return new PaginatedResultDto(data, total, query.page, query.limit);
   }
 
-  // ------------------------------------------------------- CRUD cua man hinh kho
-
-  /**
-   * Khai bao mot mat hang co mat o mot chi nhanh.
-   *
-   * Truoc P6 endpoint nay ghi thang so ton. Gio no chi tao DONG ton kho; neu co
-   * `inventoryQuantity > 0` thi phan do di qua `adjust` de van sinh dong so cai - bat
-   * bien SUM(quantity_change) = inventory_quantity khong duoc phep co ngoai le nao.
-   */
   async create(dto: CreateInventoryDto, performedByUserId?: string): Promise<InventoryItem> {
     const item = await this.itemsRepository.findOne({ where: { id: dto.itemId } });
     if (!item) {
@@ -305,13 +236,6 @@ export class InventoryService {
     });
   }
 
-  /**
-   * Sua mot dong ton kho tu man hinh kho.
-   *
-   * `inventoryQuantity` (dat so tuyet doi) va `delta` deu duoc quy ve mot lenh `adjust`
-   * co sinh so cai - khong con duong ghi thang nao nua. `active` khong dung toi ton nen
-   * ghi truc tiep.
-   */
   async update(
     id: string,
     dto: UpdateInventoryDto,
@@ -352,8 +276,6 @@ export class InventoryService {
       });
     });
   }
-
-  // ------------------------------------------------------------------ Ben trong
 
   private async receiveIn(em: EntityManager, params: ReceiveStockParams): Promise<InventoryBatch> {
     const type = params.type ?? InventoryTransactionType.PURCHASE;
@@ -429,8 +351,7 @@ export class InventoryService {
       where: { itemId: params.itemId, branchId: params.branchId },
     });
     if (!inventoryItem) {
-      // Chua khai bao ton o chi nhanh nay = khong co hang. Cung ket qua 409 voi
-      // truong hop co dong nhung ton 0, de nguoi goi chi phai xu ly mot loai loi.
+
       throw new ConflictException('Khong du ton kho: kha dung 0');
     }
 
@@ -518,14 +439,6 @@ export class InventoryService {
     });
   }
 
-  /**
-   * Kiem ke phat hien THUA thi so thua do thuoc lo nao?
-   *
-   * Neu nguoi kiem ke chi ro lo thi dung lo do. Neu khong (truong hop thuong gap - dem
-   * ra thua ba hop ma khong biet tu dau), don vao mot lo ky thuat `KK-<ngay>`: khong
-   * han dung, gia von 0. Khong tao lo ky thuat thi `SUM(batches.quantity)` se lech khoi
-   * `inventory_quantity` va toan bo quyet dinh (B) sup do.
-   */
   private async resolveAdjustmentBatch(
     em: EntityManager,
     inventoryItem: InventoryItem,
@@ -560,13 +473,6 @@ export class InventoryService {
     );
   }
 
-  /**
-   * Kiem ke phat hien THIEU thi tru vao lo nao?
-   *
-   * Tru theo FEFO nhung KHONG loai lo het han - khac han `issue`. Ly do: dang doi soat
-   * so thuc te, ma hang thieu hoan toan co the la hang het han da bi vut di. Loai lo het
-   * han ra thi co truong hop khong tru du va lenh kiem ke se that bai vo co.
-   */
   private async planShortageAcrossBatches(
     em: EntityManager,
     inventoryItem: InventoryItem,
@@ -590,7 +496,7 @@ export class InventoryService {
     }
 
     const batches = await this.loadBatches(em, inventoryItem.id);
-    // Ngay "hom nay" gia dinh la 1970 de khong lo nao bi coi la het han - xem comment ham.
+    
     const allocations = (() => {
       try {
         return allocateFefo(batches, shortage, '1970-01-01');
@@ -608,12 +514,6 @@ export class InventoryService {
     }));
   }
 
-  /**
-   * Ghi cac dong so cai va cap nhat so tong - hai viec nay LUON di cung nhau.
-   *
-   * `quantityAfter` cua dong cuoi chinh la so tong moi; lay tu `planLedgerLines` chu
-   * khong tinh lai o day, de chi co dung mot cho tinh ton luy ke.
-   */
   private async writeLedger(
     em: EntityManager,
     inventoryItem: InventoryItem,
@@ -650,14 +550,6 @@ export class InventoryService {
     return em.save(inventoryItem);
   }
 
-  /**
-   * Tao dong ton kho neu chi nhanh chua co mat hang nay.
-   *
-   * `INSERT ... ON CONFLICT DO NOTHING` roi doc lai, thay vi kiem-roi-ghi: advisory lock
-   * o tren da noi tiep hoa cac lenh cua CUNG cap (item, branch), nhung mot dong
-   * `inventory_items` co the duoc tao boi duong khac (endpoint khai bao ton) khong di
-   * qua khoa do.
-   */
   private async ensureInventoryItem(
     em: EntityManager,
     itemId: string,
@@ -685,18 +577,10 @@ export class InventoryService {
     return batches.filter((batch) => batch.quantity > 0);
   }
 
-  /**
-   * Khoa theo cap `(itemId, branchId)` trong pham vi transaction.
-   *
-   * `hashtext` cua mot chuoi ghep chu khong phai `pg_advisory_xact_lock(a, b)` hai tham
-   * so: hai tham so kia la int4, ma id o day la uuid. Va chan tren mot chuoi ghep thi
-   * hai chi nhanh khac nhau cua cung mot mat hang khong chan nhau.
-   */
   private lock(em: EntityManager, itemId: string, branchId: string): Promise<unknown> {
     return em.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`inv:${itemId}:${branchId}`]);
   }
 
-  /** Chay trong transaction cua nguoi goi neu co, khong thi tu mo mot cai. */
   private run<T>(
     manager: EntityManager | undefined,
     work: (em: EntityManager) => Promise<T>,
@@ -704,7 +588,6 @@ export class InventoryService {
     return manager ? work(manager) : this.dataSource.transaction(work);
   }
 
-  /** Binh quan gia quyen theo so luong, lam tron xuong ve dong nguyen. */
   private weightedCost(
     currentQuantity: number,
     currentCost: number,

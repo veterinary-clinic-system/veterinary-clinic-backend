@@ -8,17 +8,6 @@ import {
   planLedgerLines,
 } from './inventory-allocation.util';
 
-/**
- * Test cho phan tinh toan thuan cua nghiep vu kho - acceptance cua P6-T2 va P6-T3.
- *
- * KHONG dung CSDL: FEFO va ton luy ke la ham thuan. Phan con lai cua `InventoryService`
- * (transaction, advisory lock, CHECK o CSDL) can Postgres that moi kiem chung duoc - do
- * la viec cua smoke test bang API that, khong phai cua file nay.
- *
- * `describe('bat bien so cai')` ben duoi la test ma P6-T2 goi dich danh: "SUM(quantityChange)
- * cua mot item = inventory_quantity hien tai". No bat moi loi lech kho ve sau, nen dung
- * xoa hay noi long no khi refactor.
- */
 describe('inventory-allocation.util', () => {
   const TODAY = '2026-08-05';
 
@@ -34,7 +23,7 @@ describe('inventory-allocation.util', () => {
 
   describe('allocateFefo', () => {
     it('lay het lo het han som nhat truoc roi moi sang lo sau', () => {
-      // Acceptance P6-T3: lo HSD 01/2027 (10) va 06/2027 (10), xuat 15.
+      
       const batches = [
         batch({ id: 'b-06', expiryDate: '2027-06-30', quantity: 10 }),
         batch({ id: 'b-01', expiryDate: '2027-01-31', quantity: 10 }),
@@ -95,9 +84,7 @@ describe('inventory-allocation.util', () => {
     });
 
     it('thieu hang thi nem loi va KHONG phan bo mot phan nao', () => {
-      // Acceptance P6-T3: "xuat 10 khi ton 8 -> 409, khong thay doi gi". Kiem tra o day
-      // la ham nem truoc khi kip chia - neu no tra ve mot phan roi moi bao thieu thi
-      // service se da tru mat vai lo.
+
       const batches = [batch({ id: 'b1', quantity: 8 })];
 
       expect(() => allocateFefo(batches, 10, TODAY)).toThrow(InsufficientStockError);
@@ -141,9 +128,7 @@ describe('inventory-allocation.util', () => {
 
   describe('bat bien so cai', () => {
     it('ton sau cung = ton dau + SUM(quantityChange)', () => {
-      // Day la bat bien P6-T2 dat ra, viet duoi dang kiem chung duoc bang ham thuan:
-      // `quantity_after` cua dong cuoi chinh la `inventory_quantity` service se ghi,
-      // va no phai bang tong cong don cua ca chuoi.
+
       const quantityBefore = 20;
       const changes = [
         { batchId: 'b1', quantityChange: +50 },

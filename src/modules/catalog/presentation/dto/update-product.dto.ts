@@ -9,15 +9,12 @@ import {
   ValidateIf,
 } from 'class-validator';
 
-/**
- * `PATCH /catalog/products/:id`. Cung cac truong CreateProductDto nhung deu tuy chon,
- * cong `active`.
- *
- * `active` duoc ghi len CA `items` LAN `products` (xem ProductsService.update): bo loc
- * gia cong khai doc `items.active`, con man hinh kho doc `products.active` - de lech
- * nhau thi mot san pham ngung kinh doanh van hien ra o mot trong hai cho.
- */
 export class UpdateProductDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  imageUrl?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(255)

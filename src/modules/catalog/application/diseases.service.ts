@@ -8,16 +8,9 @@ import { UpdateDiseaseDto } from '@/modules/catalog/presentation/dto/update-dise
 import { QueryDiseasesDto } from '@/modules/catalog/presentation/dto/query-diseases.dto';
 
 const SORTABLE_COLUMNS = new Set(['diseaseName', 'createdAt', 'updatedAt']);
-/** Postgres unique_violation error code. */
+
 const UNIQUE_VIOLATION = '23505';
 
-/**
- * Admin CRUD for the Disease catalog. The prescreening module (owned by another agent)
- * also auto-creates Disease rows on the fly by name when its AI service returns a
- * disease-group name that doesn't exist yet - that's expected; this service is not the
- * only writer of this table, which is why `create()`/`update()` defend against a
- * concurrent unique-name insert as well as pre-checking it.
- */
 @Injectable()
 export class DiseasesService {
   constructor(

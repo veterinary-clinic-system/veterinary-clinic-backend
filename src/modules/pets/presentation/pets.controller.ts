@@ -22,7 +22,6 @@ export class PetsController {
     private readonly petProfileService: PetProfileService,
   ) {}
 
-  /** Receptionist/Doctor/Admin adding a pet to an existing owner's profile (Section 4.1.1). */
   @RequirePermissions(Permission.PET_CREATE)
   @Audit({ action: AuditAction.CREATE, entity: 'Pet' })
   @Post()
@@ -30,45 +29,27 @@ export class PetsController {
     return this.petsService.create(dto);
   }
 
-  /** Paginated staff search ("Search profiles by name, phone number, or record ID"). */
   @RequirePermissions(Permission.PET_VIEW)
   @Get()
   findAll(@Query() query: QueryPetsDto) {
     return this.petsService.findAll(query);
   }
 
-  /** Registered before `:id` so it isn't swallowed by the param route. */
   @Roles(Role.PET_OWNER)
   @Get('mine')
   findMine(@CurrentUser() actor: AuthenticatedUser) {
     return this.petsService.findMine(actor);
   }
 
-  /**
-   * Intentionally no `@Roles(...)`: staff roles always pass, and a PetOwner is allowed
-   * through to view their own pet - `PetsService.findOneForActor` branches on that and
-   * throws `ForbiddenException` for anyone else's pet.
-   */
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthenticatedUser) {
     return this.petsService.findOneForActor(id, actor);
   }
 
-  /** Same open-route + owner-self-access branch as `GET /pets/:id` above. */
   @Get(':id/timeline')
   getTimeline(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthenticatedUser) {
     return this.petsService.getTimeline(id, actor);
   }
-
-  // ---------------------------------------------------------------------------------
-  // Cac khoi cua trang ho so thu cung (FR-04-03 / muc 12.4 SRS)
-  //
-  // Deu la route cua NHAN VIEN: `@RequirePermissions` tu dong tu choi PET_OWNER (ho
-  // khong co dong nao trong ma tran `role_permissions`). Cong tu phuc vu cua chu thu
-  // cung van la `/pets/:id` + `/pets/:id/timeline` o tren.
-  //
-  // Khoi "Vaccination" chua co route: bang tiem chung se ra doi o Phase 9.
-  // ---------------------------------------------------------------------------------
 
   @RequirePermissions(Permission.PET_VIEW, Permission.APPOINTMENT_VIEW)
   @Get(':id/appointments')

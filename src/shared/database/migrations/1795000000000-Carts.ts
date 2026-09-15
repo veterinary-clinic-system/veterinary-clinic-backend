@@ -1,13 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Gio hang POS - P8-T4, SRS FR-19.
- *
- * Mot mat hang chi duoc xuat hien MOT DONG trong mot gio (chi muc unique co dieu kien
- * `(cart_id, item_id)`): them lai cung mon la cong don so luong, khong phai them dong
- * thu hai. Hai dong cung mot mon tren man hinh POS la thu nhan vien phai tu cong nham
- * khi doc lai gio, va lam phep kiem tra ton kho phai gom nhom truoc khi so sanh.
- */
 export class Carts1795000000000 implements MigrationInterface {
   name = 'Carts1795000000000';
 
@@ -41,7 +33,7 @@ export class Carts1795000000000 implements MigrationInterface {
       CREATE INDEX IF NOT EXISTS "idx_carts_branch_status"
       ON "carts" ("branch_id", "status")
     `);
-    // Cron don gio bo do quet theo (status, updated_at) - xem `PosService.abandonStaleCarts`.
+    
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_carts_open_updated"
       ON "carts" ("updated_at") WHERE "status" = 'OPEN' AND "deleted_at" IS NULL

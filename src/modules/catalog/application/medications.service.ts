@@ -12,10 +12,6 @@ import { QueryCatalogEntryDto } from '@/modules/catalog/presentation/dto/query-c
 const ITEM_SORT_COLUMNS = new Set(['itemName', 'unitPrice']);
 const MEDICATION_SORT_COLUMNS = new Set(['unit', 'createdAt', 'updatedAt']);
 
-/**
- * This is the catalog the examinations module (built in parallel by another agent)
- * references by `medicationId` when a doctor prescribes.
- */
 @Injectable()
 export class MedicationsService {
   constructor(
@@ -23,12 +19,12 @@ export class MedicationsService {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  /** Creates the backing Item (itemType=MEDICATION) and the Medication row in one transaction. */
   async create(dto: CreateMedicationDto): Promise<Medication> {
     const medicationId = await this.dataSource.transaction(async (manager) => {
       const item = await manager.save(
         manager.create(Item, {
           itemName: dto.itemName,
+          imageUrl: dto.imageUrl ?? '/images/default-item.svg',
           describe: dto.describe ?? null,
           itemType: ItemType.MEDICATION,
           unitPrice: dto.unitPrice,
@@ -92,23 +88,16 @@ export class MedicationsService {
     return medication;
   }
 
-  /**
-   * Updates the Item-owned fields (itemName/describe/unitPrice) and/or the
-   * Medication-owned fields (unit/activeIngredient) in one transaction. `active` is
-   * mirrored onto both rows - see UpdateMedicationDto for why.
-   */
   async update(id: string, dto: UpdateMedicationDto): Promise<Medication> {
     const medication = await this.findOne(id);
 
     await this.dataSource.transaction(async (manager) => {
-      // Pick (not Partial<Item>/Partial<Medication>) deliberately excludes relation
-      // properties from the update object's type - see services.service.ts's
-      // `update()` for why a `Partial<Entity>`-typed variable doesn't structurally
-      // match TypeORM's QueryDeepPartialEntity even when relation keys are never set.
+
       const itemUpdates: Partial<
-        Pick<Item, 'itemName' | 'describe' | 'unitPrice' | 'categoryId' | 'active'>
+        Pick<Item, 'itemName' | 'imageUrl' | 'describe' | 'unitPrice' | 'categoryId' | 'active'>
       > = {};
       if (dto.itemName !== undefined) itemUpdates.itemName = dto.itemName;
+      if (dto.imageUrl !== undefined) itemUpdates.imageUrl = dto.imageUrl;
       if (dto.describe !== undefined) itemUpdates.describe = dto.describe;
       if (dto.unitPrice !== undefined) itemUpdates.unitPrice = dto.unitPrice;
       if (dto.categoryId !== undefined) itemUpdates.categoryId = dto.categoryId;

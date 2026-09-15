@@ -1,17 +1,3 @@
-/**
- * Diem dang ky entity duy nhat cho TypeORM.
- *
- * File entity nam trong `modules/<bounded-context>/domain/entities/` theo Phan III tai lieu
- * kien truc, nhung TypeORM van can biet TAT CA entity tai mot cho de dung do thi quan he.
- * Day la cho do - va la ngoai le duy nhat duoc phep import xuyen module o tang shared.
- *
- * Luu y ranh gioi module (Phan III): module A DUOC import `domain/entities` cua module B
- * (chung tao nen mot lucc do quan he duy nhat, khoa ngoai bat buoc phai tham chieu duoc
- * lan nhau), nhung KHONG duoc import `application/`, `infrastructure/` hay `presentation/`
- * cua B - moi tuong tac hanh vi phai di qua barrel `application/index.ts` cong khai.
- * Quy tac nay duoc ESLint `import/no-restricted-paths` chan cung.
- */
-
 export * from '@/shared/database/base.entity';
 
 export * from '@/modules/identity/domain/entities/user.entity';
@@ -66,6 +52,7 @@ export * from '@/modules/clinical/domain/entities/vaccination.entity';
 export * from '@/modules/billing/domain/entities/invoice.entity';
 export * from '@/modules/billing/domain/entities/invoice-item.entity';
 export * from '@/modules/billing/domain/entities/payment.entity';
+export * from '@/modules/billing/domain/entities/sepay-transaction.entity';
 
 export * from '@/modules/sales/domain/entities/cart.entity';
 export * from '@/modules/sales/domain/entities/cart-item.entity';

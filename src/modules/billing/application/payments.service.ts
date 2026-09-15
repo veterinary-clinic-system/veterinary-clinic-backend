@@ -16,51 +16,29 @@ import { StaffNotificationType } from '@/shared/common/enums/staff-notification.
 import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
 import { QueryPaymentsDto } from '@/modules/billing/presentation/dto/query-payments.dto';
 
-/** Cot duoc phep sap xep - chan `?sortBy=` di thang vao SQL. */
 const SORTABLE_COLUMNS = new Set(['createdAt', 'paidAt', 'amount']);
 
-/** Mot lan ghi nhan tien vao hoa don. */
 export interface RecordPaymentParams {
   invoiceId: string;
   amount: number;
   method: PaymentMethod;
-  /** Mac dinh `SUCCESS` - tien da o trong ket. `PENDING` danh cho cong thanh toan online. */
+  
   status?: PaymentStatus;
   referenceCode?: string | null;
   receivedByUserId?: string | null;
   note?: string | null;
 }
 
-/** So tien cua mot hoa don, tinh tu bang `payments`. */
 export interface InvoiceBalance {
   totalAmount: number;
-  /** Tong cac dong da chot (`SUCCESS` + `REFUNDED`) - da tru phan hoan lai. */
+  
   paidAmount: number;
-  /** `totalAmount - paidAmount`, khong bao gio am. */
+  
   outstandingAmount: number;
   hasRefund: boolean;
   status: InvoiceStatus;
 }
 
-/**
- * =====================================================================================
- * MOI THAY DOI TIEN CUA MOT HOA DON PHAI DI QUA SERVICE NAY.
- *
- * Cung mot ly le voi "luat so mot cua kho" o `InventoryService`: `invoices.status`,
- * `invoices.paid`, `invoices.paid_at` va `invoices.payment_method` deu la BAN CACHE cua
- * bang `payments`. Chung chi dung neu duoc tinh lai trong CUNG transaction voi dong tien
- * vua ghi - mot cho ghi tat la mot hoa don bao "da thanh toan" ma khong co dong tien nao
- * dung sau, va khong ai phat hien ra cho toi luc doi soat cuoi thang.
- *
- * Ba bao dam:
- *   1. Transaction + `pg_advisory_xact_lock` theo `invoiceId` - hai quay cung thu tien
- *      mot hoa don khong bao gio cung vuot qua duoc phep kiem tra "tra du".
- *   2. Moi lan thu/hoan sinh dung mot dong `payments` bat bien - khong sua dong cu.
- *   3. `SUM(payments.amount) FILTER (SUCCESS, REFUNDED)` luon khop trang thai hoa don.
- *
- * Ham nghiep vu nhan `manager` tuy chon de POS (P8-T5) goi duoc trong transaction cua no.
- * =====================================================================================
- */
 @Injectable()
 export class PaymentsService {
   constructor(
@@ -69,13 +47,6 @@ export class PaymentsService {
     private readonly staffNotificationsService: StaffNotificationsService,
   ) {}
 
-  /**
-   * Ghi nhan mot lan thu tien.
-   *
-   * TRA DU BI CHAN (409) chu khong lam tron xuong: neu khach dua thua thi phan thua la
-   * tien thoi lai, khong phai doanh thu. Cho phep ghi vuot nghia la bao cao doanh thu
-   * cua P10 se cong ca tien thoi.
-   */
   async record(params: RecordPaymentParams, manager?: EntityManager): Promise<Payment> {
     return this.run(manager, async (em) => {
       if (!Number.isFinite(params.amount) || params.amount <= 0) {
@@ -94,8 +65,6 @@ export class PaymentsService {
 
       const status = params.status ?? PaymentStatus.SUCCESS;
 
-      // Chi cac dong DA CHOT moi chiem cho: mot lan tra dang `PENDING` o cong thanh toan
-      // chua chac ve, khoa cho no thi khach khong tra duoc bang cach khac.
       if (SETTLED_PAYMENT_STATUSES.includes(status)) {
         const paidAmount = await this.paidAmountOf(em, invoice.id);
         const remaining = invoice.totalAmount - paidAmount;
@@ -121,10 +90,6 @@ export class PaymentsService {
 
       await this.syncStatus(em, invoice.id);
 
-      // Thanh toan that bai -> bao cho le tan va quan ly (muc 18 SRS, P10-T5). Day la
-      // truong hop DUY NHAT trong ham nay can nguoi xu ly: mot lan `SUCCESS` khong can
-      // ai lam gi, con `FAILED` nghia la khach dang dung o quay voi mot hoa don chua
-      // dong duoc - va man hinh POS thi da chuyen sang khach ke tiep.
       if (status === PaymentStatus.FAILED) {
         await this.staffNotificationsService.notify(em, {
           type: StaffNotificationType.PAYMENT_FAILED,
@@ -134,8 +99,7 @@ export class PaymentsService {
             `${params.amount.toLocaleString('vi-VN')} đ không thành công.`,
           link: `/staff/billing/${invoice.id}`,
           branchId: invoice.branchId,
-          // Khoa theo dong thanh toan chu khong theo hoa don: mot hoa don co the that
-          // bai nhieu lan (thu lai the khac), va moi lan la mot viec phai xu ly rieng.
+
           dedupeKey: `payment-failed:${payment.id}`,
         });
       }
@@ -144,12 +108,6 @@ export class PaymentsService {
     });
   }
 
-  /**
-   * Ghi mot dong HOAN TIEN (P8-T3). So tien truyen vao la so DUONG, dong luu se la am.
-   *
-   * Khong tu quyet dinh hoan bao nhieu: nguoi goi (`BillingService.refund`) biet dang
-   * hoan toan bo hay mot phan, va con phai hoan hang ve kho trong cung transaction.
-   */
   async refund(
     params: { invoiceId: string; amount: number; method: PaymentMethod } & Omit<
       RecordPaymentParams,
@@ -195,7 +153,6 @@ export class PaymentsService {
     });
   }
 
-  /** Cac lan tra cua mot hoa don, cu nhat truoc - dung thu tu doc tren man hinh hoa don. */
   async findByInvoice(invoiceId: string): Promise<Payment[]> {
     return this.paymentsRepository.find({
       where: { invoiceId },
@@ -203,7 +160,6 @@ export class PaymentsService {
     });
   }
 
-  /** Danh sach thanh toan co phan trang - man hinh doi soat cuoi ca (P8-T7). */
   async findAll(query: QueryPaymentsDto): Promise<PaginatedResultDto<Payment>> {
     const qb = this.paymentsRepository
       .createQueryBuilder('payment')
@@ -212,8 +168,7 @@ export class PaymentsService {
     if (query.invoiceId) {
       qb.andWhere('payment.invoiceId = :invoiceId', { invoiceId: query.invoiceId });
     }
-    // Chi nhanh nam tren HOA DON, khong tren lan tra: tien duoc thu o dau thi hoa don da
-    // ghi chi nhanh do, va nhan doi cot se tao ra hai nguon su that co the lech nhau.
+
     if (query.branchId) {
       qb.andWhere('invoice.branchId = :branchId', { branchId: query.branchId });
     }
@@ -255,7 +210,6 @@ export class PaymentsService {
     return payment;
   }
 
-  /** So tien cua mot hoa don, doc tai thoi diem goi. */
   async balanceOf(invoiceId: string, manager?: EntityManager): Promise<InvoiceBalance> {
     const em = manager ?? this.dataSource.manager;
     const invoice = await this.loadInvoice(em, invoiceId);
@@ -270,13 +224,6 @@ export class PaymentsService {
     };
   }
 
-  /**
-   * Tinh lai trang thai hoa don tu bang `payments` va ghi vao ban cache.
-   *
-   * PHAI goi trong cung transaction voi moi thay doi cua `payments`. Ba cot cu
-   * (`paid`/`paid_at`/`payment_method`) cung duoc cap nhat o day: chung la ban tom tat
-   * cua lan tra gan nhat, va bao cao doanh thu hien tai van doc `paid_at`.
-   */
   async syncStatus(em: EntityManager, invoiceId: string): Promise<InvoiceStatus> {
     const invoice = await this.loadInvoice(em, invoiceId);
     const paidAmount = await this.paidAmountOf(em, invoiceId);
@@ -308,12 +255,6 @@ export class PaymentsService {
     return status;
   }
 
-  // ------------------------------------------------------------------ Ben trong
-
-  /**
-   * Tong cac dong DA CHOT. `SUCCESS` cong vao, `REFUNDED` (so am) tru ra - xem
-   * `SETTLED_PAYMENT_STATUSES`.
-   */
   private async paidAmountOf(em: EntityManager, invoiceId: string): Promise<number> {
     const row = await em
       .createQueryBuilder(Payment, 'payment')
@@ -340,15 +281,10 @@ export class PaymentsService {
     return invoice;
   }
 
-  /**
-   * Khoa theo hoa don trong pham vi transaction - cung mau voi
-   * `BillingService.generateForAppointment` va `InventoryService.lock`.
-   */
   private lock(em: EntityManager, invoiceId: string): Promise<unknown> {
     return em.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`invoice:${invoiceId}`]);
   }
 
-  /** Chay trong transaction cua nguoi goi neu co, khong thi tu mo mot cai. */
   private run<T>(
     manager: EntityManager | undefined,
     work: (em: EntityManager) => Promise<T>,

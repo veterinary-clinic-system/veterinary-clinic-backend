@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Sse,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
@@ -21,55 +22,68 @@ import { Audit } from '@/shared/common/decorators/audit.decorator';
 import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 import { SepayService } from '@/modules/billing/application/sepay.service';
 import { SepayWebhookDto } from './dto/sepay-webhook.dto';
+import { ReconcileSepayTransactionDto } from './dto/reconcile-sepay-transaction.dto';
+import { CurrentUser } from '@/shared/common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user.interface';
+import { PaymentRealtimeService } from '@/modules/billing/application/payment-realtime.service';
+import { concat, from } from 'rxjs';
+import { map } from 'rxjs/operators';
 
-/**
- * Thanh toan chuyen khoan qua SePay.
- *
- * Tach khoi `BillingController` vi mot trong ba cua o day la CONG KHAI (webhook cua
- * SePay khong mang JWT nao ca) - de chung lan voi cac route can quyen se rat de mot
- * lan sua sau nay lam ho hang rao.
- */
 @ApiTags('billing')
 @Controller('billing/sepay')
 export class SepayController {
-  constructor(private readonly sepayService: SepayService) {}
+  constructor(
+    private readonly sepayService: SepayService,
+    private readonly realtimeService: PaymentRealtimeService,
+  ) {}
 
-  /** Mo mot lan cho chuyen khoan va lay ma QR de khach quet. */
   @RequirePermissions(Permission.PAYMENT_CREATE)
   @Audit({ action: AuditAction.PAYMENT, entity: 'Invoice' })
   @Post('invoices/:id/qr')
-  createQr(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Query('amount') amount?: string,
-  ) {
+  createQr(@Param('id', ParseUUIDPipe) id: string, @Query('amount') amount?: string) {
     return this.sepayService.createQrTicket(id, amount ? Number(amount) : undefined);
   }
 
-  /** Giao dien hoi lien tuc trong khi hien ma QR de biet tien da ve chua. */
   @RequirePermissions(Permission.INVOICE_VIEW)
   @Get('tickets/:paymentId')
   getTicket(@Param('paymentId', ParseUUIDPipe) paymentId: string) {
     return this.sepayService.getTicketStatus(paymentId);
   }
 
-  /** Khach doi sang tra tien mat - dong lan cho lai de no khong treo mai. */
+  @RequirePermissions(Permission.INVOICE_VIEW)
+  @Sse('tickets/:paymentId/events')
+  ticketEvents(@Param('paymentId', ParseUUIDPipe) paymentId: string) {
+    return concat(
+      from(this.sepayService.getTicketStatus(paymentId)).pipe(
+        map((data) => ({ type: 'payment.updated', data: { paymentId, ...data } })),
+      ),
+      this.realtimeService.watch(paymentId),
+    );
+  }
+
+  @RequirePermissions(Permission.INVOICE_VIEW)
+  @Get('reconciliation')
+  listPendingReconciliations() {
+    return this.sepayService.listPendingReconciliations();
+  }
+
+  @RequirePermissions(Permission.PAYMENT_CREATE)
+  @Audit({ action: AuditAction.PAYMENT, entity: 'SepayTransaction' })
+  @Post('reconciliation/:id/match')
+  reconcile(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReconcileSepayTransactionDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.sepayService.reconcile(id, dto.invoiceCode, actor.userId);
+  }
+
   @RequirePermissions(Permission.PAYMENT_CREATE)
   @Delete('tickets/:paymentId')
   cancelTicket(@Param('paymentId', ParseUUIDPipe) paymentId: string) {
     return this.sepayService.cancelTicket(paymentId);
   }
 
-  /**
-   * Webhook cua SePay - CONG KHAI, khong co JWT.
-   *
-   * Hang rao la header `Authorization: Apikey <SEPAY_API_KEY>`, duoc kiem tra TRUOC khi
-   * dung toi than request. Throttle de mot ben thu ba khong the dung cua nay lam kenh
-   * do khoa.
-   *
-   * Luon tra 200 khi da qua duoc buoc xac thuc, ke ca khi khong khop hoa don nao: SePay
-   * coi moi ma khac 2xx la that bai va se gui lai, ma mot khoan chuyen khoan khong lien
-   * quan thi gui lai bao nhieu lan cung khong khop.
-   */
   @Public()
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 120, ttl: 60_000 } })

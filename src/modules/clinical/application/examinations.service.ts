@@ -20,13 +20,6 @@ import { CreatePrescriptionDto } from '@/modules/clinical/presentation/dto/creat
 import { CreateLabTestDto } from '@/modules/clinical/presentation/dto/create-lab-test.dto';
 import { UpdateLabTestDto } from '@/modules/clinical/presentation/dto/update-lab-test.dto';
 
-/**
- * Full relation graph for "detail" reads (GET by id/by-appointment, PDF export).
- * `prescriptions.items.medication`/`.medication.item` and `appointment.pet.breed.*` are
- * technically eager on their owning entities already, but are listed explicitly anyway -
- * mirrors the convention already established in appointments.service.ts's `findOne`
- * (`relations: [..., 'service', 'service.item']` despite Service.item being eager).
- */
 const EXAMINATION_DETAIL_RELATIONS = [
   'appointment',
   'appointment.pet',
@@ -36,9 +29,7 @@ const EXAMINATION_DETAIL_RELATIONS = [
   'appointment.doctor',
   'appointment.branch',
   'doctor',
-  // Don thuoc va chi dinh xet nghiem treo duoi HO SO chu khong duoi phieu kham tu
-  // P4-T6. Van nap o day (them mot chang `medicalRecord`) de phieu kham PDF - thu
-  // duy nhat con doc chung qua duong nay - khong doi hinh dang.
+
   'medicalRecord',
   'medicalRecord.diagnoses',
   'medicalRecord.treatments',
@@ -61,17 +52,6 @@ export class ExaminationsService {
     private readonly prescriptionsService: PrescriptionsService,
   ) {}
 
-  /**
-   * Section 4.1.4 exam-entry form - phan SINH HIEU cua mot lan kham.
-   *
-   * Tu P4, viec dau tien la MO HO SO BENH AN cho lich hen (idempotent - dung lai ho so
-   * co san neu man hinh kham da mo truoc do) roi gan phieu kham vao ho so do. Moi luat
-   * BR-06 nam trong `MedicalRecordsService.openForAppointment`, khong lap lai o day.
-   *
-   * KHONG con dong lich hen thanh COMPLETED nua: tu P4, dieu do do
-   * `MedicalRecordsService.complete()` lam. Truoc day, chi vua ghi xong sinh hieu la
-   * lich hen da bi dong - truoc ca khi bac si kip nhap chan doan hay dieu tri.
-   */
   async create(dto: CreateExaminationDto, actor: AuthenticatedUser): Promise<Examination> {
     const doctor = await this.doctorsRepository.findOne({ where: { userId: actor.userId } });
     if (!doctor) {
@@ -112,7 +92,6 @@ export class ExaminationsService {
     return this.findOne(created.id);
   }
 
-  /** **BR-08**: sinh hieu la mot phan cua ho so, ho so da chot thi cung khong sua duoc. */
   async update(id: string, dto: UpdateExaminationDto): Promise<Examination> {
     await this.assertExists(id);
     await this.assertParentRecordEditable(id);
@@ -157,25 +136,6 @@ export class ExaminationsService {
     return examination;
   }
 
-  /**
-   * Section 4.1.4: "Prescribe medication: dosage, number of days" - one submit = one
-   * Prescription.
-   *
-   * Duong vao van la id PHIEU KHAM (giao dien hien tai goi
-   * `POST /examinations/:id/prescriptions`) nhung don thuoc duoc ghi vao HO SO cua
-   * phieu kham do - khoa ngoai da doi o P4-T6.
-   *
-   * Tu P7, toan bo nghiep vu don thuoc nam o `PrescriptionsService`; ham nay chi con la
-   * cua vao cu duoc giu lai cho giao dien hien co. HAI THAY DOI QUAN TRONG so voi truoc:
-   *
-   *   1. KE DON KHONG CON TRU KHO. Ke khong phai la giao - thuoc chi roi kho khi duoc si
-   *      bam cap phat (`PrescriptionsService.dispense`, BR-10).
-   *   2. Doan tru kho cu ghi thang vao `inventory_items`, bo qua lo va so cai. Ke tu P6
-   *      do la viec bi cam: no pha bat bien `SUM(quantityChange) = inventory_quantity`.
-   *
-   * Ke don gio chi CANH BAO khi thieu hang - `stockCheck` trong ket qua tra ve cho biet
-   * dong nao thieu (FR-11-02).
-   */
   async createPrescription(
     examinationId: string,
     dto: CreatePrescriptionDto,
@@ -189,7 +149,6 @@ export class ExaminationsService {
     return this.prescriptionsService.findByMedicalRecord(medicalRecordId);
   }
 
-  /** Section 4.1.4: "order lab tests" - result is filled in later via updateLabTest. */
   async createLabTest(examinationId: string, dto: CreateLabTestDto): Promise<LabTestOrder> {
     const examination = await this.loadOrThrow(examinationId);
     const labTest = this.labTestOrdersRepository.create({
@@ -199,10 +158,6 @@ export class ExaminationsService {
     return this.labTestOrdersRepository.save(labTest);
   }
 
-  /**
-   * Result files themselves are uploaded via `POST /files/upload?category=lab-results`
-   * (owned by the files module); this only records the returned URLs plus status/result text.
-   */
   async updateLabTest(labTestId: string, dto: UpdateLabTestDto): Promise<LabTestOrder> {
     const labTest = await this.labTestOrdersRepository.findOne({ where: { id: labTestId } });
     if (!labTest) {
@@ -235,11 +190,6 @@ export class ExaminationsService {
     return examination;
   }
 
-  /**
-   * Tu P4-T6, don thuoc va chi dinh xet nghiem deu treo duoi ho so benh an. Mot phieu
-   * kham khong co ho so chi con sinh ra tu du lieu cu chua duoc backfill - khong am
-   * tham tao ho so o day, vi tao ho so can biet bac si va trang thai lich hen.
-   */
   private requireMedicalRecordId(examination: Examination): string {
     if (!examination.medicalRecordId) {
       throw new ConflictException(
@@ -249,7 +199,6 @@ export class ExaminationsService {
     return examination.medicalRecordId;
   }
 
-  /** **BR-08** - chan moi duong ghi khi ho so cha da hoan tat. */
   private async assertParentRecordEditable(examinationId: string): Promise<void> {
     const examination = await this.examinationsRepository.findOne({
       where: { id: examinationId },

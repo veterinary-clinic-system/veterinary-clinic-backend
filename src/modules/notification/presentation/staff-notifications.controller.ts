@@ -7,18 +7,6 @@ import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user
 import { StaffNotificationsService } from '@/modules/notification/application/staff-notifications.service';
 import { QueryStaffNotificationsDto } from './dto/query-staff-notifications.dto';
 
-/**
- * Hop thu trong ung dung cua CHINH nguoi dang dang nhap - SRS FR-23 (P10-T5).
- *
- * KHONG CO `@RequirePermissions` o day, va do la chu dich chu khong phai bo sot. Quy uoc
- * cua du an dat `@RequirePermissions` len moi endpoint NGHIEP VU, con day la mot route
- * TU PHUC VU: khong co "quyen xem thong bao" nao ca, moi nhan vien deu duoc doc hop thu
- * cua chinh minh va khong ai doc duoc hop thu cua nguoi khac. Rang buoc do khong den tu
- * ma tran quyen ma den tu chinh cau truy van - `recipientUserId` luon lay tu token, chua
- * bao gio tu tham so nguoi dung gui len.
- *
- * `@Roles(...STAFF_ROLES)` chan chu thu cung: ho co hop thu rieng o cong PET_OWNER.
- */
 @ApiTags('staff-notifications')
 @Roles(...STAFF_ROLES)
 @Controller('staff-notifications')
@@ -34,7 +22,6 @@ export class StaffNotificationsController {
     });
   }
 
-  /** Endpoint rieng cho chuong thong bao - no chi can mot con so, khong can ca trang. */
   @Get('unread-count')
   async unreadCount(@CurrentUser() actor: AuthenticatedUser) {
     return { unread: await this.staffNotificationsService.countUnread(actor.userId) };

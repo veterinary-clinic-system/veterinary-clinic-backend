@@ -10,12 +10,6 @@ import { QueryVaccinationsDueDto } from './dto/query-vaccinations-due.dto';
 import { Audit } from '@/shared/common/decorators/audit.decorator';
 import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
-/**
- * So tiem chung - SRS FR-12 (P9-T3).
- *
- * `due` dat TRUOC cac route co tham so duong dan: Nest so khop theo thu tu khai bao, va
- * mot route `:id` dung truoc se nuot mat `/vaccinations/due`.
- */
 @ApiTags('vaccinations')
 @Controller('vaccinations')
 export class VaccinationsController {
@@ -28,7 +22,6 @@ export class VaccinationsController {
     return this.vaccinationsService.create(dto, actor);
   }
 
-  /** Danh sach goi nhac cua le tan - mui qua han va sap den han. */
   @RequirePermissions(Permission.VACCINATION_VIEW)
   @Get('due')
   findDue(@Query() query: QueryVaccinationsDueDto) {

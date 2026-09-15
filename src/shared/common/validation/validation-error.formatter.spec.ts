@@ -10,12 +10,6 @@ function messagesOf(errors: ValidationError[]): string[] {
   return (response as { message: string[] }).message;
 }
 
-/**
- * SRS muc 16 - thong diep loi phai noi dung cai nguoi nhap can sua (P10-T8).
- *
- * Bo test nay khoa lai chinh cai loi da tim ra khi chay tay muc 22: mot truong bat buoc
- * bo trong tra ve "note không được vượt quá 500 ký tự".
- */
 describe('formatValidationErrors', () => {
   it('một thông điệp cho mỗi trường', () => {
     const messages = messagesOf([
@@ -27,8 +21,7 @@ describe('formatValidationErrors', () => {
   });
 
   it('trường bỏ trống báo "thiếu giá trị" chứ không báo giới hạn độ dài', () => {
-    // Mot truong `note: string` bat buoc, bo trong: class-validator lam hong CA BA luat
-    // cung luc. Chon nham thi nguoi dung nhan mot cau vo nghia.
+
     const messages = messagesOf([
       error('note', {
         maxLength: 'note must be shorter than or equal to 500 characters',
@@ -53,7 +46,7 @@ describe('formatValidationErrors', () => {
   });
 
   it('không phụ thuộc vào thứ tự khai báo decorator', () => {
-    // Cung mot tap luat, chi khac thu tu khoa trong object - ket qua phai giong nhau.
+    
     const a = messagesOf([error('x', { isNotEmpty: 'thiếu', maxLength: 'quá dài' })]);
     const b = messagesOf([error('x', { maxLength: 'quá dài', isNotEmpty: 'thiếu' })]);
 

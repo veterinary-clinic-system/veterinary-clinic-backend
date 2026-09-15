@@ -5,11 +5,6 @@ import { firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
 import { ChatRequest, ChatResponse, TriageRequest, TriageResponse } from './ai-client.types';
 
-/**
- * Thin client for veterinary-clinic-ai (Section 3: "Internal REST over HTTP - NestJS
- * calls FastAPI endpoints directly"). The AI service isn't public - every call carries
- * the shared `AI_SERVICE_TOKEN` bearer token (Section 6).
- */
 @Injectable()
 export class AiClientService {
   private readonly logger = new Logger(AiClientService.name);

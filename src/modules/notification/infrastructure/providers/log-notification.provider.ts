@@ -5,12 +5,6 @@ import {
   NotificationSendResult,
 } from '@/modules/notification/application/ports/notification.port';
 
-/**
- * Default provider for local/dev (Section 5.3: "a logging/mock implementation that
- * writes to console or a local table is acceptable"). NotificationsService already
- * persists every attempt to the `notifications` table regardless of provider, so this
- * one only needs to write to the console and always "succeed".
- */
 @Injectable()
 export class LogNotificationProvider implements NotificationProvider {
   private readonly logger = new Logger('NotificationProvider:log');

@@ -1,6 +1,5 @@
 import { IsArray, IsNumber, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
-/** Same editable fields as CreateExaminationDto minus the immutable appointmentId/doctorId. */
 export class UpdateExaminationDto {
   @IsOptional()
   @IsArray()

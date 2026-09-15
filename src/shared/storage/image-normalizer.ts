@@ -10,14 +10,6 @@ export interface NormalizedFile {
   contentType: string;
 }
 
-/**
- * Chuan hoa tep truoc khi day xuong kho luu tru - dung chung cho MOI adapter, vi day la
- * quy tac nghiep vu (bao mat + gioi han dung luong), khong phai chi tiet cua noi luu tru:
- *
- *   - Anh duoc ma hoa lai qua sharp: xoa metadata EXIF (tranh lo toa do GPS cho nuoi)
- *     va gioi han kich thuoc, de mot buc anh dien thoai khong lam phinh kho luu tru.
- *   - Cac loai khac (PDF ket qua xet nghiem) duoc giu nguyen.
- */
 export async function normalizeForStorage(
   category: FileCategory,
   file: Express.Multer.File,

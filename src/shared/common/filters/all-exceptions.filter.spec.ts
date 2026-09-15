@@ -14,7 +14,6 @@ interface CapturedResponse {
   body: Record<string, unknown>;
 }
 
-/** `ArgumentsHost` gia lap - chi can hai thu bo loc thuc su dung toi. */
 function hostFor(url: string, captured: CapturedResponse): ArgumentsHost {
   const response = {
     status(code: number) {
@@ -41,13 +40,6 @@ function run(exception: unknown, url = '/api/v1/test'): CapturedResponse {
   return captured;
 }
 
-/**
- * SRS muc 17 - MOT dinh dang loi cho toan he thong (P10-T8).
- *
- * Bo test nay khoa lai chinh hop dong voi SRS: ba truong `code`/`message`/`timestamp`
- * phai co mat o MOI loai loi. No cung khoa lai dieu quan trong hon - loi ngoai du kien
- * khong duoc phep de lo noi dung that ra ngoai.
- */
 describe('AllExceptionsFilter', () => {
   it('luôn trả đủ ba trường của SRS mục 17', () => {
     const { body } = run(new NotFoundException('Không tìm thấy thú cưng'));
@@ -86,7 +78,6 @@ describe('AllExceptionsFilter', () => {
       }),
     );
 
-    // Noi thanh mot chuoi o day se lam giao dien khong gan duoc tung loi vao dung o nhap.
     expect(body.message).toEqual(['phone không hợp lệ', 'startAt phải là ngày ISO 8601']);
   });
 
@@ -102,7 +93,7 @@ describe('AllExceptionsFilter', () => {
   });
 
   it('KHÔNG để lộ nội dung của lỗi ngoài dự kiến', () => {
-    // Thong diep nay mo phong mot loi tho cua TypeORM: no chua ten bang va cau SQL.
+    
     const leaky = new Error(
       'insert into "users" ("password_hash") values ($1) - duplicate key value violates unique constraint',
     );

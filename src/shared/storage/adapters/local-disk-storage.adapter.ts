@@ -6,10 +6,6 @@ import { FileCategory } from '@/shared/storage/file-category.enum';
 import { normalizeForStorage } from '@/shared/storage/image-normalizer';
 import { StorageProvider, StoredFile } from '@/shared/storage/ports/storage.port';
 
-/**
- * Adapter luu tru tren dia cuc bo (qua Docker volume). Mac dinh khi phat trien:
- * khong can dung MinIO/S3 chi de chay thu mot man hinh.
- */
 @Injectable()
 export class LocalDiskStorageAdapter implements StorageProvider {
   constructor(private readonly configService: ConfigService) {}

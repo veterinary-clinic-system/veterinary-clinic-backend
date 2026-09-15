@@ -1,9 +1,5 @@
 import { IsDateString, IsOptional, IsString, Matches } from 'class-validator';
 
-/**
- * One-off unavailability carved out of a doctor's recurring `DoctorShift` (a lunch
- * overrun, a sick day, vacation) - `POST /users/doctors/:id/breaks`.
- */
 export class CreateDoctorBreakDto {
   @IsDateString()
   date: string;

@@ -9,25 +9,6 @@ import {
 import { PrescriptionStatus } from '@/shared/common/enums/prescription-status.enum';
 import { PrescriptionsService } from './prescriptions.service';
 
-/**
- * Test cho `PrescriptionsService.dispense` - buoc tien va kho gap nhau (P7-T4).
- *
- * KHONG dung CSDL: cai can khang dinh o day la LUAT DIEU PHOI, khong phai hanh vi cua
- * Postgres. Cu the la ba dieu, va ca ba deu quan sat duoc qua mot `InventoryService`
- * gia:
- *
- *   1. Mot dong thieu ton -> KHONG dong nao bi tru (`issue` khong duoc goi lan nao).
- *      Day la muc ma Definition of Done cua phase 7 goi dich danh. Neu ai do sau nay
- *      doi vong lap kiem tra thanh "kiem den dau tru den do", test nay do ngay - trong
- *      khi transaction that van se rollback nen mot test tich hop co the KHONG bat duoc
- *      loi do neu chi nhin ton cuoi cung.
- *   2. Don da `DISPENSED` khong tru kho lan hai.
- *   3. So luong tru kho lay tu `quantity` (P7-T1) chu khong phai `durationDays`.
- *
- * Phan con lai - transaction that co rollback that, va advisory lock chan hai duoc si
- * bam cung luc - can Postgres that moi kiem chung duoc; do la viec cua smoke test bang
- * API that.
- */
 describe('PrescriptionsService.dispense', () => {
   const BRANCH_ID = 'branch-1';
   const PRESCRIPTION_ID = 'presc-1';
@@ -60,7 +41,7 @@ describe('PrescriptionsService.dispense', () => {
 
   function makeService(options: {
     lines: Line[];
-    /** Ton kha dung theo `itemId` cua thuoc. */
+    
     available: Record<string, number>;
     status?: PrescriptionStatus;
   }) {
@@ -121,7 +102,7 @@ describe('PrescriptionsService.dispense', () => {
   it('mot dong thieu ton -> ca don 409 va KHONG dong nao bi tru', async () => {
     const { service, issue } = makeService({
       lines: TWO_LINES,
-      // Dong dau du, dong sau thieu - dung thu tu de bat loi "kiem den dau tru den do".
+      
       available: { 'item-a': 100, 'item-b': 1 },
     });
 
@@ -208,9 +189,6 @@ describe('PrescriptionsService.dispense', () => {
 
     await service.dispense(PRESCRIPTION_ID, 'user-1');
 
-    // Tham so thu hai cua `issue` la EntityManager cua transaction dang chay. Thieu no
-    // thi InventoryService tu mo transaction rieng va rollback cua don se khong keo
-    // theo cac lenh tru kho - dung loi ma NFR-07 muon tranh.
     for (const call of issue.mock.calls) {
       expect(call[1]).toBe(manager);
     }

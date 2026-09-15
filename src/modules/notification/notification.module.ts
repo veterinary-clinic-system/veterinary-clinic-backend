@@ -27,8 +27,7 @@ import { ZaloNotificationProvider } from '@/modules/notification/infrastructure/
     SmsNotificationProvider,
     ZaloNotificationProvider,
     EmailNotificationProvider,
-    // Noi port cua tang application voi adapter o tang infrastructure. Day la
-    // composition root - cho duy nhat trong module duoc biet ca hai phia.
+
     { provide: NOTIFICATION_DISPATCHER, useExisting: NotificationProviderRegistry },
   ],
   exports: [NotificationsService, OutboxService, StaffNotificationsService],

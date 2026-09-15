@@ -52,12 +52,11 @@ class EnvironmentVariables {
   @IsOptional()
   STORAGE_PROVIDER: string;
 
-  @IsIn(['manual', 'vnpay'])
+  @IsIn(['manual', 'vnpay', 'sepay'])
   @IsOptional()
   PAYMENT_PROVIDER: string;
 }
 
-/** Fails fast at boot (instead of at first use) when required env vars are missing/malformed. */
 export function validateEnv(config: Record<string, unknown>) {
   const validated = plainToInstance(EnvironmentVariables, config, {
     enableImplicitConversion: true,

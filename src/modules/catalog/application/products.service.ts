@@ -12,11 +12,6 @@ import { QueryProductsDto } from '@/modules/catalog/presentation/dto/query-produ
 const ITEM_SORT_COLUMNS = new Set(['itemName', 'unitPrice', 'code']);
 const PRODUCT_SORT_COLUMNS = new Set(['sku', 'brand', 'costPrice', 'createdAt', 'updatedAt']);
 
-/**
- * Hang hoa ban le - SRS FR-16. Cung khuon voi `MedicationsService`/`ServicesService`:
- * moi Product co dung mot `Item` phia sau giu ten/mo ta/gia ban/danh muc, con bang
- * `products` chi giu phan rieng cua hang hoa.
- */
 @Injectable()
 export class ProductsService {
   constructor(
@@ -31,6 +26,7 @@ export class ProductsService {
       const item = await manager.save(
         manager.create(Item, {
           itemName: dto.itemName,
+          imageUrl: dto.imageUrl ?? '/images/default-item.svg',
           describe: dto.describe ?? null,
           itemType: ItemType.PRODUCT,
           unitPrice: dto.unitPrice,
@@ -57,15 +53,6 @@ export class ProductsService {
     return this.findOne(productId);
   }
 
-  /**
-   * NFR-02: tim kiem phai duoi 500ms voi 5.000 san pham.
-   *
-   * `search` doi chieu ba cot cung luc - ten san pham, SKU va ma noi bo. Ten di qua
-   * `f_unaccent` de go khong dau van ra ket qua ("thuc an" tim duoc "Thức ăn"); chi muc
-   * GIN trigram tren bieu thuc do (xem migration 1791000005000) phuc vu dung dang
-   * `ILIKE '%...%'` nay - mot chi muc B-tree thuong khong dung duoc cho tien to `%`.
-   * SKU va ma la chuoi ngan, khong dau, nen so thang.
-   */
   async findAll(query: QueryProductsDto): Promise<PaginatedResultDto<Product>> {
     const qb = this.productsRepository
       .createQueryBuilder('product')
@@ -119,12 +106,12 @@ export class ProductsService {
     }
 
     await this.dataSource.transaction(async (manager) => {
-      // `Pick` chu khong `Partial<Item>` - loai han cac thuoc tinh quan he khoi kieu cua
-      // doi tuong update, xem ghi chu trong medications.service.ts.
+
       const itemUpdates: Partial<
-        Pick<Item, 'itemName' | 'describe' | 'unitPrice' | 'categoryId' | 'active'>
+        Pick<Item, 'itemName' | 'imageUrl' | 'describe' | 'unitPrice' | 'categoryId' | 'active'>
       > = {};
       if (dto.itemName !== undefined) itemUpdates.itemName = dto.itemName;
+      if (dto.imageUrl !== undefined) itemUpdates.imageUrl = dto.imageUrl;
       if (dto.describe !== undefined) itemUpdates.describe = dto.describe;
       if (dto.unitPrice !== undefined) itemUpdates.unitPrice = dto.unitPrice;
       if (dto.categoryId !== undefined) itemUpdates.categoryId = dto.categoryId;
@@ -150,11 +137,6 @@ export class ProductsService {
     return this.findOne(id);
   }
 
-  /**
-   * SRS muc 16: "SKU khong duoc trung". Chi muc `uq_products_sku` la chot chan cuoi,
-   * nhung de no bat thi nguoi dung nhan mot loi 500 thay vi biet SKU dang thuoc ve
-   * san pham nao.
-   */
   private async assertSkuIsFree(sku: string, excludeId: string | null): Promise<void> {
     const existing = await this.productsRepository.findOne({
       where: excludeId ? { sku, id: Not(excludeId), deletedAt: IsNull() } : { sku },

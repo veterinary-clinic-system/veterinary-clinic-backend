@@ -1,17 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 import { DEFAULT_ROLE_PERMISSIONS, Permission } from '@/shared/common/enums/permission.enum';
 
-/**
- * Ma tran phan quyen (vai tro x quyen) - SRS FR-02.
- *
- * Phai la file RIENG, chay sau `AddStaffRoles1787000000000`: cac dong seed ben duoi co
- * dung gia tri 'MANAGER'/'PHARMACIST'/'STAFF', ma Postgres khong cho dung mot gia tri
- * enum vua duoc them trong CUNG transaction.
- *
- * `role_permissions_role_enum` la kieu RIENG, khong dung lai `users_role_enum`: ten kieu
- * phai khop quy uoc TypeORM sinh ra tu (ten bang, ten cot), neu khong thi lan
- * `migration:generate` sau se tuong schema bi lech.
- */
 export class RolePermissions1787000001000 implements MigrationInterface {
   name = 'RolePermissions1787000001000';
 
@@ -48,8 +37,6 @@ export class RolePermissions1787000001000 implements MigrationInterface {
       ON "role_permissions" ("role", "permission")
     `);
 
-    // Seed ma tran mac dinh. `ON CONFLICT DO NOTHING` de migration chay lai duoc tren
-    // co so du lieu da co du lieu ma khong ghi de lua chon cua quan tri vien.
     const rows: string[] = [];
     for (const [role, permissions] of Object.entries(DEFAULT_ROLE_PERMISSIONS)) {
       for (const permission of permissions) {

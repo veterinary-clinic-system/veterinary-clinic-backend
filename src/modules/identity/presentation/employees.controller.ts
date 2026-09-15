@@ -7,14 +7,6 @@ import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { QueryEmployeesDto } from './dto/query-employees.dto';
 
-/**
- * Ho so nhan su - SRS FR-22. Khac voi `UsersController` (tai khoan dang nhap) va
- * `/users/doctors` (ho so chuyen mon bac si) - xem ghi chu trong employee.entity.ts.
- *
- * KHONG co route DELETE: nghi viec la mot TRANG THAI (`status = RESIGNED`), khong phai
- * viec xoa ban ghi. Ho so nhan su cu con phai tra cuu duoc de biet ai da thao tac gi
- * trong qua khu (audit log o Phase 10 tro nguoc ve day).
- */
 @ApiTags('employees')
 @Controller('employees')
 @RequirePermissions(Permission.EMPLOYEE_MANAGE)

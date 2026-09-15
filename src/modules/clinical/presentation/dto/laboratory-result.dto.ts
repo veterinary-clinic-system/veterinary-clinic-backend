@@ -10,9 +10,8 @@ import {
 } from 'class-validator';
 import { LabResultFlag } from '@/shared/common/enums/lab-result-flag.enum';
 
-/** Mot chi so trong ket qua xet nghiem - SRS FR-13-02 (P9-T5). */
 export class LaboratoryResultDto {
-  /** Ten chi so ("WBC"). Duoc chuan hoa ve CHU HOA khi luu - xem `LaboratoriesService`. */
+  
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
@@ -39,11 +38,6 @@ export class LaboratoryResultDto {
   @IsNumber({ maxDecimalPlaces: 4 })
   referenceMax?: number | null;
 
-  /**
-   * GHI DE co bat thuong. Bo trong = he thong tu tinh tu khoang tham chieu (truong hop
-   * thuong gap). Truyen gia tri khi co ngoai le theo loai/tuoi, hoac de danh dau
-   * `CRITICAL` - co nay khong bao gio tu sinh ra, xem `LabResultFlag`.
-   */
   @IsOptional()
   @IsEnum(LabResultFlag)
   flag?: LabResultFlag;

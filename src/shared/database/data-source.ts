@@ -5,12 +5,6 @@ import * as entities from './entity-registry';
 
 config();
 
-/**
- * Used only by the `typeorm`/`migration:*` CLI scripts in package.json (they run
- * outside Nest's DI container, so config comes straight from process.env via dotenv
- * rather than ConfigService). The app itself boots TypeORM through
- * `database.module.ts`, which mirrors these same options.
- */
 export const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',
   host: process.env.DB_HOST ?? 'localhost',

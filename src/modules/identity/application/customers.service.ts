@@ -23,16 +23,15 @@ import { QueryCustomersDto } from '@/modules/identity/presentation/dto/query-cus
 
 const BCRYPT_ROUNDS = 12;
 
-/** Cot duoc phep noi vao `ORDER BY customer.<col>` tu `?sortBy=` cua client. */
 const CUSTOMER_SORTABLE_COLUMNS = new Set(['createdAt', 'updatedAt', 'fullName', 'phone', 'email']);
 
-/** Mot dong trong bang tom tat danh sach khach hang. */
 export interface CustomerListRow {
   id: string;
-  /** Ma nghiep vu `KH000123` (FR-03-01). Ho so cu duoc backfill nen luon co gia tri. */
+  
   customerCode: string | null;
   phone: string;
   fullName: string;
+  avatarUrl: string;
   email: string | null;
   dateOfBirth: string | null;
   address: string | null;
@@ -43,39 +42,27 @@ export interface CustomerListRow {
   lastVisitAt: Date | null;
 }
 
-/** Ho so chi tiet mot khach hang - them cac so lieu tong hop cua man hinh chi tiet. */
 export interface CustomerDetail extends CustomerListRow {
   appointmentCount: number;
   completedAppointmentCount: number;
-  /** So hoa don KHAM (`source = CLINIC`) - dung cho nhan tab "Hoa don". */
+  
   invoiceCount: number;
-  /** So hoa don BAN LE (`source = POS`) - dung cho nhan tab "Lich su mua hang" (P8-T9). */
+  
   purchaseCount: number;
-  /**
-   * TONG CHI TIEU: tien khach da thuc tra, gom CA hoa don kham lan hoa don ban le
-   * (acceptance P8-T9). Tinh tu bang `payments` chu khong tu co `paid` - hoa don tra
-   * mot phan phai duoc tinh dung phan da tra, va dong hoan tien (so am) tu tru ra.
-   */
+  
   totalPaid: number;
-  /** Con phai thu = tong hoa don chua huy/chua hoan tru di so da thu, khong bao gio am. */
+  
   totalUnpaid: number;
 }
 
-/**
- * Mot dong trong tab "Lich su mua hang" - mot hoa don BAN LE tai quay (P8-T9).
- *
- * Tach hoan toan khoi `CustomerTransactionRow` (hoa don kham): hai loai giao dich nay
- * khong co chung truong nao dang ke ngoai so tien - ban le khong co thu cung, khong co
- * bac si, khong co lich hen, con hoa don kham thi khong co danh sach mat hang de tom tat.
- */
 export interface CustomerPurchaseRow {
   invoiceId: string;
   invoiceCode: string;
-  /** Thoi diem lap hoa don - voi ban le thi day cung la luc mua. */
+  
   purchasedAt: Date;
   branchName: string | null;
   status: InvoiceStatus;
-  /** Tom tat cac mat hang: "Thuc an hat x1, Vitamin x2". */
+  
   itemSummary: string;
   itemCount: number;
   totalAmount: number;
@@ -83,7 +70,6 @@ export interface CustomerPurchaseRow {
   paymentMethod: PaymentMethod | null;
 }
 
-/** Mot dong trong tab "Lich hen" cua ho so khach (FR-03-04). */
 export interface CustomerAppointmentRow {
   appointmentId: string;
   startAt: Date;
@@ -97,11 +83,6 @@ export interface CustomerAppointmentRow {
   serviceName: string | null;
 }
 
-/**
- * Mot dong trong tab "Lich su kham" - moi ho so benh an bac si da mo cho thu cung cua
- * khach. Khac tab "Lich hen" o cho: lich hen la KE HOACH (co ca lich bi huy, khach
- * khong den), ho so benh an la thu that su da dien ra trong phong kham.
- */
 export interface CustomerMedicalHistoryRow {
   medicalRecordId: string;
   appointmentId: string;
@@ -115,7 +96,6 @@ export interface CustomerMedicalHistoryRow {
   diagnoses: CustomerMedicalHistoryDiagnosis[];
 }
 
-/** Chan doan rut gon nhung trong mot dong benh su. */
 export interface CustomerMedicalHistoryDiagnosis {
   id: string;
   diagnosisText: string;
@@ -124,11 +104,10 @@ export interface CustomerMedicalHistoryDiagnosis {
   diseaseName: string | null;
 }
 
-/** Mot dong trong lich su giao dich cua khach (mot hoa don = mot lan kham da lap hoa don). */
 export interface CustomerTransactionRow {
   invoiceId: string;
   appointmentId: string;
-  /** Thoi diem dien ra lan kham (`appointment.startAt`), khong phai luc lap hoa don. */
+  
   visitedAt: Date;
   petId: string;
   petName: string;
@@ -139,7 +118,7 @@ export interface CustomerTransactionRow {
   paid: boolean;
   paidAt: Date | null;
   paymentMethod: PaymentMethod | null;
-  /** Tong tien hoa don, don vi dong (SUM(price * quantity) tren cac dong hoa don). */
+  
   totalAmount: number;
 }
 
@@ -147,9 +126,7 @@ export interface CustomerTransactionRow {
 export class CustomersService {
   constructor(
     @InjectRepository(User) private readonly usersRepository: Repository<User>,
-    // Doc-only sang bang cua module khac (dem thu cung, lich su giao dich) - dung
-    // dung mot lop entity/repository, khong goi vao service cua chung. Cung cach
-    // PetsModule/SchedulingModule dang lam.
+
     @InjectRepository(Pet) private readonly petsRepository: Repository<Pet>,
     @InjectRepository(Appointment) private readonly appointmentsRepository: Repository<Appointment>,
     @InjectRepository(MedicalRecord)
@@ -157,15 +134,6 @@ export class CustomersService {
     @InjectRepository(Invoice) private readonly invoicesRepository: Repository<Invoice>,
   ) {}
 
-  // ---------------------------------------------------------------------------------
-  // CRUD
-  // ---------------------------------------------------------------------------------
-
-  /**
-   * Them khach hang moi tai quay. So dien thoai la dinh danh duy nhat cua khach nen
-   * duoc kiem tra trung truoc - neu da ton tai thi le tan phai mo ho so cu len sua
-   * chu khong tao ban ghi thu hai cho cung mot nguoi.
-   */
   async create(dto: CreateCustomerDto): Promise<CustomerDetail> {
     const existingPhone = await this.usersRepository.findOne({ where: { phone: dto.phone } });
     if (existingPhone) {
@@ -182,9 +150,9 @@ export class CustomersService {
       this.usersRepository.create({
         phone: dto.phone,
         fullName: dto.fullName,
+        avatarUrl: dto.avatarUrl ?? '/images/default-user.svg',
         email: dto.email ?? null,
-        // Khach chi den quay thi khong can mat khau - giong tai khoan duoc tu tao
-        // trong luong dat lich (xem AppointmentsService.resolveOwner).
+
         passwordHash: dto.password ? await bcrypt.hash(dto.password, BCRYPT_ROUNDS) : null,
         role: Role.PET_OWNER,
         branchId: null,
@@ -209,6 +177,7 @@ export class CustomersService {
 
     await this.usersRepository.update(id, {
       ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
+      ...(dto.avatarUrl !== undefined ? { avatarUrl: dto.avatarUrl } : {}),
       ...(dto.email !== undefined ? { email: dto.email } : {}),
       ...(dto.dateOfBirth !== undefined ? { dateOfBirth: dto.dateOfBirth } : {}),
       ...(dto.address !== undefined ? { address: dto.address } : {}),
@@ -219,18 +188,6 @@ export class CustomersService {
     return this.findOne(id);
   }
 
-  /**
-   * "Xoa" khach hang = NGUNG HOAT DONG (`active = false`), khong bao gio xoa ban ghi.
-   *
-   * Ho so kham, hoa don va lich su giao dich cua khach deu tro nguoc ve `users.id`;
-   * xoa cung se lam do vo toan bo lich su y te (rang buoc R6 - Phan V.4). Khach da
-   * ngung hoat dong khong dang nhap duoc va khong nen duoc gan lich hen moi, nhung
-   * du lieu cu van tra cuu duoc binh thuong. Co the kich hoat lai bat cu luc nao.
-   *
-   * Chan mot truong hop de gay hieu nham: khach van con lich hen SAP DIEN RA thi
-   * phai huy/hoan tat cac lich do truoc, neu khong se co lich hen mo cua mot khach
-   * "da ngung hoat dong" nam lai tren lich lam viec cua bac si.
-   */
   async deactivate(id: string): Promise<CustomerDetail> {
     const customer = await this.findCustomerEntity(id);
     if (!customer.active) {
@@ -267,14 +224,6 @@ export class CustomersService {
     return this.findOne(id);
   }
 
-  // ---------------------------------------------------------------------------------
-  // Tra cuu
-  // ---------------------------------------------------------------------------------
-
-  /**
-   * Danh sach khach hang co tim kiem + loc. `petCount` va `lastVisitAt` duoc tinh
-   * bang subquery tuong quan trong CUNG mot cau lenh thay vi N+1 truy van phu.
-   */
   async findAll(query: QueryCustomersDto): Promise<PaginatedResultDto<CustomerListRow>> {
     const qb = this.buildBaseQuery(query);
 
@@ -332,22 +281,6 @@ export class CustomersService {
     };
   }
 
-  /**
-   * So lieu tien cua mot khach - P8-T9.
-   *
-   * BA THAY DOI SO VOI BAN TRUOC P8, deu cung mot goc: hoa don khong con buoc phai gan
-   * vao lich hen.
-   *   1. Loc theo `invoices.customer_id` thay vi JOIN qua `appointment -> pet -> owner`.
-   *      JOIN cu bo qua toan bo hoa don ban le (chung khong co lich hen), nen tong chi
-   *      tieu se thieu dung phan khach mua hang tai quay.
-   *   2. Tien lay tu `invoices.total_amount` (da chot, da tru giam gia) thay vi
-   *      `SUM(price x quantity)` - hai so nay khac nhau ngay khi hoa don co giam gia.
-   *   3. So DA THU tinh tu bang `payments`, khong tu co `paid`: hoa don tra mot phan
-   *      phai duoc tinh dung phan da tra, va dong hoan tien mang so am tu tru ra.
-   *
-   * Hai truy van rieng thay vi mot: JOIN `payments` vao `invoices` roi SUM se nhan doi
-   * `total_amount` cua moi hoa don co nhieu lan tra.
-   */
   private async moneyStatsOf(customerId: string): Promise<{
     invoiceCount: number;
     purchaseCount: number;
@@ -391,7 +324,6 @@ export class CustomersService {
     };
   }
 
-  /** Danh sach thu cung cua khach hang (Section 4.1.1 - "xem danh sach thu cung"). */
   async findPets(id: string): Promise<Pet[]> {
     await this.findCustomerEntity(id);
     return this.petsRepository.find({
@@ -401,11 +333,6 @@ export class CustomersService {
     });
   }
 
-  /**
-   * Tab "Lich hen" cua ho so khach (FR-03-04): moi lich hen cua moi thu cung, moi nhat
-   * truoc - ke ca lich da huy/khach khong den, vi day la mot so kham chu khong phai
-   * danh sach viec sap lam.
-   */
   async findAppointments(id: string): Promise<CustomerAppointmentRow[]> {
     await this.findCustomerEntity(id);
 
@@ -444,13 +371,6 @@ export class CustomersService {
     }));
   }
 
-  /**
-   * Tab "Lich su kham" (FR-03-04): cac ho so benh an bac si da mo cho thu cung cua khach.
-   *
-   * Doc thang bang `medical_records` thay vi qua module clinical - cung quy uoc doc-only
-   * da dung cho Pet/Appointment/Invoice o dau file. Tu P4-T8, chan doan lay tu bang
-   * `diagnoses` chu khong con tu `examinations.disease_groups`.
-   */
   async findMedicalHistory(id: string): Promise<CustomerMedicalHistoryRow[]> {
     await this.findCustomerEntity(id);
 
@@ -459,7 +379,7 @@ export class CustomersService {
       .innerJoin('medicalRecord.appointment', 'appointment')
       .innerJoin('medicalRecord.pet', 'pet')
       .leftJoin('medicalRecord.doctor', 'doctor')
-      // `leftJoin`: ho so chua ghi sinh hieu van phai hien trong benh su.
+      
       .leftJoin('medicalRecord.examination', 'examination')
       .leftJoin('appointment.branch', 'branch')
       .select('medicalRecord.id', 'medical_record_id')
@@ -490,11 +410,6 @@ export class CustomersService {
     }));
   }
 
-  /**
-   * Lich su giao dich: moi hoa don da lap cho bat ky thu cung nao cua khach, moi nhat
-   * truoc. Tong tien lay tu SUM cac dong hoa don (anh chup gia luc lap hoa don) chu
-   * khong JOIN sang bang gia hien tai - hoa don la chung tu bat bien (Phan V.4 #4).
-   */
   async findTransactions(id: string): Promise<CustomerTransactionRow[]> {
     await this.findCustomerEntity(id);
 
@@ -547,14 +462,6 @@ export class CustomersService {
     }));
   }
 
-  /**
-   * Lich su MUA HANG tai quay - P8-T9, tach khoi tab "Hoa don" (hoa don kham).
-   *
-   * Vi sao hai tab chu khong mot: hai loai giao dich tra loi hai cau hoi khac nhau. "Con
-   * thu cung nay da kham nhung gi, het bao nhieu" doc theo lich hen va bac si; "khach
-   * nay hay mua gi o quay" doc theo mat hang. Tron chung thi ca hai cot deu mot nua bo
-   * trong, va khong cau nao tra loi gon duoc.
-   */
   async findPurchases(id: string): Promise<CustomerPurchaseRow[]> {
     await this.findCustomerEntity(id);
 
@@ -602,11 +509,6 @@ export class CustomersService {
     }));
   }
 
-  // ---------------------------------------------------------------------------------
-  // Helper rieng
-  // ---------------------------------------------------------------------------------
-
-  /** 404 neu id khong ton tai HOAC ton tai nhung khong phai khach hang (vd tai khoan bac si). */
   private async findCustomerEntity(id: string): Promise<User> {
     const customer = await this.usersRepository.findOne({
       where: { id, role: Role.PET_OWNER },
@@ -630,7 +532,7 @@ export class CustomersService {
             .where('customer.fullName ILIKE :search', { search: `%${search}%` })
             .orWhere('customer.phone ILIKE :search', { search: `%${search}%` })
             .orWhere('customer.email ILIKE :search', { search: `%${search}%` })
-            // FR-03-03 doi tim duoc theo ma khach hang (`?search=KH000123`).
+            
             .orWhere('customer.customerCode ILIKE :search', { search: `%${search}%` });
         }),
       );
@@ -663,7 +565,7 @@ export class CustomersService {
       qb.andWhere('customer.createdAt >= :createdFrom', { createdFrom: query.createdFrom });
     }
     if (query.createdTo) {
-      // Dau mut phai la HET NGAY do: '2026-08-04' phai bao gom ca luc 23:59.
+      
       qb.andWhere("customer.createdAt < (CAST(:createdTo AS date) + INTERVAL '1 day')", {
         createdTo: query.createdTo,
       });
@@ -672,10 +574,6 @@ export class CustomersService {
     return qb;
   }
 
-  /**
-   * Bo cot chung cua ca danh sach lan chi tiet. `pet_count`/`last_visit_at` la subquery
-   * tuong quan - mot cau lenh duy nhat, khong N+1.
-   */
   private selectListColumns(qb: ReturnType<CustomersService['buildBaseQuery']>) {
     return (
       qb
@@ -683,11 +581,9 @@ export class CustomersService {
         .addSelect('customer.customer_code', 'customer_code')
         .addSelect('customer.phone', 'phone')
         .addSelect('customer.full_name', 'full_name')
+        .addSelect('customer.avatar_url', 'avatar_url')
         .addSelect('customer.email', 'email')
-        // Ep sang chuoi ngay trong CHINH cau lenh: doc cot `date` bang getRawOne thi
-        // driver pg tra ve mot Date luc 00:00 GIO MAY CHU, va JSON.stringify se day no
-        // lech mui gio (1995-04-20 -> "1995-04-19T17:00:00Z"). `Pet.birthDate` khong
-        // dinh loi nay vi di qua entity chu khong qua raw query.
+
         .addSelect("TO_CHAR(customer.date_of_birth, 'YYYY-MM-DD')", 'date_of_birth')
         .addSelect('customer.address', 'address')
         .addSelect('customer.note', 'note')
@@ -716,6 +612,7 @@ export class CustomersService {
       customerCode: row.customer_code,
       phone: row.phone,
       fullName: row.full_name,
+      avatarUrl: row.avatar_url,
       email: row.email,
       dateOfBirth: row.date_of_birth,
       address: row.address,
@@ -733,6 +630,7 @@ interface RawCustomerRow {
   customer_code: string | null;
   phone: string;
   full_name: string;
+  avatar_url: string;
   email: string | null;
   date_of_birth: string | null;
   address: string | null;
@@ -769,12 +667,6 @@ interface RawCustomerMedicalHistoryRow {
   branch_name: string | null;
 }
 
-/**
- * Cac chan doan cua mot ho so, gom san thanh mang JSON trong CSDL - tranh N+1 khi
- * khach co hang chuc lan kham. Ban sao cua truy van cung ten trong
- * `pets/application/pet-profile.service.ts`: hai read-model doc lap nhau, gop lai
- * thanh mot hang SQL dung chung se buoc hai module phai doi cung nhau.
- */
 const CUSTOMER_DIAGNOSES_JSON_SUBQUERY = `(
   SELECT COALESCE(
            json_agg(
@@ -795,7 +687,6 @@ const CUSTOMER_DIAGNOSES_JSON_SUBQUERY = `(
      AND diag."deleted_at" IS NULL
 )`;
 
-/** Dong tho cua truy van lich su mua hang (P8-T9). */
 interface RawPurchaseRow {
   invoice_id: string;
   invoice_code: string;

@@ -26,15 +26,6 @@ import { AmendMedicalRecordDto } from './dto/amend-medical-record.dto';
 import { Audit } from '@/shared/common/decorators/audit.decorator';
 import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
-/**
- * SRS FR-07..FR-10 - ho so benh an.
- *
- * Phan quyen theo dung quy uoc tu P1: `@RequirePermissions` la hang rao duy nhat,
- * khong kem `@Roles`. Ket qua theo ma tran `role_permissions` hien tai:
- *   - DOCTOR + ADMIN co CREATE/UPDATE -> mo, sua, chot ho so (BR-07)
- *   - RECEPTIONIST / MANAGER / PHARMACIST chi co VIEW -> doc duoc, ghi thi 403
- *   - PET_OWNER khong co dong nao trong ma tran -> bi tu choi o moi endpoint
- */
 @ApiTags('medical-records')
 @Controller('medical-records')
 export class MedicalRecordsController {
@@ -58,14 +49,6 @@ export class MedicalRecordsController {
     return this.medicalRecordsService.findByAppointment(appointmentId);
   }
 
-  /**
-   * Sua ho so DA HOAN TAT - SRS FR-08 (P10-T2).
-   *
-   * Duong rieng chu khong noi long `PATCH :id`: BR-08 khoa ho so da chot, va viec sua no
-   * la mot NGHIEP VU KHAC han - co ly do bat buoc, co gioi han nguoi thuc hien, va luon
-   * de lai mot dong nhat ky kiem toan. Gop vao mot handler thi ba dieu kien do se thanh
-   * ba nhanh `if` trong cung mot ham va som muon co nhanh bi bo qua.
-   */
   @RequirePermissions(Permission.MEDICAL_RECORD_UPDATE)
   @Audit({ action: AuditAction.UPDATE, entity: 'MedicalRecord' })
   @Patch(':id/amend')
@@ -97,8 +80,6 @@ export class MedicalRecordsController {
     return this.medicalRecordsService.addTreatment(id, dto);
   }
 
-  // Hai route `:id` tran phai dung CUOI - dat truoc thi `by-pet`/`by-appointment` se
-  // roi vao day va chet o ParseUUIDPipe (cung quy uoc voi examinations.controller.ts).
   @RequirePermissions(Permission.MEDICAL_RECORD_VIEW)
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
@@ -112,13 +93,6 @@ export class MedicalRecordsController {
   }
 }
 
-/**
- * Chan doan va dieu tri duoc TAO duoi ho so cha (`POST /medical-records/:id/...`)
- * nhung duoc SUA/XOA qua dinh danh cua chinh no. Ly do khong long thanh
- * `/medical-records/:recordId/diagnoses/:id`: id chan doan da la duy nhat toan cuc,
- * bat client mang theo id cha chi tao them mot tham so co the truyen sai ma server
- * van phai kiem tra lai.
- */
 @ApiTags('medical-records')
 @Controller('diagnoses')
 export class DiagnosesController {

@@ -1,11 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Phieu nhap kho - P6-T5, SRS UC-05, BR-13.
- *
- * Day cung la noi dong `inventory_batches.goods_receipt_id` (tao o P6-T1 duoi dang uuid
- * tran) nhan khoa ngoai cua no - bang `goods_receipts` toi bay gio moi ton tai.
- */
 export class GoodsReceipts1792000003000 implements MigrationInterface {
   name = 'GoodsReceipts1792000003000';
 
@@ -71,7 +65,6 @@ export class GoodsReceipts1792000003000 implements MigrationInterface {
       ON "goods_receipt_items" ("goods_receipt_id")
     `);
 
-    // Khoa ngoai da hen o P6-T1: lo hang tro ve phieu nhap da sinh ra no.
     await queryRunner.query(`
       ALTER TABLE "inventory_batches"
         ADD CONSTRAINT "fk_inventory_batches_goods_receipt"

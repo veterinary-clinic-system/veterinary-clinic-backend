@@ -13,12 +13,12 @@ import {
 } from 'class-validator';
 import { Specialization } from '@/shared/common/enums/specialization.enum';
 
-/**
- * POST /catalog/services body. `unitPrice`/`itemName`/`describe` live on the backing
- * `Item` row (created alongside the `Service` row in one transaction) - see
- * CatalogService (services.service.ts) `create()`.
- */
 export class CreateServiceDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  imageUrl?: string;
+
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
@@ -39,12 +39,10 @@ export class CreateServiceDto {
   @Max(1440)
   durationMinutes: number;
 
-  /** Which Doctor.specialization this service requires, if any (free-text match, not FK-enforced). */
   @IsOptional()
   @IsEnum(Specialization)
   requiresSpecialization?: Specialization;
 
-  /** Danh muc dich vu (FR-14) - nam tren `Item`. */
   @IsOptional()
   @IsUUID()
   categoryId?: string;

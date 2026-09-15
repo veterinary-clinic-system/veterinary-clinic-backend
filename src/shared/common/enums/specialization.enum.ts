@@ -1,4 +1,4 @@
-/** Matches the <<enumeration>> Specialization block in diagram.jpg (Doctor.specialization[]). */
+
 export enum Specialization {
   GENERAL_PRACTICE = 'GENERAL_PRACTICE',
   INTERNAL_MEDICINE = 'INTERNAL_MEDICINE',

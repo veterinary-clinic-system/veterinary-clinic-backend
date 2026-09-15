@@ -8,12 +8,6 @@ import {
 
 const ZALO_OA_SEND_MESSAGE_URL = 'https://openapi.zalo.me/v3.0/oa/message/cs';
 
-/**
- * Zalo Official Account "Consulting/Support" message API. Requires the recipient to
- * already be a Zalo user who follows/has interacted with the clinic's OA (a Zalo OA
- * platform constraint, not something this service can work around) and a valid
- * long-lived `ZALO_OA_ACCESS_TOKEN`. Without one, fails closed like SmsNotificationProvider.
- */
 @Injectable()
 export class ZaloNotificationProvider implements NotificationProvider {
   private readonly logger = new Logger('NotificationProvider:zalo');

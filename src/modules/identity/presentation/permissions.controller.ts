@@ -9,28 +9,6 @@ import { SetRolePermissionsDto } from './dto/set-role-permissions.dto';
 import { Audit } from '@/shared/common/decorators/audit.decorator';
 import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
-/**
- * Ma tran phan quyen. BR-16: "Chi Admin duoc quan ly role va permission".
- *
- * ---------------------------------------------------------------------------------
- * NGUYEN TAC DUNG `@Roles` va `@RequirePermissions` TRONG TOAN BO DU AN
- * ---------------------------------------------------------------------------------
- * `@RequirePermissions` la hang rao CHINH cho moi endpoint nghiep vu. Ma tran
- * `role_permissions` la nguon su that duy nhat, quan tri vien sua duoc luc chay.
- * Endpoint nghiep vu KHONG kem `@Roles` nua - giu ca hai se tao ra hai danh sach vai
- * tro phai sua song song, va som muon chung se lech nhau.
- *
- * `@Roles` chi con o hai cho, va deu la rang buoc CAU TRUC (khong bao gio duoc phep
- * cau hinh lai luc chay):
- *   1. Be mat quan tri he thong - chinh controller nay, `users`, `branches`. BR-16 noi
- *      "chi Admin", nen ADMIN duoc go cung o tang ma nguon chu khong phai o mot dong
- *      du lieu ma chinh quan tri vien co the xoa nham.
- *   2. Route tu phuc vu cua chu thu cung (`/pets/mine`, `/appointments/mine`) - cac
- *      route nay kiem tra quyen SO HUU chu khong kiem tra permission.
- *
- * PET_OWNER co y khong co dong nao trong `role_permissions`, nen moi endpoint co
- * `@RequirePermissions` deu tu dong tu choi ho. An toan theo mac dinh.
- */
 @ApiTags('permissions')
 @Controller('permissions')
 @Roles(Role.ADMIN)
@@ -38,7 +16,6 @@ import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 export class PermissionsController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
-  /** Danh muc quyen kem cach nhom - de man hinh quan tri dung nhom checkbox. */
   @Get('catalog')
   getCatalog() {
     return this.permissionsService.getCatalog();

@@ -1,8 +1,4 @@
-/**
- * Wire contract with veterinary-clinic-ai's internal REST API. Keep this in sync with
- * that service's `app/schemas/triage.py` / `app/schemas/chat.py` - both sides were
- * designed together (see CLAUDE.md "Backend <-> AI service contract").
- */
+
 export interface TriageRequest {
   symptom_text: string;
   photo_urls: string[];

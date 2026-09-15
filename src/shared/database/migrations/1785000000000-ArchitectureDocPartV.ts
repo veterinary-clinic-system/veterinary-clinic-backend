@@ -1,34 +1,14 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Ap dung Phan V (Co so du lieu) cua tai lieu kien truc VetCare AI.
- *
- * Migration nay co pha vo schema (doi kieu cot tien te, them cot moi). Voi du lieu
- * dev thi seed lai la xong; voi du lieu that phai sao luu truoc.
- *
- * Ghi chu ve pgvector (Phan V.1.4): KHONG bat `CREATE EXTENSION vector` o day, vi
- * anh postgres:16-alpine tieu chuan khong kem san pgvector va migration se that bai.
- * Do la "huong phat trien" trong tai lieu, khong phai yeu cau cua ban hien tai -
- * khi nao can thi doi sang anh pgvector/pgvector va them mot migration rieng.
- */
 export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
   name = 'ArchitectureDocPartV1785000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // ================================================================
-    // 1. CAC EXTENSION CAN THIET (Phan V.1)
-    // ================================================================
-    // btree_gist: cho phep tron cot binh thuong (=) voi cot pham vi (&&) trong mot
-    //             rang buoc EXCLUDE - can cho chong trung lich hen.
-    // unaccent  : bo dau tieng Viet ("Cho Muc" khop "cho muc").
-    // pg_trgm   : tim gan dung, chiu duoc go sai chinh ta.
+
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS btree_gist`);
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS unaccent`);
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
 
-    // `unaccent()` chi la STABLE (no phu thuoc tu dien co the thay doi), trong khi
-    // cot sinh (generated column) va chi muc bieu thuc doi ham IMMUTABLE. Boc lai
-    // qua ham nay - chi dinh ro tu dien nen ket qua tro thanh tat dinh.
     await queryRunner.query(`
       CREATE OR REPLACE FUNCTION f_unaccent(text)
       RETURNS text
@@ -36,10 +16,6 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
       $$ SELECT public.unaccent('public.unaccent', $1) $$
     `);
 
-    // ================================================================
-    // 2. XOA MEM (Phan V.4 quyet dinh #5, rang buoc R6)
-    // ================================================================
-    // Them deleted_at vao moi bang nghiep vu ke thua BaseEntity.
     const softDeletableTables = [
       'users',
       'refresh_tokens',
@@ -72,10 +48,6 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
       );
     }
 
-    // Chi muc duy nhat phai tro thanh partial: sau khi xoa mem mot nguoi dung, so dien
-    // thoai do phai dung lai duoc cho ban ghi moi.
-    // Ten rang buoc trong migration goc do TypeORM sinh tu dong (UQ_<hash>), khong doan
-    // duoc - tra cuu tu catalog he thong roi drop theo ten thuc te.
     await queryRunner.query(`
       DO $$
       DECLARE c RECORD;
@@ -103,12 +75,6 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
       ON "users" ("email") WHERE "email" IS NOT NULL AND "deleted_at" IS NULL
     `);
 
-    // ================================================================
-    // 3. TIEN TE -> BIGINT DON VI DONG (Phan V.4 quyet dinh #2)
-    // ================================================================
-    // VND khong co don vi nho hon dong. Giu numeric(12,2) nghia la luon keo theo
-    // hai chu so thap phan vo nghia, con float thi gay sai so cong don - khong chap
-    // nhan duoc voi chung tu tai chinh.
     await queryRunner.query(`
       ALTER TABLE "items"
       ALTER COLUMN "unit_price" TYPE BIGINT USING round("unit_price")::bigint,
@@ -127,19 +93,6 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
       CHECK ("price" >= 0)
     `);
 
-    // ================================================================
-    // 4. CHONG TRUNG LICH HEN O TANG CSDL (Phan V.1.1)
-    // ================================================================
-    // Day la ly do manh nhat de chon PostgreSQL thay vi MySQL. Kiem tra o tang ung
-    // dung luon co khe ho race condition: hai request dat cung khung gio cua cung bac
-    // si chay song song deu vuot qua buoc "kiem tra con trong khong" truoc khi ben kia
-    // kip INSERT. Rang buoc EXCLUDE dong khe ho do lai o dung mot cho.
-    //
-    // Cac trang thai CANCELLED / NO_SHOW khong con giu cho nen duoc loai tru - khop
-    // voi SLOT_BLOCKING_STATUSES trong shared/common/enums/appointment-status.enum.ts.
-    //
-    // Neu du lieu hien co da co lich trung, lenh nay se that bai - do la co y: phai
-    // don du lieu truoc chu khong duoc am tham bo qua.
     await queryRunner.query(`
       ALTER TABLE "appointments"
       ADD CONSTRAINT "appointment_no_overlap"
@@ -150,12 +103,6 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
       WHERE ("status" NOT IN ('CANCELLED', 'NO_SHOW') AND "deleted_at" IS NULL)
     `);
 
-    // ================================================================
-    // 5. OUTPUT AI: JSONB + GIN (Phan V.1.2)
-    // ================================================================
-    // Hinh dang output cua model SE doi moi lan retrain / doi kien truc. Neu chuan hoa
-    // thanh bang thi moi lan do lai phai migrate schema. JSONB co GIN cho ta do linh
-    // hoat cua document database dung tai cho can, phan nghiep vu con lai van quan he chat.
     await queryRunner.query(`
       ALTER TABLE "pre_screening_results"
       ADD COLUMN IF NOT EXISTS "model_version" VARCHAR(64) NOT NULL DEFAULT 'unknown'
@@ -164,17 +111,12 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
       CREATE INDEX IF NOT EXISTS "idx_prescreening_raw_ai_gin"
       ON "pre_screening_results" USING GIN ("raw_ai_response" jsonb_path_ops)
     `);
-    // Phuc vu bao cao do chinh xac AI theo tung phien ban model.
+    
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_prescreening_model_version"
       ON "pre_screening_results" ("model_version", "created_at")
     `);
 
-    // ================================================================
-    // 6. TIM KIEM TIENG VIET (Phan V.1.3)
-    // ================================================================
-    // Yeu cau: le tan go "cho muc" phai ra "Cho Muc"; go sai chinh ta van ra ket qua.
-    // Co san hai thu nay thi khong can Elasticsearch - bot mot thanh phan phai van hanh.
     await queryRunner.query(`
       ALTER TABLE "pets"
       ADD COLUMN IF NOT EXISTS "search_vector" tsvector
@@ -192,15 +134,12 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
       CREATE INDEX IF NOT EXISTS "idx_users_full_name_trgm"
       ON "users" USING GIN (f_unaccent("full_name") gin_trgm_ops)
     `);
-    // Le tan tra cuu theo so dien thoai go tung phan.
+    
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_users_phone_trgm"
       ON "users" USING GIN ("phone" gin_trgm_ops)
     `);
 
-    // ================================================================
-    // 7. TRANSACTIONAL OUTBOX (Phan IV.2)
-    // ================================================================
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "outbox_events" (
         "id"           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -213,18 +152,12 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
         "last_error"   TEXT
       )
     `);
-    // Partial index: chi chua cac su kien CHUA xu ly. Bang co the phinh to theo thoi
-    // gian ma chi muc worker dung van luon nho.
+
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_outbox_unprocessed"
       ON "outbox_events" ("created_at") WHERE "processed_at" IS NULL
     `);
 
-    // ================================================================
-    // 8. AUDIT LOG PHAN MANH THEO THANG (Phan V.4 quyet dinh #8, R6)
-    // ================================================================
-    // Bang tang nhanh nhat he thong. Phan manh cho phep don du lieu cu bang
-    // DROP PARTITION (tuc thi) thay vi DELETE (cham, de lai bloat phai VACUUM).
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "audit_logs" (
         "id"            UUID        NOT NULL DEFAULT gen_random_uuid(),
@@ -248,8 +181,6 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
       ON "audit_logs" ("entity_name", "entity_id")
     `);
 
-    // Ham tao partition cho mot thang bat ky, goi duoc nhieu lan ma khong loi.
-    // Worker se goi ham nay hang thang de tao truoc partition cua thang sau.
     await queryRunner.query(`
       CREATE OR REPLACE FUNCTION ensure_audit_log_partition(target_month DATE)
       RETURNS void
@@ -268,8 +199,6 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
       END $$
     `);
 
-    // Tao san partition cho thang truoc, thang nay va thang sau, de he thong ghi duoc
-    // ngay ma khong cho worker chay lan dau.
     await queryRunner.query(
       `SELECT ensure_audit_log_partition((now() - interval '1 month')::date)`,
     );
@@ -278,59 +207,35 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
       `SELECT ensure_audit_log_partition((now() + interval '1 month')::date)`,
     );
 
-    // Partition mac dinh: hung cac dong roi ngoai moi khoang da tao, de mot su co
-    // "quen tao partition" khong lam mat ban ghi kiem toan.
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "audit_logs_default"
       PARTITION OF "audit_logs" DEFAULT
     `);
 
-    // ================================================================
-    // 9. CHI MUC THEO TRUY VAN THUC TE (Phan V.5)
-    // ================================================================
-    // Nguyen tac cua tai lieu: khong tao chi muc suy doan. Bon chi muc duoi day tuong
-    // ung dung bon truy van duoc liet ke o bang V.5.
-
-    // "Hang doi hom nay cua chi nhanh" - partial index nen rat nho, chi chua cac ca
-    // dang cho kham chu khong phai toan bo lich su.
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_appointments_queue_today"
       ON "appointments" ("branch_id", "start_at")
       WHERE "status" IN ('CHECKED_IN', 'IN_PROGRESS') AND "deleted_at" IS NULL
     `);
 
-    // "Timeline thu cung" - lich su kham cua mot be, moi nhat truoc.
-    // Dat tren "appointments" chu KHONG phai "examinations": bang examinations khong co
-    // cot pet_id, no lien he voi thu cung gian tiep qua appointment. Truy van timeline
-    // vi vay bat dau tu appointments roi join sang examinations.
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_appointments_pet_timeline"
       ON "appointments" ("pet_id", "start_at" DESC)
       WHERE "deleted_at" IS NULL
     `);
 
-    // "Bao cao doanh thu theo khoang ngay" - covering index cho phep index-only scan,
-    // khong phai cham vao bang chinh.
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_invoices_revenue"
       ON "invoices" ("paid_at") INCLUDE ("paid", "payment_method")
       WHERE "paid" = true AND "deleted_at" IS NULL
     `);
 
-    // Tra cuu lich hen cua mot bac si trong khoang thoi gian (man hinh lich lam viec).
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_appointments_doctor_range"
       ON "appointments" ("doctor_id", "start_at", "end_at")
       WHERE "deleted_at" IS NULL
     `);
 
-    // ================================================================
-    // 10. CQRS-LITE: MATERIALIZED VIEW CHO BAO CAO (Phan IV.3)
-    // ================================================================
-    // Truy van bao cao la tong hop nang, quet nhieu bang. Chay chung duong voi OLTP
-    // se lam cham man hinh kham. Tach ra materialized view, worker lam moi theo lich.
-
-    // Doanh thu theo ngay va chi nhanh.
     await queryRunner.query(`
       CREATE MATERIALIZED VIEW IF NOT EXISTS "mv_revenue_daily" AS
       SELECT
@@ -344,15 +249,12 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
       WHERE i."paid" = true AND i."paid_at" IS NOT NULL AND i."deleted_at" IS NULL
       GROUP BY 1, 2
     `);
-    // UNIQUE index la DIEU KIEN BAT BUOC de dung REFRESH ... CONCURRENTLY (lam moi ma
-    // khong khoa nguoi doc). Thieu no thi moi lan refresh se chan man hinh bao cao.
+
     await queryRunner.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_mv_revenue_daily"
       ON "mv_revenue_daily" ("day", "branch_id")
     `);
 
-    // Do chinh xac cua AI theo ngay va phien ban model: bao nhieu lan nhan vien giu
-    // nguyen mau uu tien AI de xuat, bao nhieu lan ho sua.
     await queryRunner.query(`
       CREATE MATERIALIZED VIEW IF NOT EXISTS "mv_ai_accuracy_daily" AS
       SELECT

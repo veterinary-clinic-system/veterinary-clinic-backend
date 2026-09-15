@@ -32,7 +32,6 @@ export class PetsService {
     @InjectRepository(Appointment) private readonly appointmentsRepository: Repository<Appointment>,
   ) {}
 
-  /** Staff adding a pet profile to an existing owner outside the booking flow (Section 4.1.1). */
   async create(dto: CreatePetDto): Promise<Pet> {
     await assertOwnerIsActive(this.usersRepository, dto.ownerId);
     await this.assertBreedBelongsToSpecies(dto.breedId, dto.speciesId);
@@ -50,7 +49,7 @@ export class PetsService {
       birthDate: dto.birthDate ?? null,
       microchipId,
       color: dto.color ?? null,
-      avatarUrl: dto.avatarUrl ?? null,
+      avatarUrl: dto.avatarUrl ?? '/images/default-pet.svg',
       notes: dto.notes ?? null,
       allergies: dto.allergies ?? [],
       chronicConditions: dto.chronicConditions ?? [],
@@ -66,9 +65,6 @@ export class PetsService {
       throw new NotFoundException('Không tìm thấy thú cưng');
     }
 
-    // BR-02 chi chan viec CHUYEN sang mot chu nuoi da ngung hoat dong. Sua ten/can nang
-    // cua thu cung dang thuoc mot khach ngung hoat dong van phai lam duoc - khoa lai se
-    // khoa luon ca ho so cu.
     if (dto.ownerId !== undefined && dto.ownerId !== pet.ownerId) {
       await assertOwnerIsActive(this.usersRepository, dto.ownerId);
     }
@@ -83,9 +79,6 @@ export class PetsService {
       await this.assertMicrochipIsFree(microchipId, id);
     }
 
-    // A raw partial UPDATE (rather than mutate-then-save the relation-hydrated entity)
-    // so a reassigned breedId/ownerId can't be shadowed by the stale `breed`/`owner`
-    // relation objects - same convention as AppointmentsService.update() for doctorId.
     await mapMicrochipConflict(() =>
       this.petsRepository.update(id, {
         ...(dto.name !== undefined ? { name: dto.name } : {}),
@@ -108,15 +101,10 @@ export class PetsService {
     return this.loadPetOrThrow(id);
   }
 
-  /** Full staff view - no ownership check. Used internally and by the staff-only `findOne` path. */
   async findOne(id: string): Promise<Pet> {
     return this.loadPetOrThrow(id);
   }
 
-  /**
-   * Shared by `GET /pets/:id` and `GET /pets/:id/timeline`, neither of which carries
-   * `@Roles(...)`: staff roles always pass, a PetOwner only passes for their own pet.
-   */
   async findOneForActor(id: string, actor: AuthenticatedUser): Promise<Pet> {
     const pet = await this.loadPetOrThrow(id);
     if (actor.role === Role.PET_OWNER && pet.ownerId !== actor.userId) {
@@ -133,7 +121,6 @@ export class PetsService {
     });
   }
 
-  /** Paginated staff search backing "Search profiles by name, phone number, or record ID" (Section 4.1.1). */
   async findAll(query: QueryPetsDto): Promise<PaginatedResultDto<Pet>> {
     const qb = this.petsRepository
       .createQueryBuilder('pet')
@@ -154,12 +141,10 @@ export class PetsService {
             .orWhere('owner.phone ILIKE :search', {
               search: `%${search}%`,
             })
-            // Ma nghiep vu (FR-04-01) va so microchip - hai thu le tan doc duoc tren
-            // giay to cua khach, khac voi UUID.
+
             .orWhere('pet.petCode ILIKE :search', { search: `%${search}%` })
             .orWhere('pet.microchipId ILIKE :search', { search: `%${search}%` });
-          // Only add the exact-id branch when `search` is actually a UUID - a raw
-          // non-UUID string in a `uuid = :param` comparison throws a Postgres error.
+
           if (isUUID(search)) {
             sub.orWhere('pet.id = :exactId', { exactId: search });
           }
@@ -167,7 +152,6 @@ export class PetsService {
       );
     }
 
-    // sortBy is caller-controlled input - never interpolate it unchecked into raw SQL.
     const sortBy =
       query.sortBy && PET_SORTABLE_COLUMNS.has(query.sortBy) ? query.sortBy : 'createdAt';
     qb.orderBy(`pet.${sortBy}`, query.sortOrder ?? 'DESC')
@@ -178,19 +162,8 @@ export class PetsService {
     return new PaginatedResultDto(data, total, query.page, query.limit);
   }
 
-  /**
-   * Section 4.1.4 "timeline view of examination history": this pet's appointments, most
-   * recent first, each with its linked Examination (vitals) and MedicalRecord when one
-   * exists.
-   *
-   * Tu P4-T8, chan doan doc tu `medicalRecord.diagnoses` chu khong con tu
-   * `examination.diseaseGroups`. Van tra ve `Appointment[]` chu khong phai
-   * `MedicalRecord[]`: day la route CHU THU CUNG tu xem (`GET /pets/:id/timeline`), noi
-   * mot lich hen chua kham xong van phai hien ra - `MedicalRecordsService.getTimelineForPet`
-   * moi la benh su cua nhan vien, va no chi thay nhung lan da mo ho so.
-   */
   async getTimeline(id: string, actor: AuthenticatedUser): Promise<Appointment[]> {
-    await this.findOneForActor(id, actor); // 404s / 403s before touching the appointments table
+    await this.findOneForActor(id, actor); 
 
     return this.appointmentsRepository.find({
       where: { petId: id },
@@ -216,11 +189,6 @@ export class PetsService {
     return pet;
   }
 
-  /**
-   * Muc 16 SRS: loai la truong bat buoc. Giong da chon phai THUOC loai do - neu khong,
-   * mot bieu mau doi loai sang "Mèo" nhung con giu lai giong "Poodle" cua lan chon
-   * truoc se tao ra mot ho so tu mau thuan.
-   */
   private async assertBreedBelongsToSpecies(breedId: string, speciesId?: string): Promise<Breed> {
     const breed = await this.breedsRepository.findOne({ where: { id: breedId } });
     if (!breed) {
@@ -232,11 +200,6 @@ export class PetsService {
     return breed;
   }
 
-  /**
-   * Mot so microchip chi duoc gan cho mot thu cung. Kiem o day de le tan nhan duoc
-   * thong bao co ten con vat dang giu so do; chi muc `uq_pets_microchip_id` van la
-   * thu chot chan (xem `mapMicrochipConflict`).
-   */
   private async assertMicrochipIsFree(
     microchipId: string,
     excludePetId: string | null,
@@ -252,22 +215,13 @@ export class PetsService {
   }
 }
 
-/** Ma loi PostgreSQL cho vi pham rang buoc UNIQUE. */
 const PG_UNIQUE_VIOLATION = '23505';
 
-/** O trong tren giao dien gui len chuoi rong - phai thanh NULL de khong dinh unique. */
 function normalizeMicrochipId(raw: string | undefined): string | null {
   const trimmed = raw?.trim();
   return trimmed ? trimmed : null;
 }
 
-/**
- * Doi vi pham `uq_pets_microchip_id` cua CSDL thanh 409 co thong bao tieng Viet.
- *
- * Van can du da kiem truoc bang `assertMicrochipIsFree`: giua luc doc va luc ghi, mot
- * request khac co the da chiem so chip do. Cung ly do voi
- * `mapAppointmentOverlapError` ben scheduling.
- */
 async function mapMicrochipConflict<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
@@ -283,7 +237,6 @@ async function mapMicrochipConflict<T>(operation: () => Promise<T>): Promise<T> 
   }
 }
 
-/** BR-02 tai cua "them/chuyen thu cung" - xem `assertCustomerCanOwnPets`. */
 async function assertOwnerIsActive(
   usersRepository: Repository<User>,
   ownerId: string,

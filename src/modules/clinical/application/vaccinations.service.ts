@@ -32,14 +32,12 @@ import { QueryVaccinationsDueDto } from '@/modules/clinical/presentation/dto/que
 
 const DETAIL_RELATIONS = ['vaccine', 'vaccine.item', 'doctor', 'doctor.user'];
 
-/** Mot mui trong so tiem chung, kem trang thai lich nhac da tinh san. */
 export interface VaccinationRecordView {
   vaccination: Vaccination;
-  /** `OVERDUE` to do, `DUE_SOON` to vang - acceptance P9-T3. */
+  
   dueStatus: VaccinationDueStatus;
 }
 
-/** Mot dong trong danh sach goi nhac (`GET /vaccinations/due`). */
 export interface VaccinationDueRow {
   vaccinationId: string;
   petId: string;
@@ -54,29 +52,11 @@ export interface VaccinationDueRow {
   doseNumber: number;
   vaccinatedAt: string;
   nextDueDate: string;
-  /** Am = da qua han. */
+  
   daysUntilDue: number;
   branchId: string;
 }
 
-/**
- * Tiem chung - SRS FR-12, BR-11 (P9-T2, P9-T3).
- *
- * BA DIEU LAM NEN TOAN BO SERVICE NAY:
- *
- *  1. TIEM LA TRU KHO. Mot mui tiem khong phai mot dong ghi chu - no lam mot liu
- *     vaccine roi khoi kho that. Viec tru di qua `InventoryService.issue` nhu moi thay
- *     doi ton khac (luat so mot cua P6), khong bao gio ghi thang.
- *  2. BR-11 CHAN CUNG. Vaccine het han khong duoc tiem. FEFO cua P6 da tu loai lo het
- *     han ra khoi phep phan bo, nhung khi CHI con lo het han no bao "khong du ton kho:
- *     kha dung 0" - dung ve so hoc, vo nghia voi nguoi dung. `assertUsableStock` bien
- *     tinh huong do thanh mot cau noi ro rang truoc khi cham vao kho.
- *  3. LO DA XUAT DUOC CHEP LAI. `batchNo`/`expiryDate` tren `vaccinations` lay tu chinh
- *     lo ma FEFO da chon, khong phai tu nguoi nhap - xem `CreateVaccinationDto`.
- *
- * Toan bo `create` nam trong MOT transaction: mot mui tiem da ghi ma kho chua tru (hoac
- * nguoc lai) la sai lech khong the phat hien duoc cho toi ky kiem ke.
- */
 @Injectable()
 export class VaccinationsService {
   constructor(
@@ -86,9 +66,6 @@ export class VaccinationsService {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  // ------------------------------------------------------------------- Ghi nhan
-
-  /** Ghi nhan mot mui tiem va tru kho vaccine - FR-12, BR-11. */
   async create(
     dto: CreateVaccinationDto,
     actor: AuthenticatedUser,
@@ -116,9 +93,6 @@ export class VaccinationsService {
 
       await this.assertUsableStock(em, vaccine, branchId);
 
-      // Luu dong tiem TRUOC khi tru kho de co `id` lam `referenceId` cho so cai. Ca hai
-      // nam trong cung transaction nen khong co cua so nao dong tiem ton tai ma kho chua
-      // tru; doi lai so cai tro nguoc ve duoc dung mui tiem da sinh ra no.
       const vaccination = await em.save(
         em.create(Vaccination, {
           petId: pet.id,
@@ -138,9 +112,6 @@ export class VaccinationsService {
         }),
       );
 
-      // MOT LIEU MOT MUI. Vaccine nhieu lieu trong mot lo hien khong co trong SRS; neu
-      // ve sau can, cho so lieu vao DTO chu dung suy tu `doseCount` - `doseCount` la so
-      // mui CUA PHAC DO, khong phai so lieu cua mot lan tiem.
       const [allocation] = await this.inventoryService.issue(
         {
           itemId: vaccine.itemId,
@@ -167,8 +138,6 @@ export class VaccinationsService {
     return this.findOne(vaccinationId);
   }
 
-  // ----------------------------------------------------------------------- Doc
-
   async findOne(id: string): Promise<VaccinationRecordView> {
     const vaccination = await this.vaccinationsRepository.findOne({
       where: { id },
@@ -180,7 +149,6 @@ export class VaccinationsService {
     return this.toView(vaccination);
   }
 
-  /** So tiem chung cua mot thu cung - moi gan nhat len truoc. */
   async findByPet(petId: string): Promise<VaccinationRecordView[]> {
     const vaccinations = await this.vaccinationsRepository.find({
       where: { petId },
@@ -190,7 +158,6 @@ export class VaccinationsService {
     return vaccinations.map((vaccination) => this.toView(vaccination));
   }
 
-  /** Cac mui da tiem trong mot lan kham - dung cho man hinh kham (P9-T3). */
   async findByMedicalRecord(medicalRecordId: string): Promise<VaccinationRecordView[]> {
     const vaccinations = await this.vaccinationsRepository.find({
       where: { medicalRecordId },
@@ -200,21 +167,6 @@ export class VaccinationsService {
     return vaccinations.map((vaccination) => this.toView(vaccination));
   }
 
-  /**
-   * Cac mui den han trong `days` ngay toi - le tan goi nhac khach (FR-12).
-   *
-   * HAI DIEU KIEN KHONG HIEN NHIEN, va bo cai nao cung ra danh sach sai:
-   *
-   *  - `DISTINCT ON (pet_id, vaccine_id)` lay MUI GAN NHAT cua tung cap. Khi con cho
-   *    tiem mui 2, `next_due_date` cua mui 1 tro thanh mot ngay trong qua khu da duoc
-   *    dap ung roi. Khong loc thi moi mui cu deu bao "qua han" mai mai, va danh sach
-   *    goi nhac se dai them mot dong sau moi lan tiem.
-   *  - Khach ngung hoat dong thi khong goi (acceptance P9-T4). Ho so cu van tra cuu
-   *    duoc binh thuong - day chi la loc cua danh sach NHAC.
-   *
-   * Khoang lay la `(-vo cuc, hom nay + days]`: mui qua han la cai can goi gap nhat, cat
-   * no ra khoi danh sach thi khong con ai goi nua.
-   */
   async findDue(query: QueryVaccinationsDueDto): Promise<VaccinationDueRow[]> {
     return this.dataSource.query(
       `
@@ -253,8 +205,6 @@ export class VaccinationsService {
     );
   }
 
-  // ------------------------------------------------------------------ Ben trong
-
   private toView(vaccination: Vaccination): VaccinationRecordView {
     return {
       vaccination,
@@ -262,19 +212,6 @@ export class VaccinationsService {
     };
   }
 
-  /**
-   * BR-11 - vaccine het han khong duoc tiem.
-   *
-   * Phan biet HAI tinh huong ma nguoi dung xu ly khac han nhau, thay vi de ca hai roi
-   * vao mot cau "khong du ton kho: kha dung 0" cua `InventoryService`:
-   *   - con lo nhung TAT CA da het han -> phai HUY lo roi nhap lo moi, tuyet doi khong tiem;
-   *   - khong con lo nao dung duoc      -> chi nhanh het hang, phai dat hang.
-   *
-   * Doc thang cac LO chu khong suy tu `inventoryQuantity`: hai con so do la mot bang
-   * cache va mot su that (quyet dinh (B) cua P6), va suy nguoc tu cache se noi "chi con
-   * lo het han" cho ca truong hop khong co lo nao ca - dung sai o dung cho nguoi dung
-   * can duoc noi that.
-   */
   private async assertUsableStock(
     em: EntityManager,
     vaccine: Vaccine,
@@ -309,7 +246,6 @@ export class VaccinationsService {
     );
   }
 
-  /** Mui thu may = so mui da tiem cua chinh cap (thu cung, vaccine) nay, cong 1. */
   private async nextDoseNumber(
     em: EntityManager,
     petId: string,
@@ -331,23 +267,13 @@ export class VaccinationsService {
     if (!medicalRecord) {
       throw new NotFoundException('Medical record not found');
     }
-    // Gan mui tiem vao ho so cua mot con khac la loi du lieu im lang nhat co the co
-    // trong ca phase nay - no chi lo ra khi ai do doc so tiem chung nam sau.
+
     if (medicalRecord.petId !== petId) {
       throw new BadRequestException('Ho so benh an nay khong thuoc ve thu cung da chon');
     }
     return medicalRecord;
   }
 
-  /**
-   * Chi nhanh tru kho.
-   *
-   * Uu tien lich hen cua ho so benh an - cung ly do da ghi o `PrescriptionsService`:
-   * lay chi nhanh cua nguoi dang dang nhap se tru nham kho khi bac si truc o chi nhanh
-   * khac, va sai lech do khong ai phat hien duoc cho toi ky kiem ke. Chi khi tiem don le
-   * (khong co ho so) moi dung `branchId` nguoi goi truyen len, roi den chi nhanh cua tai
-   * khoan.
-   */
   private async resolveBranchId(
     em: EntityManager,
     dto: CreateVaccinationDto,
@@ -370,13 +296,6 @@ export class VaccinationsService {
     );
   }
 
-  /**
-   * BR-07 cho mui tiem: mot mui tiem thuoc ve mot BAC SI.
-   *
-   * Cung khuon voi `MedicalRecordsService.resolveDoctorId` - ADMIN co toan quyen nhung
-   * khong co ho so bac si, khi do ghi ten bac si phu trach ho so benh an. Khong co ca
-   * hai thi tu choi: bia mot `doctorId` se lam sai thong ke o P10.
-   */
   private async resolveDoctorId(
     em: EntityManager,
     actor: AuthenticatedUser,

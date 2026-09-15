@@ -1,21 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Chi muc phuc vu tim kiem danh muc - NFR-02 ("tim kiem duoi 500ms voi 5.000 san pham").
- *
- * Man hinh san pham tim bang `ILIKE '%tu khoa%'`. Mot chi muc B-tree KHONG dung duoc
- * cho dang do (tien to `%` lam hong thu tu sap xep) nen Postgres se quet toan bang.
- * GIN trigram thi dung duoc - cung cach da lam cho `users.full_name` va `pets.name`
- * trong `1785000000000-ArchitectureDocPartV.ts`.
- *
- * Ten hang di qua `f_unaccent` (ham IMMUTABLE dinh nghia o migration do) de go khong
- * dau van ra ket qua: "thuc an" tim duoc "Thức ăn". Bieu thuc trong chi muc phai TRUNG
- * KHIT bieu thuc trong menh de WHERE, neu khong chi muc se bi bo qua - xem
- * `ProductsService.findAll`.
- *
- * `sku`, `items.code` va `suppliers.supplier_code` khong boc `f_unaccent`: chung la ma
- * ASCII, khong dau, nen boc vao chi ton them mot lan goi ham moi hang.
- */
 export class CatalogSearchIndexes1791000005000 implements MigrationInterface {
   name = 'CatalogSearchIndexes1791000005000';
 

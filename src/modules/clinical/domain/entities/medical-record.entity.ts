@@ -11,25 +11,6 @@ import { Prescription } from './prescription.entity';
 import { LabTestOrder } from './lab-test-order.entity';
 import { Vaccination } from './vaccination.entity';
 
-/**
- * Ho so benh an - aggregate root cua SRS FR-07..FR-10.
- *
- * QUAN HE VOI `Examination` (quyet dinh "Hybrid" - xem docs/plan/README.md):
- * `Examination` KHONG bi tach nho. No dang giu dung vai SRS giao cho `Examination`
- * (sinh hieu + trieu chung) va dang duoc BillingService/PrescreeningService/
- * ReportsService dung. `MedicalRecord` la lop BOC BEN NGOAI:
- *
- *   Appointment 1--1 MedicalRecord 1--1 Examination
- *                          |--< Diagnosis
- *                          |--< Treatment
- *                          |--< Prescription
- *                          '--< LabTestOrder
- *
- * `petId` duoc DENORMALISE tu `appointment.petId` co chu dich: moi truy van "benh su
- * cua con nay" deu di qua day, join nguoc qua appointments moi lan la lang phi. Doi
- * lai phai giu hai cho khop nhau - `MedicalRecordsService` la noi duy nhat ghi cot
- * nay, va no luon lay tu chinh lich hen.
- */
 @Entity({ name: 'medical_records' })
 @Index(['petId', 'createdAt'])
 export class MedicalRecord extends BaseEntity {
@@ -42,7 +23,6 @@ export class MedicalRecord extends BaseEntity {
   @Column({ name: 'appointment_id' })
   appointmentId: string;
 
-  /** Ban sao cua `appointment.petId` - xem ghi chu ve denormalise o tren. */
   @ManyToOne(() => Pet, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'pet_id' })
   pet: Pet;
@@ -50,7 +30,6 @@ export class MedicalRecord extends BaseEntity {
   @Column({ name: 'pet_id' })
   petId: string;
 
-  /** Bac si chiu trach nhiem ho so nay (BR-07: chi bac si duoc tao ho so benh an). */
   @ManyToOne(() => Doctor, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'doctor_id' })
   doctor: Doctor;
@@ -58,17 +37,9 @@ export class MedicalRecord extends BaseEntity {
   @Column({ name: 'doctor_id' })
   doctorId: string;
 
-  /**
-   * Hai truong FR-07 doi ma `Examination` chua co.
-   *
-   * `visitReason` khac `Appointment.otherSymptoms`: cai kia la loi KHACH tu ke luc dat
-   * lich, cai nay la ly do kham do BAC SI ghi lai sau khi hoi benh - hai thu thuong
-   * khac nhau ("cho bo an" vs "nghi tac ruot").
-   */
   @Column({ name: 'visit_reason', type: 'text', nullable: true })
   visitReason: string | null;
 
-  /** Tinh trang chung khi tiep nhan ("tinh tao, phan ung tot" ...). */
   @Column({ name: 'general_condition', type: 'text', nullable: true })
   generalCondition: string | null;
 
@@ -83,7 +54,6 @@ export class MedicalRecord extends BaseEntity {
   })
   status: MedicalRecordStatus;
 
-  /** Thoi diem chot ho so. Null khi con DRAFT. */
   @Column({ name: 'completed_at', type: 'timestamptz', nullable: true })
   completedAt: Date | null;
 
@@ -96,18 +66,12 @@ export class MedicalRecord extends BaseEntity {
   @OneToMany(() => Treatment, (treatment) => treatment.medicalRecord)
   treatments?: Treatment[];
 
-  /** Chuyen tu `Examination` sang day o P4-T6 - xem ghi chu trong `prescription.entity.ts`. */
   @OneToMany(() => Prescription, (prescription) => prescription.medicalRecord)
   prescriptions?: Prescription[];
 
   @OneToMany(() => LabTestOrder, (order) => order.medicalRecord)
   labTestOrders?: LabTestOrder[];
 
-  /**
-   * Cac mui tiem ghi nhan trong lan kham nay (P9). Quan he mot chieu ve phia ho so:
-   * `Vaccination.medicalRecordId` nullable vi tiem don le khong di kem lan kham nao -
-   * xem `vaccination.entity.ts`.
-   */
   @OneToMany(() => Vaccination, (vaccination) => vaccination.medicalRecord)
   vaccinations?: Vaccination[];
 }

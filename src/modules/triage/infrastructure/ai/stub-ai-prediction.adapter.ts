@@ -8,14 +8,6 @@ import {
   AiTriageResult,
 } from '@/modules/triage/application/ports/ai-prediction.port';
 
-/**
- * Adapter stub (dev / test / dien tap su co).
- *
- * Bat bang AI_PROVIDER=stub. Khong goi mang, khong can model, ket qua TAT DINH
- * (deterministic) nen test E2E on dinh. Ket qua co y dat o muc than trong -
- * mau VANG, do tin cay thap - de neu ai do vo tinh chay stub o moi truong that
- * thi he thong khong tao ra canh bao mau DO gia.
- */
 @Injectable()
 export class StubAiPredictionAdapter implements AiPredictionProvider {
   private readonly logger = new Logger(StubAiPredictionAdapter.name);

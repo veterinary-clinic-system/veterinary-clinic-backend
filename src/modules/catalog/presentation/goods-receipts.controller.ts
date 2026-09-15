@@ -8,13 +8,6 @@ import { GoodsReceiptsService } from '@/modules/catalog/application/goods-receip
 import { CreateGoodsReceiptDto } from './dto/create-goods-receipt.dto';
 import { QueryGoodsReceiptsDto } from './dto/query-goods-receipts.dto';
 
-/**
- * Phieu nhap kho - SRS UC-05, BR-13, muc 15.
- *
- * KHONG CO PATCH VA DELETE. Phieu nhap da sinh ra cac dong so cai bat bien va da tang
- * ton that; sua no se lam chung tu va so cai noi nhau. Nhap sai thi lap phieu kiem ke
- * (`/catalog/stock-takes`) co ghi ly do - dau vet giu duoc ca hai buoc.
- */
 @ApiTags('catalog')
 @Controller('catalog/goods-receipts')
 export class GoodsReceiptsController {

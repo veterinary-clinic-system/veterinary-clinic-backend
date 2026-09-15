@@ -13,11 +13,6 @@ import { AiClientService } from '@/modules/triage/infrastructure/ai-client/ai-cl
 import { HttpAiPredictionAdapter } from '@/modules/triage/infrastructure/ai/http-ai-prediction.adapter';
 import { StubAiPredictionAdapter } from '@/modules/triage/infrastructure/ai/stub-ai-prediction.adapter';
 
-/**
- * Bounded context `triage`. Diem dang chu y ve kien truc: adapter AI duoc chon o day,
- * ngay tai composition root cua module - day la cho DUY NHAT trong ca he thong biet
- * dang chay AI that hay stub. Tang application chi thay port AI_PREDICTION_PROVIDER.
- */
 @Module({
   imports: [HttpModule, TypeOrmModule.forFeature([PreScreeningResult, Disease, Appointment])],
   controllers: [PrescreeningController, AiChatController],

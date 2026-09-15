@@ -3,7 +3,6 @@ import { BaseEntity } from '@/shared/database/base.entity';
 import { OperatingHour } from './operating-hour.entity';
 import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
 
-/** diagram.jpg `Branch` box. */
 @Entity({ name: 'branches' })
 export class Branch extends BaseEntity {
   @Column({ name: 'branch_name', length: 255 })

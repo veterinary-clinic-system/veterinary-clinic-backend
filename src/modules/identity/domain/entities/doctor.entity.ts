@@ -6,12 +6,6 @@ import { Specialization } from '@/shared/common/enums/specialization.enum';
 import { DoctorShift } from '@/modules/scheduling/domain/entities/doctor-shift.entity';
 import { DoctorBreak } from '@/modules/scheduling/domain/entities/doctor-break.entity';
 
-/**
- * diagram.jpg `Doctor` box. 1:1 with `User` (login/credentials live on User; clinical
- * profile lives here) and many-to-one with `Branch` (a doctor staffs exactly one branch,
- * per the "1..*" Doctor / "1" Branch multiplicities in diagram.jpg and the
- * multi-branch rule in prompt.md Section 4.2).
- */
 @Entity({ name: 'doctors' })
 export class Doctor extends BaseEntity {
   @OneToOne(() => User, (user) => user.doctorProfile, { onDelete: 'CASCADE' })
@@ -28,8 +22,8 @@ export class Doctor extends BaseEntity {
   @Column({ name: 'branch_id' })
   branchId: string;
 
-  @Column({ name: 'avatar_url', type: 'varchar', nullable: true })
-  avatarUrl: string | null;
+  @Column({ name: 'avatar_url', type: 'varchar', default: '/images/default-doctor.svg' })
+  avatarUrl: string;
 
   @Column({ name: 'active', default: true })
   active: boolean;

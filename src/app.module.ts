@@ -23,8 +23,6 @@ import { AuditInterceptor } from './shared/common/interceptors/audit.interceptor
 import { JwtAuthGuard } from './shared/common/guards/jwt-auth.guard';
 import { RolesGuard } from './shared/common/guards/roles.guard';
 
-// Mot dong cho moi bounded context (Phan III tai lieu kien truc). App module chi biet
-// den module goc cua tung context, khong biet den service/controller ben trong chung.
 import { IdentityModule } from '@/modules/identity/identity.module';
 import { OrganizationModule } from '@/modules/organization/organization.module';
 import { PetsModule } from '@/modules/pets/pets.module';
@@ -87,17 +85,12 @@ import { HealthModule } from '@/shared/health/health.module';
     HealthModule,
   ],
   providers: [
-    // ThrottlerGuard is deliberately NOT global here - Section 5 only asks to rate-limit
-    // the public/unauthenticated endpoints (booking, login/register, file upload, AI
-    // chat), not the whole authenticated staff dashboard. Those controllers apply
-    // `@UseGuards(ThrottlerGuard)` + `@Throttle(...)` themselves.
+
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
-    // Audit toan cuc nhung CHI hoat dong tren handler co `@Audit(...)` - khong co
-    // decorator thi interceptor tra ve ngay. Dat o day thay vi gan tay tung controller
-    // de khong bao gio co chuyen "quen boc" mot endpoint moi (P10-T1).
+
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })

@@ -5,10 +5,6 @@ import { STORAGE_PROVIDER } from './ports/storage.port';
 import { LocalDiskStorageAdapter } from './adapters/local-disk-storage.adapter';
 import { S3StorageAdapter } from './adapters/s3-storage.adapter';
 
-/**
- * Composition root cho port StorageProvider. Day la cho duy nhat biet dang ghi tep
- * ra dia hay len S3; phan con lai cua he thong chi thay STORAGE_PROVIDER.
- */
 @Module({
   controllers: [FilesController],
   providers: [

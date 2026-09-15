@@ -1,8 +1,3 @@
-# Khong bat buoc cho phat trien hang ngay (uu tien `npm run start:dev` tren host),
-# chi de `docker compose --profile full up` chay duoc tron bo. Build context la
-# CHINH thu muc nay (xem docker-compose.yml) - moi tien trinh la mot repo doc lap,
-# khong con workspace npm dung chung nua.
-
 FROM node:20-alpine AS build
 WORKDIR /app
 

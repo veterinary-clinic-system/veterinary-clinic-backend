@@ -10,16 +10,6 @@ import { Cart } from '@/modules/sales/domain/entities/cart.entity';
 import { PosService } from '@/modules/sales/application/pos.service';
 import { PosController } from '@/modules/sales/presentation/pos.controller';
 
-/**
- * Ban hang tai quay (POS) - SRS FR-19, UC-04.
- *
- * Module nay la NGUOI GOI cua hai module khac, khong ai goi nguoc lai no:
- *   - `CatalogModule` -> `InventoryService` de kiem ton va tru kho (BR-09, BR-12),
- *   - `BillingModule` -> `PaymentsService` de ghi tien thu duoc (FR-21).
- *
- * Ca hai deu di qua be mat cong khai cua module do (`application/index.ts` va danh sach
- * `exports`), khong voi vao ben trong - ESLint chan cung dieu do.
- */
 @Module({
   imports: [
     TypeOrmModule.forFeature([Cart, CartItem, Item, Branch, User]),

@@ -30,45 +30,25 @@ import { UpdatePrescriptionDto } from '@/modules/clinical/presentation/dto/updat
 const DETAIL_RELATIONS = ['items', 'items.medication', 'items.medication.item'];
 const SORTABLE_COLUMNS = new Set(['createdAt', 'updatedAt', 'dispensedAt']);
 
-/** Tinh trang kho cua mot dong thuoc, tinh tai thoi diem doc - FR-11-02. */
 export interface PrescriptionItemStock {
   prescriptionItemId: string;
   medicationId: string;
   medicationName: string;
-  /** So bac si ke. */
+  
   requested: number;
-  /** So dung duoc o chi nhanh kham, DA loai lo het han (BR-11). */
+  
   availableQuantity: number;
   insufficientStock: boolean;
 }
 
-/** Don thuoc kem tinh trang kho tung dong - dang tra ve cua moi endpoint doc mot don. */
 export interface PrescriptionView {
   prescription: Prescription;
   branchId: string;
   stockCheck: PrescriptionItemStock[];
-  /** Co bat ky dong nao thieu tong khong - de FE khoa nut cap phat ma khong phai tu do. */
+  
   hasInsufficientStock: boolean;
 }
 
-/**
- * Don thuoc va cap phat - SRS FR-11, BR-10, BR-11.
- *
- * HAI MUC DO NGHIEM NGAT KHAC NHAU voi cung mot phep kiem tra ton kho, day la diem cot
- * loi cua phase 7:
- *
- *   - KE DON (`create`/`update`): CANH BAO, khong chan. FR-11-02 viet "he thong NEN
- *     kiem tra". Bac si phai ke duoc thuoc benh nhan can du kho tam het - de duoc si
- *     biet duong nhap gap hoac de xuat doi thuoc. Chan o day nghia la lay quyet dinh
- *     chuyen mon ra khoi tay nguoi co chuyen mon.
- *   - CAP PHAT (`dispense`): CHAN CUNG (BR-10). Den buoc nay thuoc dang duoc dua cho
- *     khach that; khong the giao thu khong co trong kho.
- *
- * Va vi the: `create` KHONG dong gi toi ton kho. Truoc P7, `ExaminationsService` tru
- * kho ngay luc ke don - vua sai nghiep vu (ke khong phai la giao) vua ghi thang vao
- * `inventory_items`, bo qua lo va so cai, tuc la pha bat bien cua P6. Toan bo viec tru
- * kho gio nam o `dispense` va di qua `InventoryService`.
- */
 @Injectable()
 export class PrescriptionsService {
   constructor(
@@ -78,14 +58,6 @@ export class PrescriptionsService {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  // ------------------------------------------------------------------- Ke don
-
-  /**
-   * Ke mot don thuoc vao mot ho so benh an.
-   *
-   * Khong tru kho, khong chan khi thieu hang - chi tra ve `stockCheck` de giao dien to
-   * do nhung dong dang thieu. Xem comment dau lop.
-   */
   async create(
     medicalRecordId: string,
     dto: CreatePrescriptionDto,
@@ -110,8 +82,6 @@ export class PrescriptionsService {
 
     return this.viewOf(prescription.id);
   }
-
-  // --------------------------------------------------------------------- Doc
 
   async findAll(query: QueryPrescriptionsDto): Promise<PaginatedResultDto<Prescription>> {
     const qb = this.prescriptionsRepository
@@ -138,8 +108,7 @@ export class PrescriptionsService {
     }
 
     const sortBy = query.sortBy && SORTABLE_COLUMNS.has(query.sortBy) ? query.sortBy : 'createdAt';
-    // Hang cho quay thuoc: don cho lau nhat phai duoc soan truoc, nen mac dinh la ASC -
-    // nguoc voi cac danh sach khac trong he thong. Xem `QueryPrescriptionsDto`.
+
     const defaultOrder = query.status === PrescriptionStatus.PRESCRIBED ? 'ASC' : 'DESC';
     qb.orderBy(`prescription.${sortBy}`, query.sortOrder ?? defaultOrder)
       .skip((query.page - 1) * query.limit)
@@ -149,12 +118,10 @@ export class PrescriptionsService {
     return new PaginatedResultDto(data, total, query.page, query.limit);
   }
 
-  /** Mot don kem tinh trang kho tung dong. */
   async findOne(id: string): Promise<PrescriptionView> {
     return this.viewOf(id);
   }
 
-  /** Cac don thuoc cua mot ho so benh an. */
   async findByMedicalRecord(medicalRecordId: string): Promise<Prescription[]> {
     return this.prescriptionsRepository.find({
       where: { medicalRecordId },
@@ -163,9 +130,6 @@ export class PrescriptionsService {
     });
   }
 
-  // ------------------------------------------------------------------- Sua don
-
-  /** Acceptance P7-T2: don da `DISPENSED` (hoac dang soan/da huy) thi khong sua duoc. */
   async update(id: string, dto: UpdatePrescriptionDto): Promise<PrescriptionView> {
     const prescription = await this.loadOrThrow(id);
     if (!EDITABLE_PRESCRIPTION_STATUSES.has(prescription.status)) {
@@ -194,7 +158,6 @@ export class PrescriptionsService {
     return this.viewOf(id);
   }
 
-  /** Duoc si nhan don ve quay - `PRESCRIBED` -> `DISPENSING`. Chua dong toi kho. */
   async startDispensing(id: string): Promise<PrescriptionView> {
     await this.transitionTo(id, PrescriptionStatus.DISPENSING);
     return this.viewOf(id);
@@ -205,24 +168,6 @@ export class PrescriptionsService {
     return this.viewOf(id);
   }
 
-  // ---------------------------------------------------------------- Cap phat
-
-  /**
-   * Cap phat va tru kho - BR-10, NFR-07.
-   *
-   * MOT TRANSACTION CHO CA DON. Tru kho duoc 3 tren 5 loai thuoc roi loi la tinh huong
-   * phai tuyet doi tranh: khach cam ve mot phan don, kho da tru mot phan, va khong ai
-   * biet phan nao. Moi loi o bat ky dong nao deu keo ca don ve nguyen trang.
-   *
-   * `pg_advisory_xact_lock` theo `prescriptionId` chan hai duoc si cung bam "cap phat"
-   * mot don: nguoi thu hai se doi, roi doc lai trang thai da la `DISPENSED` va nhan 409.
-   * Khong co khoa nay thi ca hai cung qua duoc phep kiem tra trang thai va kho bi tru
-   * doi - acceptance P7-T4 doi dung tinh huong nay.
-   *
-   * Kiem tra du hang cho TOAN BO cac dong TRUOC khi tru dong nao: nguoi dung can biet
-   * ca don thieu nhung gi de di lay bu mot lan, chu khong phai bam - bao thieu - bo sung
-   * - bam lai nam lan.
-   */
   async dispense(id: string, dispensedByUserId?: string): Promise<PrescriptionView> {
     await this.dataSource.transaction(async (em) => {
       await em.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`prescription:${id}`]);
@@ -249,7 +194,6 @@ export class PrescriptionsService {
         throw new ConflictException('Don thuoc khong co dong nao de cap phat');
       }
 
-      // Gom moi dong thieu vao MOT thong bao - xem comment dau ham.
       const shortages: string[] = [];
       for (const item of items) {
         const available = await this.inventoryService.getAvailable(
@@ -297,8 +241,6 @@ export class PrescriptionsService {
     return this.viewOf(id);
   }
 
-  // ------------------------------------------------------------------ Ben trong
-
   private async transitionTo(id: string, next: PrescriptionStatus): Promise<void> {
     const prescription = await this.loadOrThrow(id);
     if (!isValidPrescriptionStatusTransition(prescription.status, next)) {
@@ -320,13 +262,6 @@ export class PrescriptionsService {
     return prescription;
   }
 
-  /**
-   * Doc mot don kem tinh trang kho tung dong.
-   *
-   * Ton duoc doc tai THOI DIEM DOC chu khong luu vao don: mot con so ton chup lai luc
-   * ke don se sai ngay sau lan ban hang tiep theo, va giao dien quay thuoc can so that
-   * o thoi diem duoc si dang nhin.
-   */
   private async viewOf(id: string): Promise<PrescriptionView> {
     const prescription = await this.loadOrThrow(id);
     const branchId = await this.branchIdOf(this.dataSource.manager, prescription.medicalRecordId);
@@ -355,13 +290,6 @@ export class PrescriptionsService {
     };
   }
 
-  /**
-   * Chi nhanh de tru kho = chi nhanh cua lan kham sinh ra ho so.
-   *
-   * Khong lay chi nhanh cua nguoi dang dang nhap: duoc si o quay co the co `branchId`
-   * khac (hoac null voi ADMIN), va tru kho nham chi nhanh la loi khong ai phat hien
-   * duoc cho toi ky kiem ke.
-   */
   private async branchIdOf(em: EntityManager, medicalRecordId: string): Promise<string> {
     const record = await em.findOne(MedicalRecord, { where: { id: medicalRecordId } });
     if (!record) {

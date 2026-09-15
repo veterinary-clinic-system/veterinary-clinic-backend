@@ -42,13 +42,6 @@ export class EmployeesService {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  /**
-   * Tao ho so nhan su, kem tuy chon tao tai khoan dang nhap trong CUNG transaction.
-   *
-   * Vi sao phai cung transaction: neu tao `User` xong roi loi khi tao `Employee`, he
-   * thong se con lai mot tai khoan dang nhap duoc nhung khong thuoc ve nhan vien nao -
-   * dung nghia la mot tai khoan mo coi khong ai quan ly.
-   */
   async create(dto: CreateEmployeeDto): Promise<Employee> {
     if (dto.account) {
       const existingPhone = await this.usersRepository.findOne({ where: { phone: dto.phone } });
@@ -80,11 +73,12 @@ export class EmployeesService {
           manager.create(User, {
             phone: dto.phone,
             fullName: dto.fullName,
+            avatarUrl: dto.avatarUrl ?? '/images/default-staff.svg',
             email: dto.email ?? null,
             passwordHash: await bcrypt.hash(dto.account.password, BCRYPT_ROUNDS),
             role: dto.account.role,
             branchId: dto.account.role === Role.ADMIN ? null : (dto.branchId ?? null),
-            // Nhan vien tao o trang thai dinh chi/nghi viec thi tai khoan khoa ngay.
+            
             active: !NON_WORKING_EMPLOYEE_STATUSES.includes(status),
           }),
         );
@@ -95,6 +89,7 @@ export class EmployeesService {
         manager.create(Employee, {
           userId,
           fullName: dto.fullName,
+          avatarUrl: dto.avatarUrl ?? '/images/default-staff.svg',
           phone: dto.phone,
           email: dto.email ?? null,
           address: dto.address ?? null,
@@ -110,11 +105,6 @@ export class EmployeesService {
     return this.findOne(saved.id);
   }
 
-  /**
-   * Cap nhat ho so. Doi `status` sang SUSPENDED/RESIGNED se KHOA tai khoan dang nhap
-   * lien ket trong cung transaction - day la ly do chinh de hai khai niem nay noi voi
-   * nhau: cho nghi viec ma tai khoan van dang nhap duoc la mot lo hong that.
-   */
   async update(id: string, dto: UpdateEmployeeDto): Promise<Employee> {
     const employee = await this.findOne(id);
 
@@ -131,6 +121,7 @@ export class EmployeesService {
     await this.dataSource.transaction(async (manager) => {
       await manager.update(Employee, id, {
         ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
+        ...(dto.avatarUrl !== undefined ? { avatarUrl: dto.avatarUrl } : {}),
         ...(dto.email !== undefined ? { email: dto.email } : {}),
         ...(dto.address !== undefined ? { address: dto.address } : {}),
         ...(dto.position !== undefined ? { position: dto.position } : {}),
@@ -145,6 +136,9 @@ export class EmployeesService {
 
       if (dto.status !== undefined && employee.userId) {
         await manager.update(User, employee.userId, { active: !becomesNonWorking });
+      }
+      if (dto.avatarUrl !== undefined && employee.userId) {
+        await manager.update(User, employee.userId, { avatarUrl: dto.avatarUrl });
       }
     });
 
@@ -178,7 +172,6 @@ export class EmployeesService {
       qb.andWhere('employee.position ILIKE :position', { position: `%${query.position}%` });
     }
 
-    // sortBy la du lieu tu client - khong bao gio noi thang vao SQL khi chua loc.
     const sortBy =
       query.sortBy && EMPLOYEE_SORTABLE_COLUMNS.has(query.sortBy) ? query.sortBy : 'createdAt';
     qb.orderBy(`employee.${sortBy}`, query.sortOrder ?? 'DESC')

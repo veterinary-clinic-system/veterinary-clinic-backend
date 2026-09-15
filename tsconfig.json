@@ -23,8 +23,7 @@
       "@/*": ["src/*"]
     }
   },
-  // TypeORM CLI (migration:run / seed) chay qua ts-node, khong qua nest build - nen no
-  // can duoc bao rieng cach giai alias "@/..." o tren.
+
   "ts-node": {
     "require": ["tsconfig-paths/register"]
   }

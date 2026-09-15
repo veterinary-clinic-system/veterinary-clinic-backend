@@ -1,14 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { Examination } from '@/modules/clinical/domain/entities/examination.entity';
 
-/**
- * Section 4.1.4: "print/export the exam record and prescription as PDF". pdfkit-only
- * (no HTML-to-PDF/browser dependency) - draws directly onto a document the caller
- * already created and will `.pipe()`/`.end()` themselves (see ExaminationsController).
- * `examination` must be loaded with EXAMINATION_DETAIL_RELATIONS (see
- * examinations.service.ts) so appointment/pet/owner/doctor and the medical record's
- * prescriptions/labTestOrders are all populated.
- */
 export function renderExaminationPdf(
   doc: InstanceType<typeof PDFDocument>,
   examination: Examination,
@@ -17,8 +9,7 @@ export function renderExaminationPdf(
   const pet = appointment?.pet;
   const owner = pet?.owner;
   const branch = appointment?.branch;
-  // The doctor who actually wrote up the exam (current user at creation time) is the
-  // authoritative signature; fall back to the appointment's assigned doctor if absent.
+
   const doctor = examination.doctor ?? appointment?.doctor;
 
   doc.fontSize(18).text(branch?.branchName ?? 'Veterinary Clinic', { align: 'center' });
@@ -48,8 +39,6 @@ export function renderExaminationPdf(
   );
   doc.moveDown();
 
-  // Tu P4-T8 doc tu bang `diagnoses`. `examination.diseaseGroups` / `diagnosisText` chi
-  // con la duong lui cho phieu kham cu chua duoc backfill sang ho so.
   const diagnoses = examination.medicalRecord?.diagnoses ?? [];
   doc.fontSize(13).text('Diagnosis', { underline: true });
   doc.fontSize(11);
@@ -93,8 +82,6 @@ export function renderExaminationPdf(
     doc.moveDown();
   }
 
-  // Don thuoc va chi dinh xet nghiem doc qua HO SO tu P4-T6 (truoc do treo thang duoi
-  // phieu kham). `EXAMINATION_DETAIL_RELATIONS` da nap san chang `medicalRecord`.
   const prescriptionItems = (examination.medicalRecord?.prescriptions ?? []).flatMap(
     (p) => p.items ?? [],
   );

@@ -1,20 +1,4 @@
-/**
- * Smoke test acceptance P9-T4 (nhac lich tiem) bang CSDL that.
- *
- * Cron chay 08:00 nen khong doi duoc trong mot phien lam viec - script nay dung Nest
- * application context de goi thang `publishDueReminders()`, dung cai ma `@Cron` goi.
- *
- * Chay: npx ts-node -r tsconfig-paths/register scripts/smoke-vaccination-reminder.ts
- *
- * =====================================================================================
- * CANH BAO: SCRIPT NAY SUA DU LIEU. No dat lai `next_due_date` cua MOI mui tiem (mot mui
- * thanh ngay mai, con lai thanh NULL) va bat/tat `active` cua mot khach hang, roi xoa cac
- * su kien outbox loai `VACCINATION_DUE`. Chi dung tren CSDL phat trien.
- *
- * Chot an toan o duoi tu choi chay khi `NODE_ENV=production`. Do la mot cai chan, khong
- * phai mot bao dam - CSDL phat trien tro toi mot moi truong that thi chot nay khong biet.
- * =====================================================================================
- */
+
 import 'reflect-metadata';
 import { config } from 'dotenv';
 import { NestFactory } from '@nestjs/core';
@@ -50,7 +34,6 @@ async function main() {
 
   const tomorrow = toDateOnly(new Date(Date.now() + 86400000));
 
-  // Don sach nhac cu de phep dem duoi day chi thay cai script nay sinh ra.
   await dataSource.query(`DELETE FROM "outbox_events" WHERE "type" = 'VACCINATION_DUE'`);
 
   const vaccinations = await dataSource.getRepository(Vaccination).find({ take: 2 });
@@ -65,7 +48,7 @@ async function main() {
   await dataSource
     .getRepository(Vaccination)
     .update({ id: target.id }, { nextDueDate: tomorrow });
-  // Cac mui khac day ra ngoai cua so 7 ngay de phep dem khong lan.
+  
   await dataSource.query(
     `UPDATE "vaccinations" SET "next_due_date" = NULL WHERE "id" <> $1`,
     [target.id],
@@ -104,7 +87,6 @@ async function main() {
     Boolean(event?.payload?.recipientPhone && event?.payload?.message),
   );
 
-  // Khach ngung hoat dong -> khong nhac.
   const pet = await dataSource.getRepository(Pet).findOne({ where: { id: target.petId } });
   const ownerId = pet!.ownerId;
   await dataSource.getRepository(User).update({ id: ownerId }, { active: false });
@@ -120,7 +102,6 @@ async function main() {
     `tra ve ${third}, outbox ${afterThird}`,
   );
 
-  // Tra lai trang thai ban dau de khong lam ban du lieu demo.
   await dataSource.getRepository(User).update({ id: ownerId }, { active: true });
   await dataSource.query(`DELETE FROM "outbox_events" WHERE "type" = 'VACCINATION_DUE'`);
 

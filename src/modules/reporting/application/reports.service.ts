@@ -19,11 +19,6 @@ import {
   RevenueByService,
 } from './reports.types';
 
-/**
- * Read-only aggregation queries over entities other modules own (Invoice/InvoiceItem,
- * Diagnosis/MedicalRecord, PreScreeningResult/Appointment). Backs the ADMIN/RECEPTIONIST
- * reporting dashboard - nothing here writes to the database.
- */
 @Injectable()
 export class ReportsService {
   constructor(
@@ -33,11 +28,6 @@ export class ReportsService {
     private readonly preScreeningResultRepository: Repository<PreScreeningResult>,
   ) {}
 
-  /**
-   * `GET /reports/revenue` - sums `price * quantity` of every line item on a `paid`
-   * invoice, bucketed by the invoice's `paidAt` date (not the appointment date - revenue
-   * is recognized when it's actually collected).
-   */
   async getRevenue(query: RevenueQueryDto): Promise<RevenueByPeriod[]> {
     const fromDate = startOfDay(new Date(query.from));
     const toDate = endOfDay(new Date(query.to));
@@ -45,9 +35,7 @@ export class ReportsService {
 
     const groupBy = query.groupBy ?? 'day';
     const dateFormat = groupBy === 'month' ? 'YYYY-MM' : 'YYYY-MM-DD';
-    // Raw column name (not the `paidAt` entity property) so the expression survives
-    // untouched through TypeORM's alias.property -> "alias"."column" rewriting, which
-    // only rewrites plain `alias.property` tokens, not ones buried inside a function call.
+
     const periodExpr = `TO_CHAR(invoice.paid_at, '${dateFormat}')`;
 
     const qb = this.invoiceItemRepository
@@ -70,8 +58,7 @@ export class ReportsService {
       .select(periodExpr, 'period')
       .addSelect('SUM(invoiceItem.price * invoiceItem.quantity)', 'totalRevenue')
       .addSelect('COUNT(DISTINCT invoice.id)', 'invoiceCount')
-      // Group/order by the expression itself (not the `period` alias) to sidestep
-      // Postgres's case-folding of unquoted identifiers vs. TypeORM's quoted alias.
+
       .groupBy(periodExpr)
       .orderBy(periodExpr, 'ASC')
       .getRawMany<{ period: string; totalRevenue: string | null; invoiceCount: string }>();
@@ -83,7 +70,6 @@ export class ReportsService {
     }));
   }
 
-  /** `GET /reports/revenue/by-service` - paid `SERVICE`-type line items grouped by item, richest first. */
   async getRevenueByService(query: RevenueFilterQueryDto): Promise<RevenueByService[]> {
     const fromDate = startOfDay(new Date(query.from));
     const toDate = endOfDay(new Date(query.to));
@@ -124,7 +110,6 @@ export class ReportsService {
     }));
   }
 
-  /** `GET /reports/revenue/by-doctor` - paid invoices grouped by the appointment's doctor, richest first. */
   async getRevenueByDoctor(query: RevenueFilterQueryDto): Promise<RevenueByDoctor[]> {
     const fromDate = startOfDay(new Date(query.from));
     const toDate = endOfDay(new Date(query.to));
@@ -167,23 +152,6 @@ export class ReportsService {
     }));
   }
 
-  /**
-   * `GET /reports/exam-volume-by-disease-group`.
-   *
-   * Tu P4-T8, doc tu bang `diagnoses` thay vi `unnest(examinations.disease_groups)`.
-   * Con so KHONG DOI voi du lieu cu: migration `Diagnoses1790000001000` sinh dung mot
-   * hang `diagnoses` cho moi phan tu cua `disease_groups`, nen `COUNT(*)` tren bang moi
-   * bang so lan `unnest` truoc day.
-   *
-   * MOT KHAC BIET CO Y: nhung phieu kham chi co `diagnosis_text` tu do (khong chon
-   * nhom benh nao) truoc day KHONG xuat hien trong bao cao - gio chung thanh mot nhom
-   * mang chinh chuoi mo ta do. Do la du lieu that von bi bo qua, khong phai hang bia
-   * them.
-   *
-   * Gom nhom theo TEN BENH trong danh muc khi chan doan co noi sang `diseases`, con
-   * khong thi theo chinh `diagnosis_text` - hai chan doan cung tro ve mot benh nhung go
-   * khac chu phai rot vao cung mot nhom.
-   */
   async getExamVolumeByDiseaseGroup(query: DateRangeQueryDto): Promise<ExamVolumeByDiseaseGroup[]> {
     const fromDate = query.from ? startOfDay(new Date(query.from)) : undefined;
     const toDate = query.to ? endOfDay(new Date(query.to)) : undefined;
@@ -192,7 +160,7 @@ export class ReportsService {
     const qb = this.diagnosisRepository
       .createQueryBuilder('diagnosis')
       .innerJoin('diagnosis.medicalRecord', 'medicalRecord')
-      // `leftJoin`: ho so co chan doan nhung chua ghi sinh hieu van phai duoc dem.
+      
       .leftJoin('medicalRecord.examination', 'examination')
       .leftJoin('diagnosis.disease', 'disease')
       .select('COALESCE(disease.disease_name, diagnosis.diagnosis_text)', 'diseaseGroup')
@@ -206,8 +174,7 @@ export class ReportsService {
         },
       );
     }
-    // Moc thoi gian van la NGAY KHAM de doi chieu duoc voi bao cao cu; ho so chua ghi
-    // sinh hieu thi lay ngay mo ho so.
+
     const examinedAtExpr = 'COALESCE(examination.examined_at, medicalRecord.created_at)';
     if (fromDate) {
       qb.andWhere(`${examinedAtExpr} >= :from`, { from: fromDate });
@@ -216,9 +183,6 @@ export class ReportsService {
       qb.andWhere(`${examinedAtExpr} <= :to`, { to: toDate });
     }
 
-    // Quoted so it matches TypeORM's quoted `AS "diseaseGroup"` / `AS "count"` output
-    // aliases exactly - an unquoted reference would Postgres-fold to lowercase and fail
-    // to resolve against the mixed-case `"diseaseGroup"` alias.
     const rows = await qb
       .groupBy('"diseaseGroup"')
       .orderBy('"count"', 'DESC')
@@ -227,16 +191,6 @@ export class ReportsService {
     return rows.map((row) => ({ diseaseGroup: row.diseaseGroup, count: parseInt(row.count, 10) }));
   }
 
-  /**
-   * `GET /reports/ai-accuracy` - "accepted" vs. "overridden" is computed in application
-   * code (not a SQL CASE) per the task spec, comparing each appointment's immutable
-   * `PreScreeningResult.aiPriorityColor` to its (possibly staff-edited) current
-   * `Appointment.priorityColor`. Date filter is on `Appointment.startAt` (the visit the
-   * triage was for), not `PreScreeningResult.createdAt`, so "accuracy for appointments in
-   * July" means exactly that regardless of when the AI call happened relative to the
-   * visit. An appointment whose `priorityColor` is `null` (never set/triaged) is treated
-   * as "overridden" - it doesn't equal the AI's (always non-null) suggestion.
-   */
   async getAiAccuracy(query: DateRangeQueryDto): Promise<AiAccuracyReport> {
     const fromDate = query.from ? startOfDay(new Date(query.from)) : undefined;
     const toDate = query.to ? endOfDay(new Date(query.to)) : undefined;
@@ -294,7 +248,6 @@ export class ReportsService {
     };
   }
 
-  /** Guards every report's date-range params against an inverted `from`/`to`. */
   private assertValidRange(fromDate?: Date, toDate?: Date): void {
     if (fromDate && toDate && fromDate > toDate) {
       throw new BadRequestException('`from` must be on or before `to`');

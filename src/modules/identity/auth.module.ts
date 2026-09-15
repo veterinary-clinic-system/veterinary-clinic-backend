@@ -22,7 +22,7 @@ import { AuditLogModule } from './audit-log.module';
         signOptions: { expiresIn: config.get<string>('jwt.accessExpiresIn') },
       }),
     }),
-    // P10-T2: `AuthService` tu ghi audit `LOGIN`/`LOGOUT` - xem ghi chu dau service do.
+    
     AuditLogModule,
   ],
   controllers: [AuthController],

@@ -12,16 +12,6 @@ import {
 } from 'class-validator';
 import { Gender } from '@/shared/common/enums/gender.enum';
 
-/**
- * Staff adding a pet profile to an *existing* owner (Section 4.1.1). Distinct from
- * `CreatePetInlineDto` in appointments/, which is for a pet created inline during a
- * first-time public booking - that flow is owned by the appointments module.
- *
- * `speciesId` la BAT BUOC theo muc 16 SRS ("Species required"). Loai duoc gui KEM giong
- * chu khong suy ra tu `breedId`: nho vay `PetsService` doi chieu duoc hai gia tri voi
- * nhau va chan truong hop giao dien doi loai sang "Mèo" nhung van giu giong "Poodle"
- * cua lan chon truoc.
- */
 export class CreatePetDto {
   @IsUUID(undefined, { message: 'Chủ nuôi không hợp lệ' })
   ownerId: string;
@@ -48,7 +38,6 @@ export class CreatePetDto {
   @IsDateString({}, { message: 'Ngày sinh không hợp lệ' })
   birthDate?: string;
 
-  /** So microchip (FR-04-01) - duy nhat trong toan he thong, xem `uq_pets_microchip_id`. */
   @IsOptional()
   @IsString({ message: 'Số microchip không hợp lệ' })
   @MaxLength(64, { message: 'Số microchip không được vượt quá 64 ký tự' })
@@ -67,7 +56,6 @@ export class CreatePetDto {
   @IsString({ message: 'Ghi chú không hợp lệ' })
   notes?: string;
 
-  /** Free-text flags per Section 4.1.1 ("Flag special info: drug allergies, chronic conditions"). */
   @IsOptional()
   @IsArray({ message: 'Danh sách dị ứng không hợp lệ' })
   @IsString({ each: true, message: 'Danh sách dị ứng không hợp lệ' })

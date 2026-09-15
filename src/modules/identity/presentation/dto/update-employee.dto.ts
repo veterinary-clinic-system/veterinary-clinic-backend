@@ -10,12 +10,12 @@ import {
 } from 'class-validator';
 import { EmployeeStatus } from '@/shared/common/enums/employee-status.enum';
 
-/**
- * `employeeCode` va `phone` khong khai bao o day co chu dich: ma nhan vien do he thong
- * sinh va duoc dung lam dinh danh trong giay to noi bo, con so dien thoai la dinh danh
- * dang nhap cua tai khoan lien ket. Doi mot trong hai la nghiep vu "tao ho so moi".
- */
 export class UpdateEmployeeDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  avatarUrl?: string;
+
   @IsOptional()
   @IsString()
   @MinLength(2)

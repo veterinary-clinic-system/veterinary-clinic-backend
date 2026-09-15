@@ -11,24 +11,8 @@ import {
   TopVeterinarian,
 } from './reports.types';
 
-/** Nguong "sap het han" cua bao cao kho - khop `INVENTORY_EXPIRING_SOON_DAYS` cua P6. */
 const DEFAULT_EXPIRING_SOON_DAYS = 30;
 
-/**
- * Ba nhom bao cao van hanh cua SRS muc 19 - P10-T4.
- *
- * Tach khoi `ReportsService` (bao cao doanh thu, co tu P4) co chu dich: bao cao cu doc
- * qua QueryBuilder tren `InvoiceItem`, con ba bao cao nay deu la truy van tong hop nhieu
- * bang voi `FILTER (WHERE ...)` - viet bang SQL tho de doc hon han. Gop chung mot lop se
- * thanh mot file bay tram dong tron hai phong cach.
- *
- * DOANH THU DOC TU `payments`, KHONG TU `invoice_items`. Day la khac biet quan trong so
- * voi `ReportsService.getRevenue`: bao cao cu tong `price * quantity` cua cac dong hang
- * tren hoa don da tra, tuc no tra loi "da BAN bao nhieu". Muc 19 hoi "Total Revenue /
- * Paid / Unpaid / Refunded" - do la cau hoi ve TIEN THUC THU, va cau tra loi chi co o
- * bang `payments` (mot hoa don tra hai lan, mot hoa don hoan mot phan). Hai con so nay
- * khac nhau la dung, khong phai loi.
- */
 @Injectable()
 export class OperationalReportsService {
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
@@ -38,9 +22,6 @@ export class OperationalReportsService {
     return Number.isInteger(configured) && configured > 0 ? configured : DEFAULT_EXPIRING_SOON_DAYS;
   }
 
-  // ---------------------------------------------------------- Bao cao doanh thu
-
-  /** Tong hop doanh thu theo dung sau con so cua SRS muc 19. */
   async getRevenueSummary(query: ReportFilterDto): Promise<RevenueSummaryReport> {
     this.assertValidRange(query.from, query.to);
 
@@ -73,14 +54,6 @@ export class OperationalReportsService {
       ],
     );
 
-    // CHUA THU tinh tren HOA DON chu khong tren `payments`: mot hoa don chua tra dong nao
-    // khong co dong `payments` nao ca, nen truy van o tren khong bao gio nhin thay no.
-    // Day chinh la cho de sai nhat cua bao cao nay.
-    //
-    // `invoices` KHONG CO cot "da thu" - so do luon duoc tinh lai tu `payments` (xem
-    // `PaymentsService.paidAmountOf`). Mot cot tong tien tren hoa don se la ban sao thu
-    // hai cua cung su that, va no se lech ngay lan hoan tien dau tien. Vi vay o day
-    // dung LEFT JOIN LATERAL de cong lai dung cong thuc ay cho tung hoa don.
     const [outstanding] = await this.dataSource.query<[Record<string, string | null>]>(
       `
       SELECT COALESCE(SUM(i."total_amount" - COALESCE(paid."amount", 0)), 0) AS "totalUnpaid",
@@ -111,17 +84,6 @@ export class OperationalReportsService {
     };
   }
 
-  // ------------------------------------------------------------- Bao cao kho
-
-  /**
-   * Anh chup kho tai THOI DIEM DOC - khong nhan khoang ngay.
-   *
-   * Muc 19 liet ke sau con so: Total Products, Total Medicines, Low Stock, Out of Stock,
-   * Expiring Soon, Expired. Ca sau deu la cau hoi ve HIEN TAI ("dang con bao nhieu mat
-   * hang duoi nguong"), khong phai ve mot khoang qua khu. Them tham so ngay vao day se
-   * tao ra mot bao cao tra loi sai mot cach thuyet phuc: kho khong luu lich su ton theo
-   * ngay, nen "ton kho ngay 01/07" chi co the la ton HOM NAY duoc dan nhan ngay 01/07.
-   */
   async getInventoryReport(branchId?: string): Promise<InventoryReport> {
     const [row] = await this.dataSource.query<[Record<string, string | null>]>(
       `
@@ -182,9 +144,6 @@ export class OperationalReportsService {
     };
   }
 
-  // -------------------------------------------------------- Bao cao ban hang
-
-  /** San pham ban chay: so luong ban va doanh thu, nhieu nhat truoc (muc 19). */
   async getSalesReport(query: ReportFilterDto): Promise<SalesReportRow[]> {
     this.assertValidRange(query.from, query.to);
 
@@ -209,15 +168,6 @@ export class OperationalReportsService {
     );
   }
 
-  // ----------------------------------------------------------- Bao cao kham
-
-  /**
-   * Bo sung No-show va Top Veterinarians vao bao cao kham dang co (muc 19).
-   *
-   * `noShowRate` tinh tren tong lich hen DA DEN HAN trong ky (khong tinh lich con
-   * `PENDING`/`CONFIRMED` cua tuong lai): mot lich hen tuan sau chua co co hoi de vang
-   * mat, dem no vao mau so chi lam ty le vang thap gia.
-   */
   async getExamSummary(query: DateRangeQueryDto): Promise<ExamSummaryReport> {
     const from = query.from ?? null;
     const to = query.to ?? null;
@@ -269,14 +219,11 @@ export class OperationalReportsService {
       completed: Number(row.completed ?? 0),
       noShow,
       cancelled: Number(row.cancelled ?? 0),
-      // Mau so 0 -> ty le 0, khong phai NaN. Mot bao cao hien "NaN%" lam nguoi doc mat
-      // long tin vao ca trang, du con so con lai deu dung.
+
       noShowRate: total === 0 ? 0 : noShow / total,
       topVeterinarians,
     };
   }
-
-  // ------------------------------------------------------------------ Ben trong
 
   private assertValidRange(from: string | null, to: string | null): void {
     if (from && to && from > to) {

@@ -1,12 +1,5 @@
 import { IsEmail, IsOptional, IsString, MaxLength, Matches } from 'class-validator';
 
-/**
- * `POST /catalog/suppliers` - SRS FR-17.
- *
- * KHONG co `supplierCode`: ma (NCC0001) do cot DEFAULT cua CSDL cap - xem
- * `1791000003000-ProductsAndSuppliers.ts`. De client tu dat thi hai nguoi tao cung luc
- * se sinh trung ma.
- */
 export class CreateSupplierDto {
   @IsString()
   @MaxLength(255)

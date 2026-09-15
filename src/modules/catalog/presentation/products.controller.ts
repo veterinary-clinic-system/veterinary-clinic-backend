@@ -7,13 +7,6 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { QueryProductsDto } from './dto/query-products.dto';
 
-/**
- * SRS FR-16 - hang hoa ban le.
- *
- * Khac cac route danh muc khac, doc o day doi `CATALOG_VIEW` chu khong `@Public()`:
- * ban ghi san pham mang `costPrice` (gia von) - de lo ra ngoai la lo bien loi nhuan
- * cho doi thu. Trang gia cong khai dung `/catalog/items` von khong co cot do.
- */
 @ApiTags('catalog')
 @Controller('catalog/products')
 export class ProductsController {

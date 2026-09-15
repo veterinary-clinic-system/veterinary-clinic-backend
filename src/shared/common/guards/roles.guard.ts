@@ -4,12 +4,6 @@ import { ROLES_KEY } from '../decorators/roles.decorator';
 import { Role } from '../enums/role.enum';
 import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 
-/**
- * Registered globally alongside JwtAuthGuard. Routes with no `@Roles(...)` metadata are
- * allowed for any authenticated user; routes with `@Roles(...)` require the caller's
- * role to be in that list. Runs after JwtAuthGuard, so `request.user` is always set
- * unless the route is `@Public()` (in which case there's nothing to check).
- */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}

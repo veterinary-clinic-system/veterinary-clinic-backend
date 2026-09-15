@@ -9,14 +9,6 @@ import {
 } from 'class-validator';
 import { Gender } from '@/shared/common/enums/gender.enum';
 
-/**
- * Pet fields collected inline during a first-time booking (Section 4.1.2).
- *
- * `speciesId` la TUY CHON o day (khac `CreatePetDto` cua quay le tan, noi no bat buoc):
- * bieu mau dat lich cong khai da co san o chon Loai, nhung mot client cu chi gui
- * `breedId` van phai dat lich duoc. Khi CO gui thi giong phai thuoc dung loai do -
- * `PartyResolverService.resolvePet` doi chieu (muc 16 SRS).
- */
 export class CreatePetInlineDto {
   @IsString({ message: 'Vui lòng nhập tên thú cưng' })
   @IsNotEmpty({ message: 'Vui lòng nhập tên thú cưng' })

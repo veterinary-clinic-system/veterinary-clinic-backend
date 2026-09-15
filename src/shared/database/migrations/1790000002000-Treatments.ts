@@ -1,17 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Phuong phap dieu tri - SRS FR-10.
- *
- * KHONG co du lieu cu de backfill: khai niem "dieu tri" truoc P4 khong ton tai o dau
- * trong luoc do (don thuoc khong thay the duoc - truyen dich, tiem, phau thuat deu la
- * dieu tri ma khong phai thuoc).
- *
- * `chk_treatments_date_order` lap lai o tang CSDL luat ma DTO da kiem. Ly do khong
- * chi tin vao DTO: cac duong ghi khac (script nhap lieu, migration ve sau, sua tay
- * qua psql) khong di qua ValidationPipe, va mot khoang dieu tri ket thuc truoc khi
- * bat dau la du lieu vo nghia trong ho so y te.
- */
 export class Treatments1790000002000 implements MigrationInterface {
   name = 'Treatments1790000002000';
 

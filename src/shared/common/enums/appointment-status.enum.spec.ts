@@ -1,10 +1,5 @@
 import { AppointmentStatus, isValidAppointmentStatusTransition } from './appointment-status.enum';
 
-/**
- * Bug that this guards against: PATCH /appointments/:id could previously write ANY
- * status straight to the row, including moving a COMPLETED/CANCELLED/NO_SHOW
- * appointment back to an earlier status. These tests lock the fix in place.
- */
 describe('isValidAppointmentStatusTransition', () => {
   it('cho phep giu nguyen trang thai bat ky', () => {
     for (const status of Object.values(AppointmentStatus)) {
@@ -50,7 +45,6 @@ describe('isValidAppointmentStatusTransition', () => {
     }
   });
 
-  // BR-06: "Appointment chi duoc hoan thanh sau khi pet da duoc tiep nhan."
   describe('BR-06 - COMPLETED phai di qua tiep nhan', () => {
     it('chan hoan tat mot lich chua duoc tiep nhan', () => {
       expect(

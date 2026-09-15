@@ -13,14 +13,6 @@ import { Examination } from '@/modules/clinical/domain/entities/examination.enti
 import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
 import { Invoice } from '@/modules/billing/domain/entities/invoice.entity';
 
-/**
- * diagram.jpg `Appointment` box - the central booking/slot record. Two fields not in
- * the diagram were added: `status` (Section 4.1.2/5.1 booking-lifecycle + slot-blocking
- * logic) and `serviceId`/`bookedByUserId` (booking flow needs a service, and Section
- * 4.1.2 lets a Receptionist book "on a pet owner's behalf" so we track who booked it).
- * The diagram's `followUpAppointment : Appointment[]` / `appointment : Appointment`
- * pair is modeled as a self-referencing parent/children relation.
- */
 @Entity({ name: 'appointments' })
 @Index(['doctor', 'startAt'])
 export class Appointment extends BaseEntity {
@@ -52,7 +44,6 @@ export class Appointment extends BaseEntity {
   @Column({ name: 'service_id' })
   serviceId: string;
 
-  /** Who created the booking: null when the owner/guest self-booked online. */
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'booked_by_user_id' })
   bookedBy: User | null;
@@ -83,31 +74,15 @@ export class Appointment extends BaseEntity {
   @Column({ type: 'enum', enum: CommonSymptom, array: true, default: [] })
   commonSymptoms: CommonSymptom[];
 
-  /**
-   * Anh xa sang SRS FR-05-01: day CHINH LA truong `Reason` cua tai lieu ("ly do kham /
-   * trieu chung khach tu ke"), con `notes` ben duoi la `Note` ("ghi chu noi bo cua nhan
-   * vien"). Khong tach them mot cot `reason` rieng: hai cot se chua cung mot loai noi
-   * dung, va moi bieu mau se phai chon bo mot trong hai - no la no ky thuat khong co
-   * nguoi dung. Giao dien hien nhan "Ly do kham / trieu chung" cho cot nay.
-   */
   @Column({ name: 'other_symptoms', type: 'text', nullable: true })
   otherSymptoms: string | null;
 
   @Column({ name: 'address', type: 'text', nullable: true })
   address: string | null;
 
-  /** `Note` cua FR-05-01 - ghi chu NOI BO, khach khong doc. Xem ghi chu tren `otherSymptoms`. */
   @Column({ name: 'notes', type: 'text', nullable: true })
   notes: string | null;
 
-  // ---------------------------------------------------------------------------------
-  // Luu vet ket thuc bat thuong (FR-05-04)
-  //
-  // Dung cho CA `CANCELLED` lan `NO_SHOW` - `status` da phan biet duoc hai truong hop,
-  // khong can hai bo cot. Lich hen ket thuc binh thuong (`COMPLETED`) de ca ba NULL.
-  // ---------------------------------------------------------------------------------
-
-  /** Nguoi bam huy / danh vang. Null voi du lieu cu tao truoc khi co luu vet nay. */
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'cancelled_by_user_id' })
   cancelledBy: User | null;
@@ -140,11 +115,6 @@ export class Appointment extends BaseEntity {
   @OneToOne(() => Examination, (examination) => examination.appointment)
   examination?: Examination;
 
-  /**
-   * Ho so benh an cua lan kham nay (P4). Chieu nguoc lai duoc khai bao o day de cac
-   * truy van bat dau tu `Appointment` - benh su cua thu cung chang han - nap thang
-   * duoc ho so va cac chan doan cua no, khong phai truy van rieng mot vong nua.
-   */
   @OneToOne(() => MedicalRecord, (record) => record.appointment)
   medicalRecord?: MedicalRecord;
 

@@ -1,16 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Kiem ke - P6-T6, SRS FR-18-03.
- *
- * `counted_quantity` nullable: phieu duoc tao truoc, nhan vien dem dan tung dong. NULL
- * nghia la "chua dem", khac han voi 0 nghia la "dem duoc khong con cai nao" - gop hai
- * cai nay lai thi mot phieu dem do dang se bien moi dong chua dem thanh that thoat toan
- * bo. Xac nhan phieu bo qua cac dong con NULL.
- *
- * `uq_stock_take_items_take_inventory`: mot dong ton kho chi duoc dem mot lan tren mot
- * phieu. Hai dong cho cung mot mat hang thi khong biet lay so nao lam so dem.
- */
 export class StockTakes1792000004000 implements MigrationInterface {
   name = 'StockTakes1792000004000';
 

@@ -20,10 +20,6 @@ export class AuthController {
     return this.authService.registerPetOwner(dto);
   }
 
-  /**
-   * `LOGIN` duoc ghi audit ben trong `AuthService`, khong qua `@Audit(...)` - luc handler
-   * nay chay thi request van chua co danh tinh nao. Xem ghi chu dau `AuthService`.
-   */
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('login')

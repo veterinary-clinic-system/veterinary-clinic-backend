@@ -19,12 +19,12 @@ export class ServicesService {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  /** Creates the backing Item (itemType=SERVICE) and the Service row in one transaction. */
   async create(dto: CreateServiceDto): Promise<Service> {
     const serviceId = await this.dataSource.transaction(async (manager) => {
       const item = await manager.save(
         manager.create(Item, {
           itemName: dto.itemName,
+          imageUrl: dto.imageUrl ?? '/images/default-item.svg',
           describe: dto.describe ?? null,
           itemType: ItemType.SERVICE,
           unitPrice: dto.unitPrice,
@@ -82,25 +82,16 @@ export class ServicesService {
     return service;
   }
 
-  /**
-   * Updates the Item-owned fields (itemName/describe/unitPrice) and/or the Service-owned
-   * fields (durationMinutes/requiresSpecialization) in one transaction. `active` is
-   * mirrored onto both rows - see UpdateServiceDto for why.
-   */
   async update(id: string, dto: UpdateServiceDto): Promise<Service> {
     const service = await this.findOne(id);
 
     await this.dataSource.transaction(async (manager) => {
-      // Pick (not Partial<Item>/Partial<Service>) deliberately excludes relation
-      // properties (invoiceItems, inventoryItems, item, ...) from the update object's
-      // type - TypeORM's QueryDeepPartialEntity requires relation values to themselves
-      // be deep-partial, so a `Partial<Entity>`-typed variable (which types relations as
-      // full related entities) doesn't structurally match even when the relation keys
-      // are never actually set at runtime.
+
       const itemUpdates: Partial<
-        Pick<Item, 'itemName' | 'describe' | 'unitPrice' | 'categoryId' | 'active'>
+        Pick<Item, 'itemName' | 'imageUrl' | 'describe' | 'unitPrice' | 'categoryId' | 'active'>
       > = {};
       if (dto.itemName !== undefined) itemUpdates.itemName = dto.itemName;
+      if (dto.imageUrl !== undefined) itemUpdates.imageUrl = dto.imageUrl;
       if (dto.describe !== undefined) itemUpdates.describe = dto.describe;
       if (dto.unitPrice !== undefined) itemUpdates.unitPrice = dto.unitPrice;
       if (dto.categoryId !== undefined) itemUpdates.categoryId = dto.categoryId;

@@ -8,12 +8,6 @@ import {
 } from '@/modules/triage/application/ports/ai-prediction.port';
 import { SendChatMessageDto } from './dto/send-chat-message.dto';
 
-/**
- * Proxies the Section 6 "AI chat assistant" so the web app never talks to
- * veterinary-clinic-ai directly (Section 3: the backend is the only thing the frontend
- * talks to, and the only place auth/rate-limiting is enforced). Public because a Guest
- * should be able to ask general questions before ever booking.
- */
 @ApiTags('ai-chat')
 @Controller('ai-chat')
 @UseGuards(ThrottlerGuard)

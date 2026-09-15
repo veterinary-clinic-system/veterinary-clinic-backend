@@ -12,14 +12,6 @@ import {
 } from 'class-validator';
 import { Gender } from '@/shared/common/enums/gender.enum';
 
-/**
- * Every field optional/patchable, including re-assigning owner/breed and the
- * allergy/condition flags.
- *
- * `speciesId` chi de DOI CHIEU: gui kem `breedId` thi hai gia tri phai khop nhau. Ban
- * than loai khong duoc luu tren `pets` (no nam o `breeds.species_id`) nen gui rieng
- * `speciesId` khong lam thay doi gi.
- */
 export class UpdatePetDto {
   @IsOptional()
   @IsUUID(undefined, { message: 'Chủ nuôi không hợp lệ' })

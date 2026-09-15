@@ -1,37 +1,16 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Bang `payments` + trang thai hoa don - P8-T2, SRS FR-21.
- *
- * BACKFILL: moi hoa don `paid = true` sinh dung MOT dong `payments` `SUCCESS` voi
- * `amount = total_amount` (so da chot o P8-T1), `method` lay tu `invoices.payment_method`
- * (mac dinh `CASH` neu trong - hoa don cu duoc danh dau da tra ma khong ghi phuong thuc
- * gan nhu chac chan la thu tien mat tai quay), `paid_at` lay tu `invoices.paid_at`.
- *
- * `received_by_user_id` de NULL: khong co du lieu that ve nguoi thu tien cua cac hoa don
- * truoc P8, va bia mot cai ten vao chung tu tien la dieu khong duoc phep. NULL o day doc
- * duoc dung la "da thu truoc khi he thong theo doi nguoi thu".
- *
- * Ba cot cu (`paid`, `paid_at`, `payment_method`) DUOC GIU. Chung tro thanh ban tom tat
- * cua lan tra gan nhat, do `PaymentsService.syncStatus` cap nhat; bao cao doanh thu (P10)
- * va cac man hinh co truoc P8 van doc chung ma khong phai doi cung mot luc.
- */
 export class Payments1794000001000 implements MigrationInterface {
   name = 'Payments1794000001000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // ------------------------------------------- 1. Mo rong phuong thuc thanh toan
 
-    // Postgres 12+ cho ALTER TYPE ... ADD VALUE trong transaction mien la gia tri moi
-    // khong duoc DUNG trong chinh transaction do - backfill duoi chi dung CASH nen an toan.
     await queryRunner.query(`
       ALTER TYPE "invoices_payment_method_enum" ADD VALUE IF NOT EXISTS 'BANK_TRANSFER'
     `);
     await queryRunner.query(`
       ALTER TYPE "invoices_payment_method_enum" ADD VALUE IF NOT EXISTS 'QR'
     `);
-
-    // --------------------------------------------------------- 2. Bang payments
 
     await queryRunner.query(`
       DO $$ BEGIN
@@ -80,8 +59,6 @@ export class Payments1794000001000 implements MigrationInterface {
       ON "payments" ("status", "paid_at" DESC) WHERE "deleted_at" IS NULL
     `);
 
-    // ------------------------------------------------ 3. Trang thai tren hoa don
-
     await queryRunner.query(`
       DO $$ BEGIN
         CREATE TYPE "invoices_status_enum" AS ENUM (
@@ -93,8 +70,6 @@ export class Payments1794000001000 implements MigrationInterface {
       ALTER TABLE "invoices"
         ADD COLUMN IF NOT EXISTS "status" "invoices_status_enum" NOT NULL DEFAULT 'PENDING'
     `);
-
-    // ---------------------------------------------------------- 4. Backfill
 
     await queryRunner.query(`
       INSERT INTO "payments" (
@@ -130,7 +105,6 @@ export class Payments1794000001000 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "payments"`);
     await queryRunner.query(`DROP TYPE IF EXISTS "payments_status_enum"`);
     await queryRunner.query(`DROP TYPE IF EXISTS "payments_method_enum"`);
-    // Khong go 'BANK_TRANSFER'/'QR' khoi "invoices_payment_method_enum": Postgres khong
-    // co ALTER TYPE ... DROP VALUE, va hai gia tri thua khong lam hong du lieu nao.
+
   }
 }

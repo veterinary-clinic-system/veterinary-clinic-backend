@@ -40,7 +40,6 @@ export class AppointmentsController {
     private readonly partyResolver: PartyResolverService,
   ) {}
 
-  /** Guest or logged-in PetOwner self-booking (Section 4.1.2: "No login required to book"). */
   @Public()
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 15, ttl: 60_000 } })
@@ -49,20 +48,12 @@ export class AppointmentsController {
     return this.appointmentsService.createBooking(dto, null);
   }
 
-  /** Receptionist "can also create bookings on a pet owner's behalf" (Section 4.1.2). */
   @RequirePermissions(Permission.APPOINTMENT_CREATE)
   @Post('staff')
   createStaffBooking(@Body() dto: CreateBookingDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.appointmentsService.createBooking(dto, actor.userId);
   }
 
-  /**
-   * Tra cuu chu nuoi theo so dien thoai cho buoc "Thong tin" cua bieu mau dat lich:
-   * da co ho so thi ten duoc dien san, chua co thi khach tu nhap.
-   *
-   * Throttle chat hon cac cua cong khai khac (10 lan/phut): day la mot cua tra loi
-   * "so nay co trong he thong khong", nen no phai dat de quet.
-   */
   @Public()
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
@@ -71,7 +62,6 @@ export class AppointmentsController {
     return this.partyResolver.lookupOwnerForBooking(query.phone);
   }
 
-  /** Public free/busy widget for the booking form - never exposes appointment detail. */
   @Public()
   @Get('calendar/public')
   getPublicCalendar(@Query() query: QueryWeekDto) {
@@ -83,7 +73,6 @@ export class AppointmentsController {
     );
   }
 
-  /** Staff calendar with full appointment detail (Section 4.2). */
   @RequirePermissions(Permission.APPOINTMENT_VIEW)
   @Get('calendar')
   getStaffCalendar(@Query() query: QueryWeekDto) {
@@ -95,7 +84,6 @@ export class AppointmentsController {
     );
   }
 
-  /** Che do NGAY cua lich lam viec nhan vien (FR-05-03). */
   @RequirePermissions(Permission.APPOINTMENT_VIEW)
   @Get('calendar/day')
   getDayCalendar(@Query() query: QueryDayDto) {
@@ -106,7 +94,6 @@ export class AppointmentsController {
     );
   }
 
-  /** Che do THANG (FR-05-03) - so lieu tong hop moi ngay, khong dung luoi slot. */
   @RequirePermissions(Permission.APPOINTMENT_VIEW)
   @Get('calendar/month')
   getMonthCalendar(@Query() query: QueryMonthDto) {
@@ -141,11 +128,6 @@ export class AppointmentsController {
     });
   }
 
-  /**
-   * Co y KHONG gan `@RequirePermissions`: route nay phuc vu ca nhan vien lan chu thu
-   * cung xem lich cua chinh minh. Hang rao that nam trong service - `findOneForOwner`
-   * nem ForbiddenException neu lich khong thuoc ve nguoi goi.
-   */
   @Get(':id')
   async findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthenticatedUser) {
     return actor.role === Role.PET_OWNER
@@ -157,7 +139,6 @@ export class AppointmentsController {
   @Audit({
     action: AuditAction.UPDATE,
     entity: 'Appointment',
-    // Xac nhan lich va doi gio kham di chung mot handler - xem `AuditActionResolver`.
     resolveAction: (body) => {
       const status = (body as { status?: string } | undefined)?.status;
       if (status === AppointmentStatus.CONFIRMED) return AuditAction.APPROVE;
@@ -174,7 +155,6 @@ export class AppointmentsController {
     return this.appointmentsService.update(id, dto, actor);
   }
 
-  /** Cung ly do voi `findOne` o tren - `cancel` tu kiem tra quyen so huu voi PET_OWNER. */
   @Audit({ action: AuditAction.CANCEL, entity: 'Appointment' })
   @Post(':id/cancel')
   cancel(
@@ -185,10 +165,6 @@ export class AppointmentsController {
     return this.appointmentsService.cancel(id, dto, actor);
   }
 
-  /**
-   * Danh dau khach khong den (FR-06-03) - thao tac cua quay le tan, khong phai cua chu
-   * thu cung, nen co `@RequirePermissions` trong khi `cancel` o tren thi khong.
-   */
   @RequirePermissions(Permission.APPOINTMENT_UPDATE)
   @Audit({ action: AuditAction.UPDATE, entity: 'Appointment' })
   @Post(':id/no-show')
@@ -200,11 +176,6 @@ export class AppointmentsController {
     return this.appointmentsService.markNoShow(id, dto, actor);
   }
 
-  /**
-   * Bac si nghi dot xuat: dong lich ngay do va chuyen cac ca chua tiep nhan sang bac
-   * si khac dang trong. Ca nao khong tim duoc nguoi thay se nam trong `unresolved` de
-   * le tan goi khach doi lich - he thong khong tu huy lich cua ai.
-   */
   @RequirePermissions(Permission.APPOINTMENT_UPDATE)
   @Audit({ action: AuditAction.UPDATE, entity: 'Appointment' })
   @Post('doctor-absence')

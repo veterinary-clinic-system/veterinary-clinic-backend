@@ -26,13 +26,7 @@ export enum SlotStatus {
   BOOKED = 'BOOKED',
   BREAK = 'BREAK',
   OFF_SHIFT = 'OFF_SHIFT',
-  /**
-   * Khung gio nam TRUOC thoi diem som nhat con dat duoc (xem `domain/booking-window.ts`).
-   * Chi xuat hien o goc nhin cong khai: lich cua nhan vien van phai thay qua khu that
-   * su de tra cuu lich su. Tach khoi `OFF_SHIFT` de giao dien noi dung ly do vi sao o
-   * do bi khoa.
-   */
-  PAST = 'PAST',
+    PAST = 'PAST',
 }
 
 export interface SlotInfo extends TimeRange {
@@ -49,30 +43,20 @@ export interface DayAvailability {
   slots: SlotInfo[];
 }
 
-/** Mot o ngay trong che do THANG (FR-05-03) - chi so lieu tong hop, khong co luoi slot. */
 export interface MonthDaySummary {
-  /** 'yyyy-MM-dd'. */
-  date: string;
+    date: string;
   dayOfWeek: number;
   isBranchOpen: boolean;
-  /** So lich hen con hieu luc (chua bi huy / khach khong den). */
-  appointmentCount: number;
-  /** So lich da huy hoac khach khong den - de o lich thang khong "mat" chung. */
-  closedCount: number;
-  /** Mau uu tien NANG NHAT trong ngay; null khi khong lich nao duoc gan mau. */
-  topPriorityColor: PriorityColor | null;
+    appointmentCount: number;
+    closedCount: number;
+    topPriorityColor: PriorityColor | null;
 }
 
 export interface MonthOverview {
-  /** 'yyyy-MM'. */
-  month: string;
+    month: string;
   days: MonthDaySummary[];
 }
 
-/**
- * Do "tot" cua mot trang thai o khi gop luoi cua NHIEU bac si lai lam mot (che do
- * "de phong kham sap xep"): con mot bac si ranh la o do van dat duoc.
- */
 const MERGE_PRECEDENCE: SlotStatus[] = [
   SlotStatus.FREE,
   SlotStatus.BOOKED,
@@ -81,15 +65,6 @@ const MERGE_PRECEDENCE: SlotStatus[] = [
   SlotStatus.PAST,
 ];
 
-/**
- * Gop luoi slot cua nhieu bac si trong cung mot ngay thanh MOT luoi "chi nhanh".
- *
- * Dung cho lua chon "khong chon bac si cu the" o buoc dat lich: khach chi can biet
- * khung gio nao con nguoi kham duoc, con viec ai kham do he thong xep.
- *
- * `appointmentId` bi bo di co y - o goc nhin gop, mot o "da dat" khong ung voi mot lich
- * hen duy nhat nao ca.
- */
 export function mergeDoctorDays(days: DayAvailability[]): DayAvailability | null {
   if (days.length === 0) return null;
 
@@ -120,21 +95,6 @@ export function mergeDoctorDays(days: DayAvailability[]): DayAvailability | null
   };
 }
 
-/**
- * Cac o cua luoi ma khoang [startAt, endAt) chiem, hoac `null` khi khoang do KHONG nam
- * gon tren luoi.
- *
- * Luoi la 30 phut nhung dich vu co the dai hon (vi du "Phau thuat nho" 60 phut), nen
- * mot lich hen thuong an nhieu o lien tiep. Ba dieu kien de coi la "nam gon":
- *   1. Bat dau DUNG mep mot o - khong cho bat dau luc 17:05.
- *   2. Cac o phu lien tuc, khong co khe ho - 10:30 + 60 phut khong duoc phep nhay qua
- *      gio nghi trua 11:00-13:30 roi dem tiep tu 13:30.
- *   3. O cuoi phai cham toi `endAt` - 17:00 + 60 phut vuot qua o cuoi 17:00-17:30 cua
- *      ngay lam viec.
- *
- * Tra ve cac o de nguoi goi tu phan xu trang thai (BOOKED -> 409, BREAK/OFF_SHIFT ->
- * 400); ham nay chi tra loi cau hoi "khoang gio nay co ton tai tren luoi khong".
- */
 export function slotsCovering(
   slots: SlotInfo[],
   startAt: Date,
@@ -157,7 +117,6 @@ export function slotsCovering(
   return covered;
 }
 
-/** Trang thai lich hen van "con hieu luc" - dung cho so dem cua che do thang. */
 const ACTIVE_STATUS_LIST = [
   AppointmentStatus.PENDING,
   AppointmentStatus.CONFIRMED,
@@ -168,7 +127,6 @@ const ACTIVE_STATUS_LIST = [
   .map((status) => `'${status}'`)
   .join(', ');
 
-/** Bang rank cua `PRIORITY_COLOR_SEVERITY`, viet duoi dang SQL. 99 = chua gan mau. */
 const PRIORITY_RANK_SQL = `CASE appointment.priority_color
     ${Object.entries(PRIORITY_COLOR_SEVERITY)
       .map(([color, rank]) => `WHEN '${color}' THEN ${rank}`)
@@ -192,14 +150,6 @@ interface RawMonthDayRow {
   top_priority_rank: string | null;
 }
 
-/**
- * Implements the Section 5.1 slot rules: a slot must fall inside the branch's
- * OperatingHour blocks AND the doctor's DoctorShift blocks, must not overlap a
- * DoctorBreak, and must not overlap an existing (non-cancelled) Appointment. The
- * canonical grid always comes from the branch's operating hours so the UI can render
- * every possible slot with a distinct status (Section 5.2) instead of just omitting
- * unavailable ones.
- */
 @Injectable()
 export class AvailabilityService {
   constructor(
@@ -214,15 +164,7 @@ export class AvailabilityService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
-  /**
-   * Cached wrapper (Section 3: "caching doctor availability lookups"). A short 20s TTL
-   * bounds staleness without needing perfect invalidation coverage; the actual booking
-   * write path (AppointmentsService.assertSlotIsFree) always re-validates against
-   * Postgres directly inside the transaction, so a stale cache read can at worst show a
-   * slot as free for a few seconds after it's taken - it can never cause a double-booking.
-   * Writes still proactively call `invalidateDoctorDay` so the common case is fresh.
-   */
-  async getDoctorDayAvailability(
+    async getDoctorDayAvailability(
     doctorId: string,
     branchId: string,
     date: Date,
@@ -242,8 +184,7 @@ export class AvailabilityService {
     return result;
   }
 
-  /** Called by AppointmentsService after any write that could change this doctor/day's slots. */
-  async invalidateDoctorDay(doctorId: string, branchId: string, date: Date): Promise<void> {
+    async invalidateDoctorDay(doctorId: string, branchId: string, date: Date): Promise<void> {
     const dateStr = format(date, 'yyyy-MM-dd');
     await this.redis.del(this.cacheKey(doctorId, branchId, dateStr)).catch(() => undefined);
   }
@@ -252,8 +193,7 @@ export class AvailabilityService {
     return `availability:${branchId}:${doctorId}:${dateStr}`;
   }
 
-  /** JSON round-tripping turns Date fields into strings - restore them for callers that rely on Date methods. */
-  private reviveDates(day: DayAvailability): DayAvailability {
+    private reviveDates(day: DayAvailability): DayAvailability {
     return {
       ...day,
       slots: day.slots.map((slot) => ({
@@ -351,18 +291,7 @@ export class AvailabilityService {
     return days;
   }
 
-  /**
-   * Che do THANG cua lich lam viec (FR-05-03).
-   *
-   * CO Y khong dung lai `getDoctorDayAvailability`: dung luoi slot 30 phut cho ca thang
-   * la ~30 x 20 o cho moi bac si, chi de ve mot con so dem tren moi o lich - vua nang
-   * vua lam phinh cache Redis. O day chi can MOT cau lenh gom nhom theo ngay; NFR-02
-   * doi che do thang duoi 500ms.
-   *
-   * `doctorId` tuy chon: bo trong = toan bo chi nhanh (goc nhin cua quan ly), co gia
-   * tri = loc theo mot bac si nhu hai che do kia.
-   */
-  async getMonthOverview(
+    async getMonthOverview(
     branchId: string,
     doctorId: string | undefined,
     monthOf: Date,
@@ -381,10 +310,6 @@ export class AvailabilityService {
         `COUNT(*) FILTER (WHERE appointment.status NOT IN (${ACTIVE_STATUS_LIST}))`,
         'closed_count',
       )
-      // Rank nho hon = nang hon (xem PRIORITY_COLOR_SEVERITY). MIN tren rank chinh la
-      // "mau uu tien cao nhat trong ngay"; 99 cho lich chua gan mau de chung khong
-      // thang MIN. Chi tinh tren lich CON HIEU LUC - neu khong, mot ngay ma moi ca deu
-      // da huy van hien nhan "Do - Cap cuu" tren o lich thang.
       .addSelect(
         `MIN(CASE WHEN appointment.status IN (${ACTIVE_STATUS_LIST}) THEN ${PRIORITY_RANK_SQL} END)`,
         'top_priority_rank',
@@ -402,8 +327,6 @@ export class AvailabilityService {
 
     const rows = await qb.getRawMany<RawMonthDayRow>();
     const byDate = new Map(rows.map((row) => [row.date, row]));
-
-    // Ngay chi nhanh mo cua chi phu thuoc thu trong tuan - mot truy van cho ca thang.
     const operatingHours = await this.operatingHoursRepository.find({ where: { branchId } });
     const openDaysOfWeek = new Set(operatingHours.map((hour) => hour.dayOfWeek));
 
@@ -424,8 +347,7 @@ export class AvailabilityService {
     return { month: format(monthStart, 'yyyy-MM'), days };
   }
 
-  /** True when `inner` falls entirely inside `outer` (used for the shift-vs-slot check). */
-  private rangeContains(outer: TimeRange, inner: TimeRange): boolean {
+    private rangeContains(outer: TimeRange, inner: TimeRange): boolean {
     return outer.start <= inner.start && inner.end <= outer.end;
   }
 }

@@ -11,12 +11,10 @@ export class QueryInventoryDto extends PaginationQueryDto {
   @IsUUID()
   itemId?: string;
 
-  /** Tim theo ten hoac ma mat hang. */
   @IsOptional()
   @IsString()
   search?: string;
 
-  /** Chi lay cac dong da cham nguong `minimum_stock` - FR-18-04. */
   @IsOptional()
   @ParseOptionalBoolean()
   @IsBoolean()

@@ -1,16 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Ho so nhan su - SRS FR-22.
- *
- * `employee_code` sinh tu sequence o tang CSDL chu khong o tang ung dung: hai quan tri
- * vien tao nhan vien cung luc se cung doc ra MAX(code) giong nhau va sinh trung ma.
- * Sequence la thu duy nhat dam bao duoc tinh duy nhat ma khong can khoa.
- *
- * Backfill: moi tai khoan nhan vien dang co (`users.role` khong phai PET_OWNER) duoc
- * tao san mot ho so nhan su tuong ung, trang thai ACTIVE. Neu khong lam buoc nay thi
- * man hinh Nhan su se rong tron trong khi he thong ro rang dang co nhan vien.
- */
 export class Employees1787000002000 implements MigrationInterface {
   name = 'Employees1787000002000';
 
@@ -46,12 +35,11 @@ export class Employees1787000002000 implements MigrationInterface {
       )
     `);
 
-    // Partial unique: ho so da xoa mem khong giu cho ma nhan vien nua.
     await queryRunner.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_employees_employee_code"
       ON "employees" ("employee_code") WHERE "deleted_at" IS NULL
     `);
-    // Mot tai khoan dang nhap chi gan duoc voi dung mot ho so nhan su.
+    
     await queryRunner.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_employees_user_id"
       ON "employees" ("user_id") WHERE "deleted_at" IS NULL AND "user_id" IS NOT NULL

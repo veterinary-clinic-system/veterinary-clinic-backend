@@ -1,13 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 import { DEFAULT_ROLE_PERMISSIONS, Permission } from '@/shared/common/enums/permission.enum';
 
-/**
- * Bon quyen moi cua P9 - SRS FR-12, FR-13.
- *
- * TAO LAI KIEU ENUM thay vi `ALTER TYPE ... ADD VALUE`, va chi seed CAC QUYEN MOI chu
- * khong seed lai ca ma tran: ca hai quyet dinh va ly do cua chung da ghi day du o
- * `1793000002000-PrescriptionPermissions.ts` - migration nay lam y het.
- */
 export class VaccinationAndLaboratoryPermissions1796000004000 implements MigrationInterface {
   name = 'VaccinationAndLaboratoryPermissions1796000004000';
 

@@ -10,21 +10,6 @@ import { CommonSymptom } from '@/shared/common/enums/common-symptom.enum';
 import { QueueSource, QueueStatus } from '@/shared/common/enums/queue-status.enum';
 import { Appointment } from './appointment.entity';
 
-/**
- * Mot luot cho tai quay le tan trong ngay. Khong co trong diagram.jpg - them de phuc
- * vu bon thao tac cua le tan: xac nhan khach da den, tao luot kham khong dat lich,
- * dua vao hang cho, gan bac si.
- *
- * Vi sao KHONG dung thang `Appointment` lam hang cho:
- *   - Khach vang lai chua duoc gan bac si thi chua the co `Appointment` (bang do bat
- *     buoc `doctor_id`, va rang buoc EXCLUDE `appointment_no_overlap` doi mot khung
- *     gio cu the cua dung mot bac si).
- *   - So thu tu, gio khach thuc su buoc vao phong kham, va viec khach bo ve giua chung
- *     la thong tin cua QUAY LE TAN, khong phai cua lich hen.
- *
- * `appointmentId` la lien ket tuy chon: co san ngay tu dau voi khach dat lich truoc,
- * va duoc dien vao sau (luc gan bac si) voi khach vang lai.
- */
 @Entity({ name: 'queue_entries' })
 @Index(['branch', 'queueDate', 'status'])
 export class QueueEntry extends BaseEntity {
@@ -42,7 +27,6 @@ export class QueueEntry extends BaseEntity {
   @Column({ name: 'pet_id' })
   petId: string;
 
-  /** Lich hen tuong ung. Null voi khach vang lai chua duoc gan bac si. */
   @ManyToOne(() => Appointment, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'appointment_id' })
   appointment: Appointment | null;
@@ -50,7 +34,6 @@ export class QueueEntry extends BaseEntity {
   @Column({ name: 'appointment_id', type: 'varchar', nullable: true })
   appointmentId: string | null;
 
-  /** Bac si phu trach. Null khi luot cho van con o trang thai WAITING. */
   @ManyToOne(() => Doctor, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'doctor_id' })
   doctor: Doctor | null;
@@ -58,7 +41,6 @@ export class QueueEntry extends BaseEntity {
   @Column({ name: 'doctor_id', type: 'varchar', nullable: true })
   doctorId: string | null;
 
-  /** Dich vu khach yeu cau - can de tinh thoi luong lich hen khi gan bac si. */
   @ManyToOne(() => Service, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'service_id' })
   service: Service;
@@ -66,15 +48,9 @@ export class QueueEntry extends BaseEntity {
   @Column({ name: 'service_id' })
   serviceId: string;
 
-  /**
-   * Ngay cua hang cho, dang 'yyyy-MM-dd'. Tach rieng khoi `checkedInAt` de so thu tu
-   * co the danh lai tu 1 moi ngay cho tung chi nhanh, va de truy van "hang cho hom
-   * nay" khong phai tinh khoang thoi gian.
-   */
   @Column({ name: 'queue_date', type: 'date' })
   queueDate: string;
 
-  /** So thu tu trong ngay, duy nhat theo (chi nhanh, ngay). Bat dau tu 1. */
   @Column({ name: 'ticket_number', type: 'integer' })
   ticketNumber: number;
 
@@ -84,7 +60,6 @@ export class QueueEntry extends BaseEntity {
   @Column({ type: 'enum', enum: QueueSource })
   source: QueueSource;
 
-  /** Muc do uu tien - quyet dinh thu tu goi vao phong, khong phai so thu tu. */
   @Column({ name: 'priority_color', type: 'enum', enum: PriorityColor, nullable: true })
   priorityColor: PriorityColor | null;
 
@@ -94,10 +69,6 @@ export class QueueEntry extends BaseEntity {
   @Column({ name: 'reason', type: 'text', nullable: true })
   reason: string | null;
 
-  /**
-   * Anh trieu chung le tan chup/nhan tu khach. Nam o day chu khong o `Appointment` vi
-   * luot cho chua gan bac si thi chua co lich hen - `assignDoctor` chep sang khi tao.
-   */
   @Column({ name: 'photo_urls', type: 'text', array: true, default: [] })
   photoUrls: string[];
 
@@ -107,23 +78,15 @@ export class QueueEntry extends BaseEntity {
   @Column({ name: 'checked_in_at', type: 'timestamptz', default: () => 'now()' })
   checkedInAt: Date;
 
-  /** Luc khach duoc goi vao phong (chuyen sang IN_ROOM). */
   @Column({ name: 'called_at', type: 'timestamptz', nullable: true })
   calledAt: Date | null;
 
-  /** Luc luot cho ket thuc (DONE hoac CANCELLED). */
   @Column({ name: 'finished_at', type: 'timestamptz', nullable: true })
   finishedAt: Date | null;
 
-  /**
-   * Ly do huy luot cho (FR-05-04). Ban sao cua `Appointment.cancelReason` khi luot cho
-   * co lich hen - giu o day de man hinh hang cho khong phai JOIN, va vi luot cho cua
-   * khach vang lai chua chac da co lich hen de JOIN.
-   */
   @Column({ name: 'cancel_reason', type: 'text', nullable: true })
   cancelReason: string | null;
 
-  /** Nhan vien thao tac quay le tan. */
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'created_by_user_id' })
   createdBy: User | null;

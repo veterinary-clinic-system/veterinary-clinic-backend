@@ -7,13 +7,6 @@ import {
   toMinutes,
 } from './slot-grid.util';
 
-/**
- * Test cho tang `domain` - chay KHONG CAN CSDL, khong can Nest TestingModule.
- *
- * Day chinh la thu ma Phan III tai lieu kien truc doi o tang trong cung: logic nghiep
- * vu thuan, kiem chung duoc bang mot ham goi. Neu mot ngay nao do file nay phai mock
- * repository moi chay duoc thi tuc la logic da ro ri xuong duoi tang domain.
- */
 describe('slot-grid.util', () => {
   describe('toMinutes / toHHmm', () => {
     it('doi qua lai giu nguyen gia tri', () => {

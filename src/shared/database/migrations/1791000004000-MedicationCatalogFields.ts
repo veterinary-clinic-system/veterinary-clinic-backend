@@ -1,18 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Bo sung truong danh muc cho thuoc - SRS FR-15.
- *
- * `code` va `category_id` da co tu `1791000002000-ItemCodeAndCategory` (dat o `items`,
- * dung chung cho ca ba loai) nen o day chi con nam truong rieng cua thuoc.
- *
- * KHONG them `batch_number`/`expiry_date`: mot loai thuoc co nhieu lo cung luc, moi lo
- * mot han va mot so luong. Hai cot o day chi giu duoc mot lo va se sai ngay dot nhap
- * thu hai - do la viec cua `InventoryBatch` o P6.
- *
- * `supplier_id` dung ON DELETE SET NULL: ngung hop tac voi mot nha cung cap khong duoc
- * lam bien mat thuoc khoi danh muc (va khong duoc lam vo don thuoc cu tro toi thuoc do).
- */
 export class MedicationCatalogFields1791000004000 implements MigrationInterface {
   name = 'MedicationCatalogFields1791000004000';
 
@@ -26,8 +13,6 @@ export class MedicationCatalogFields1791000004000 implements MigrationInterface 
         ADD COLUMN IF NOT EXISTS "minimum_stock" int NOT NULL DEFAULT 0
     `);
 
-    // Cung khuon voi `chk_products_cost_price_non_negative` va
-    // `chk_items_unit_price_non_negative` da co san.
     await queryRunner.query(`
       DO $$ BEGIN
         ALTER TABLE "medications"
@@ -44,7 +29,7 @@ export class MedicationCatalogFields1791000004000 implements MigrationInterface 
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_medications_supplier" ON "medications" ("supplier_id")
     `);
-    // Duoc si tim thuoc thay the theo ten goc - NFR-02.
+    
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_medications_generic_name" ON "medications" ("generic_name")
     `);

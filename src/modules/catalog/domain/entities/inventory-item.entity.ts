@@ -3,7 +3,6 @@ import { BaseEntity } from '@/shared/database/base.entity';
 import { Item } from './item.entity';
 import { Branch } from '@/modules/organization/domain/entities/branch.entity';
 
-/** diagram.jpg `InventoryItem` box - per-branch stock level of an Item. */
 @Entity({ name: 'inventory_items' })
 @Index(['item', 'branch'], { unique: true })
 export class InventoryItem extends BaseEntity {

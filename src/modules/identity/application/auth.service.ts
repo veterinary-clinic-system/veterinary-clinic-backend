@@ -21,16 +21,6 @@ import {
 
 const BCRYPT_ROUNDS = 12;
 
-/**
- * `LOGIN`/`LOGOUT` duoc ghi audit TU DAY chu khong qua `AuditInterceptor` - P10-T2.
- *
- * Interceptor doc `request.user` de biet ai vua lam gi, nhung dang nhap la hanh dong
- * XAC LAP `request.user`: luc no chay xong thi request van la `@Public()` va khong co
- * danh tinh nao de ghi. Chi service nay biet dong `User` nao vua duoc xac thuc.
- *
- * Va vi the day cung la cho duy nhat trong du an mot service tu goi audit. Moi nghiep vu
- * con lai deu di qua decorator `@Audit(...)`.
- */
 @Injectable()
 export class AuthService {
   constructor(
@@ -42,11 +32,6 @@ export class AuthService {
     @Inject(AUDIT_RECORDER) private readonly auditRecorder: AuditRecorder,
   ) {}
 
-  /**
-   * PetOwner self-registration. Guests booking online (Section 4) get a passwordless
-   * User row auto-created from their phone number; this either sets the first
-   * password on that same row or creates a brand new PetOwner account.
-   */
   async registerPetOwner(dto: RegisterPetOwnerDto): Promise<TokenPair> {
     let user = await this.usersRepository.findOne({ where: { phone: dto.phone } });
 
@@ -74,11 +59,6 @@ export class AuthService {
     return this.issueTokenPair(user);
   }
 
-  /**
-   * @param context IP + user-agent cua nguoi dang nhap, do controller lay tu request.
-   *   Tuy chon de cac loi goi cu (va test) khong phai sua - khi bo trong thi dong audit
-   *   van duoc ghi, chi thieu hai cot do.
-   */
   async login(dto: LoginDto, context: AuthRequestContext = {}): Promise<TokenPair> {
     const user = await this.usersRepository
       .createQueryBuilder('user')
@@ -95,15 +75,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid phone number or password');
     }
 
-    // CHI ghi khi dang nhap THANH CONG. Dang nhap that bai khong doi du lieu nao nen no
-    // khong thuoc ve nhat ky THAY DOI; theo doi tan cong do mat khau la viec cua log ung
-    // dung va cua bo gioi han tan suat (`@Throttle` tren AuthController).
     this.auditRecorder.record({
       actorUserId: user.id,
       action: AuditAction.LOGIN,
       entityName: 'User',
       entityId: user.id,
-      // Khong ghi `dto` - no chua mat khau. Chi ghi thu du de doi chieu ve sau.
+      
       changes: { phone: user.phone, role: user.role },
       ipAddress: context.ipAddress ?? null,
       userAgent: context.userAgent ?? null,
@@ -112,7 +89,6 @@ export class AuthService {
     return this.issueTokenPair(user);
   }
 
-  /** Refresh token rotation: the presented token is revoked and a new pair is issued. */
   async refresh(refreshToken: string): Promise<TokenPair> {
     let payload: RefreshTokenPayload;
     try {
@@ -157,9 +133,6 @@ export class AuthService {
       });
       await this.refreshTokensRepository.update({ id: payload.jti }, { revokedAt: new Date() });
 
-      // Trong `try` co chu dich: mot token da het han hoac da bi thu hoi thi khong co
-      // phien nao ket thuc o day ca, va ghi `LOGOUT` cho no se lam nhat ky day nhung
-      // dong khong tuong ung voi hanh dong nao that.
       this.auditRecorder.record({
         actorUserId: payload.sub,
         action: AuditAction.LOGOUT,
@@ -170,7 +143,7 @@ export class AuthService {
         userAgent: context.userAgent ?? null,
       });
     } catch {
-      // Already invalid/expired - logout is idempotent either way.
+      
     }
   }
 
@@ -210,7 +183,6 @@ export class AuthService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  /** Parses simple durations like "15m" / "7d" / "3600s" as used by JWT_*_EXPIRES_IN. */
   private parseExpiryMs(duration: string): number {
     const match = /^(\d+)([smhd])$/.exec(duration);
     if (!match) {

@@ -27,7 +27,6 @@ import { PublicDoctorDto } from '@/modules/identity/presentation/dto/public-doct
 
 const BCRYPT_ROUNDS = 12;
 
-/** Columns safe to interpolate into `ORDER BY user.<col>` from a client-supplied `sortBy`. */
 const USER_SORTABLE_COLUMNS = new Set([
   'createdAt',
   'updatedAt',
@@ -49,15 +48,6 @@ export class UsersService {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  // ---------------------------------------------------------------------------------
-  // Users (Admin)
-  // ---------------------------------------------------------------------------------
-
-  /**
-   * Admin-only staff account creation. `branchId` is forced to `null` for ADMIN
-   * regardless of what the client sent; for DOCTOR the linked `Doctor` clinical-profile
-   * row is inserted in the same transaction as the `User` row.
-   */
   async create(dto: CreateUserDto): Promise<User> {
     const existingPhone = await this.usersRepository.findOne({ where: { phone: dto.phone } });
     if (existingPhone) {
@@ -87,6 +77,7 @@ export class UsersService {
       const user = manager.create(User, {
         phone: dto.phone,
         fullName: dto.fullName,
+        avatarUrl: dto.avatarUrl ?? (dto.role === Role.DOCTOR ? '/images/default-doctor.svg' : '/images/default-staff.svg'),
         email: dto.email ?? null,
         passwordHash,
         role: dto.role,
@@ -99,7 +90,7 @@ export class UsersService {
           userId: persistedUser.id,
           branchId: branchId as string,
           fullName: dto.fullName,
-          avatarUrl: null,
+          avatarUrl: dto.avatarUrl ?? '/images/default-doctor.svg',
           yearOfStart: dto.yearOfStart ?? null,
           specialization: dto.specialization ?? [],
         });
@@ -142,13 +133,6 @@ export class UsersService {
     return user;
   }
 
-  /**
-   * `role` and `phone` are intentionally not touched here - `UpdateUserDto` doesn't
-   * declare them (swapping either is a "create a new account" operation), and the
-   * global `ValidationPipe({ whitelist: true })` already strips any extra fields a
-   * client tries to sneak in. An ADMIN's `branchId` is always kept `null`, mirroring
-   * `create()`, since Admin is a global/HQ role.
-   */
   async update(id: string, dto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
 
@@ -174,12 +158,16 @@ export class UsersService {
 
     Object.assign(user, {
       ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
+      ...(dto.avatarUrl !== undefined ? { avatarUrl: dto.avatarUrl } : {}),
       ...(dto.email !== undefined ? { email: dto.email } : {}),
       ...(dto.active !== undefined ? { active: dto.active } : {}),
       branchId,
     });
 
     await this.usersRepository.save(user);
+    if (dto.avatarUrl !== undefined && user.role === Role.DOCTOR) {
+      await this.doctorsRepository.update({ userId: id }, { avatarUrl: dto.avatarUrl });
+    }
     return this.findOne(id);
   }
 
@@ -214,7 +202,6 @@ export class UsersService {
     await this.usersRepository.save(user);
   }
 
-  /** `GET /users/pet-owners?search=` - receptionist customer lookup. */
   async searchPetOwners(
     query: PaginationQueryDto & { search?: string },
   ): Promise<PaginatedResultDto<User>> {
@@ -238,11 +225,6 @@ export class UsersService {
     return new PaginatedResultDto(data, total, query.page, query.limit);
   }
 
-  // ---------------------------------------------------------------------------------
-  // Doctors
-  // ---------------------------------------------------------------------------------
-
-  /** Public doctor directory - only `active` doctors whose linked `User` is also `active`. */
   async findPublicDoctors(branchId?: string): Promise<PublicDoctorDto[]> {
     const qb = this.doctorsRepository
       .createQueryBuilder('doctor')
@@ -299,10 +281,6 @@ export class UsersService {
     return this.findDoctorEntity(id);
   }
 
-  // ---------------------------------------------------------------------------------
-  // Doctor shifts
-  // ---------------------------------------------------------------------------------
-
   async getDoctorShifts(doctorId: string): Promise<DoctorShift[]> {
     await this.findDoctorEntity(doctorId);
     return this.doctorShiftsRepository.find({
@@ -355,10 +333,6 @@ export class UsersService {
     }
   }
 
-  // ---------------------------------------------------------------------------------
-  // Doctor breaks
-  // ---------------------------------------------------------------------------------
-
   async getDoctorBreaks(doctorId: string, date?: string): Promise<DoctorBreak[]> {
     await this.findDoctorEntity(doctorId);
     return this.doctorBreaksRepository.find({
@@ -390,10 +364,6 @@ export class UsersService {
       throw new NotFoundException('Doctor break not found');
     }
   }
-
-  // ---------------------------------------------------------------------------------
-  // Private helpers
-  // ---------------------------------------------------------------------------------
 
   private async findDoctorEntity(id: string): Promise<Doctor> {
     const doctor = await this.doctorsRepository.findOne({ where: { id }, relations: ['branch'] });

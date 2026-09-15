@@ -24,22 +24,11 @@ import { QueryPurchaseOrdersDto } from '@/modules/catalog/presentation/dto/query
 const SORTABLE_COLUMNS = new Set(['orderDate', 'expectedDate', 'totalAmount', 'createdAt']);
 const DETAIL_RELATIONS = ['items', 'items.item', 'supplier', 'branch'];
 
-/**
- * Trang thai NGUOI DUNG duoc tu dat. `PARTIALLY_RECEIVED`/`RECEIVED` khong nam trong
- * danh sach: chung duoc suy ra tu `receivedQuantity` cua cac dong (xem `syncStatus`),
- * cho dat tay thi trang thai va so lieu se noi nhau.
- */
 const USER_SETTABLE_STATUSES: readonly PurchaseOrderStatus[] = [
   PurchaseOrderStatus.ORDERED,
   PurchaseOrderStatus.CANCELLED,
 ];
 
-/**
- * Don dat hang - SRS UC-05.
- *
- * Service nay KHONG cham vao ton kho. Dat hang khong lam thay doi ton; chi phieu nhap
- * (`GoodsReceiptsService`, P6-T5) moi lam, va no di qua `InventoryService`.
- */
 @Injectable()
 export class PurchaseOrdersService {
   constructor(
@@ -114,13 +103,6 @@ export class PurchaseOrdersService {
     return order;
   }
 
-  /**
-   * Sua don.
-   *
-   * Acceptance P6-T4: don `RECEIVED` khong sua duoc nua - va `CANCELLED` cung vay.
-   * Rieng cac dong hang chi sua duoc khi don con `DRAFT`: don da gui nha cung cap ma
-   * doi so luong thi ban cua ta va ban ho dang cam se khac nhau.
-   */
   async update(id: string, dto: UpdatePurchaseOrderDto): Promise<PurchaseOrder> {
     const order = await this.findOne(id);
     this.assertOpen(order);
@@ -177,13 +159,6 @@ export class PurchaseOrdersService {
     await this.ordersRepository.softDelete(id);
   }
 
-  /**
-   * Tinh lai trang thai don tu so da nhan cua tung dong - goi tu `GoodsReceiptsService`
-   * sau moi phieu nhap, trong CUNG transaction cua phieu do.
-   *
-   * Don da huy giu nguyen `CANCELLED`: nhan hang cua mot don da huy la tinh huong can
-   * nguoi that xu ly, khong duoc am tham hoi sinh don.
-   */
   async syncStatus(em: EntityManager, purchaseOrderId: string): Promise<PurchaseOrderStatus> {
     const order = await em.findOneOrFail(PurchaseOrder, { where: { id: purchaseOrderId } });
     if (order.status === PurchaseOrderStatus.CANCELLED) {
@@ -205,8 +180,6 @@ export class PurchaseOrdersService {
     }
     return next;
   }
-
-  // ------------------------------------------------------------------ Ben trong
 
   private assertOpen(order: PurchaseOrder): void {
     if (CLOSED_PURCHASE_ORDER_STATUSES.includes(order.status)) {

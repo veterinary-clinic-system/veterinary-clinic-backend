@@ -12,14 +12,12 @@ import {
 } from 'class-validator';
 import { ParseOptionalBoolean } from './transforms';
 
-/**
- * PATCH /catalog/medications/:id - every field optional. `itemName`/`describe`/
- * `unitPrice` belong to the backing Item row; `unit`/`activeIngredient` belong to the
- * Medication row. Both are written in one transaction (medications.service.ts
- * `update()`). `active` is applied to BOTH rows, same reasoning as UpdateServiceDto.
- * Pass `null` for `describe` / `activeIngredient` to explicitly clear them.
- */
 export class UpdateMedicationDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  imageUrl?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(255)
@@ -50,9 +48,6 @@ export class UpdateMedicationDto {
   @IsBoolean()
   active?: boolean;
 
-  // ------------------------------------------------------------------ P5-T4 (FR-15)
-
-  /** Danh muc (FR-15/FR-16) - nam tren `Item`. `null` de go khoi danh muc. */
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
   @IsUUID()

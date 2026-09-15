@@ -16,7 +16,6 @@ async function bootstrap() {
   app.use(helmet({ crossOriginResourcePolicy: false }));
   app.enableCors({ origin: config.get<string>('app.corsOrigin'), credentials: true });
 
-  // Uploaded pet/symptom/exam files (local-disk volume, Section 2) served as static assets.
   app.useStaticAssets(join(process.cwd(), config.get<string>('files.storageRoot')!), {
     prefix: '/uploads',
   });
@@ -25,28 +24,10 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      // NOT forbidNonWhitelisted: several list endpoints bind `@Query() pagination:
-      // PaginationQueryDto` alongside separate `@Query('branchId')`-style params in the
-      // same handler (see AppointmentsController.listForStaff, UsersController.findAll).
-      // Nest's ValidationPipe validates that DTO binding against the *entire* raw query
-      // string, so with forbidNonWhitelisted on, any real filter param (branchId, role,
-      // status, ...) would be rejected as "should not exist" on PaginationQueryDto.
-      // `whitelist: true` alone still strips unknown properties from the DTO instance
-      // (so it can't be used to smuggle unexpected fields into a service), it just
-      // doesn't hard-fail the request over it.
+
       transform: true,
       transformOptions: { enableImplicitConversion: true },
-      // Mot loi cho MOI truong, thay vi doi het luat cua truong do. Bo trong `reason`
-      // truoc day tra ve ca ba dong - trong do co "Ly do huy khong duoc vuot qua 500 ky
-      // tu" cho mot gia tri khong ton tai, doc nhu loi cua he thong chu khong phai loi
-      // cua nguoi nhap. Cac truong KHAC van bao loi day du.
-      //
-      // KHONG dung `stopAtFirstError` de lam viec do (P10-T8): co ay de chinh
-      // class-validator chon luat nao duoc bao, va no chon theo thu tu NGUOC voi thu tu
-      // khai bao decorator. Ket qua la thong diep phu thuoc vao viec `@MaxLength` duoc
-      // go tren hay duoi `@IsNotEmpty` - mot chi tiet khong ai nho, va da tung cho ra
-      // "note không được vượt quá 500 ký tự" cho mot truong bo trong. Bo dinh dang o
-      // duoi chon theo mot bang uu tien co dinh, giong nhau o moi DTO.
+
       exceptionFactory: formatValidationErrors,
     }),
   );
@@ -62,7 +43,7 @@ async function bootstrap() {
 
   const port = config.get<number>('app.port')!;
   await app.listen(port);
-  // eslint-disable-next-line no-console
+  
   console.log(
     `veterinary-clinic-backend listening on http://localhost:${port}/${config.get('app.apiPrefix')}`,
   );

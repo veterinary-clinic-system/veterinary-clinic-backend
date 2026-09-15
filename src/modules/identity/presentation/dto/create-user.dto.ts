@@ -15,21 +15,16 @@ import {
 import { Role } from '@/shared/common/enums/role.enum';
 import { Specialization } from '@/shared/common/enums/specialization.enum';
 
-/**
- * Admin-only staff account creation (DOCTOR/RECEPTIONIST/ADMIN). PetOwner accounts are
- * never created through this endpoint - they come from the public booking flow or
- * self-registration (see AuthService.registerPetOwner). `branchId` is required for
- * DOCTOR/RECEPTIONIST (both are branch-scoped per the domain rules) and is ignored/forced
- * to null for ADMIN (global/HQ) by UsersService. `yearOfStart`/`specialization` only
- * matter when `role` is DOCTOR, in which case UsersService also creates the linked
- * `Doctor` clinical-profile row in the same transaction as the `User` insert.
- */
 export class CreateUserDto {
   @IsPhoneNumber('VN')
   phone: string;
 
   @IsString()
   fullName: string;
+
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string;
 
   @IsOptional()
   @IsEmail()
@@ -39,8 +34,8 @@ export class CreateUserDto {
   @MinLength(6)
   password: string;
 
-  @IsIn([Role.ADMIN, Role.DOCTOR, Role.RECEPTIONIST], {
-    message: 'role must be one of the following values: ADMIN, DOCTOR, RECEPTIONIST',
+  @IsIn([Role.ADMIN, Role.MANAGER, Role.DOCTOR, Role.RECEPTIONIST, Role.PHARMACIST, Role.STAFF], {
+    message: 'Vai tro nhan vien khong hop le',
   })
   role: Role;
 

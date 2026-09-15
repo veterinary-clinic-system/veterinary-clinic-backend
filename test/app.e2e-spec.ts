@@ -3,12 +3,6 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 
-/**
- * Smoke test for the whole HTTP stack (routing, global guards, global pipes). Requires
- * a real Postgres + Redis reachable via the same env vars the app itself uses (.env) -
- * point it at a disposable/test database, not production data, per CLAUDE.md's local
- * setup instructions.
- */
 describe('AppModule (e2e)', () => {
   let app: INestApplication;
 

@@ -14,7 +14,6 @@ import {
 import { EmployeeStatus } from '@/shared/common/enums/employee-status.enum';
 import { Role } from '@/shared/common/enums/role.enum';
 
-/** Tuy chon tao kem tai khoan dang nhap cho nhan vien. */
 export class CreateEmployeeAccountDto {
   @IsEnum(Role)
   role: Role;
@@ -25,6 +24,11 @@ export class CreateEmployeeAccountDto {
 }
 
 export class CreateEmployeeDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  avatarUrl?: string;
+
   @IsString()
   @MinLength(2)
   @MaxLength(255)
@@ -62,10 +66,6 @@ export class CreateEmployeeDto {
   @IsString()
   note?: string;
 
-  /**
-   * Bo trong = tao ho so nhan su thuan, khong co tai khoan dang nhap. Rat nhieu nhan
-   * vien khong bao gio dung phan mem - xem ghi chu trong employee.entity.ts.
-   */
   @IsOptional()
   @ValidateNested()
   @Type(() => CreateEmployeeAccountDto)

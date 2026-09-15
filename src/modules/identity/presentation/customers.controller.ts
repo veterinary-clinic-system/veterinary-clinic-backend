@@ -9,22 +9,6 @@ import { QueryCustomersDto } from './dto/query-customers.dto';
 import { Audit } from '@/shared/common/decorators/audit.decorator';
 import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
-/**
- * Ho so khach hang (Role.PET_OWNER) nhin tu quay le tan.
- *
- * Tach khoi `UsersController` co chu dich: `UsersController` la CRUD tai khoan NHAN SU
- * cua Admin (tao tai khoan, gan chi nhanh, xep ca bac si), con day la nghiep vu KHACH
- * HANG cua le tan - khac quyen, khac bo loc, khac du lieu tra ve (so thu cung, lich su
- * giao dich). `GET /users/pet-owners` cu van giu nguyen vi Combobox tim nhanh trong man
- * hinh dat lich dang dung no.
- *
- * KHONG co route DELETE: theo rang buoc R6 (Phan V.4) du lieu y te khong duoc xoa cung,
- * va toan bo lich su kham/hoa don deu tro ve `users.id`. "Xoa khach hang" trong nghiep
- * vu chinh la `POST :id/deactivate`.
- *
- * Quyen: dieu khien hoan toan bang `@RequirePermissions` (ma tran `role_permissions`),
- * khong con `@Roles` - xem ghi chu ve nguyen tac nay trong permissions.controller.ts.
- */
 @ApiTags('customers')
 @Controller('customers')
 export class CustomersController {
@@ -55,21 +39,18 @@ export class CustomersController {
     return this.customersService.findPets(id);
   }
 
-  /** Tab "Lich hen" cua ho so khach (FR-03-04). */
   @RequirePermissions(Permission.CUSTOMER_VIEW, Permission.APPOINTMENT_VIEW)
   @Get(':id/appointments')
   findAppointments(@Param('id', ParseUUIDPipe) id: string) {
     return this.customersService.findAppointments(id);
   }
 
-  /** Tab "Lich su kham" cua ho so khach (FR-03-04). */
   @RequirePermissions(Permission.CUSTOMER_VIEW, Permission.MEDICAL_RECORD_VIEW)
   @Get(':id/medical-history')
   findMedicalHistory(@Param('id', ParseUUIDPipe) id: string) {
     return this.customersService.findMedicalHistory(id);
   }
 
-  /** Lich su mua hang tai quay (P8-T9) - tach khoi lich su giao dich kham o duoi. */
   @RequirePermissions(Permission.CUSTOMER_VIEW, Permission.INVOICE_VIEW)
   @Get(':id/purchases')
   findPurchases(@Param('id', ParseUUIDPipe) id: string) {
@@ -89,7 +70,6 @@ export class CustomersController {
     return this.customersService.update(id, dto);
   }
 
-  /** "Xoa" khach hang trong nghiep vu = ngung hoat dong, nen dung quyen CUSTOMER_DELETE. */
   @RequirePermissions(Permission.CUSTOMER_DELETE)
   @Audit({ action: AuditAction.DELETE, entity: 'User' })
   @Post(':id/deactivate')

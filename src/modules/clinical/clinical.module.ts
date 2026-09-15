@@ -50,11 +50,9 @@ import { VaccinationReminderService } from '@/modules/clinical/application/vacci
       Medication,
       Vaccine,
     ]),
-    // P7: don thuoc tru kho khi cap phat. P9: tiem vaccine cung vay. Chi duoc di qua
-    // barrel `catalog/application` (tuc `InventoryService`) - ghi thang vao
-    // `inventory_items` la dieu P6 cam.
+
     CatalogModule,
-    // P9-T4: nhac lich tiem ghi vao outbox, worker san co gui - khong gui thang.
+    
     NotificationModule,
   ],
   controllers: [

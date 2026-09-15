@@ -16,7 +16,6 @@ export class BranchesService {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  /** Public branch list (marketing site / booking flow) - active branches only. */
   findAllPublic(): Promise<Branch[]> {
     return this.branchesRepository.find({
       where: { active: true },
@@ -25,7 +24,6 @@ export class BranchesService {
     });
   }
 
-  /** Admin management screen - every branch, including inactive ones. */
   findAllAdmin(): Promise<Branch[]> {
     return this.branchesRepository.find({
       relations: ['openingHours'],
@@ -69,15 +67,8 @@ export class BranchesService {
     return this.findOne(id);
   }
 
-  /**
-   * Replaces a branch's entire weekly schedule in one call (delete-all-then-insert, inside
-   * a transaction) so the client never has to diff individual rows - it just posts the
-   * full week it wants. `dayOfWeek`/`openTime`/`closeTime` shape is already validated by
-   * `OperatingHourDto`; `openTime < closeTime` is re-checked here per row since that's a
-   * cross-field rule class-validator decorators alone can't express cleanly.
-   */
   async replaceOpeningHours(branchId: string, hours: OperatingHourDto[]): Promise<OperatingHour[]> {
-    await this.findOne(branchId); // 404s if the branch doesn't exist
+    await this.findOne(branchId); 
 
     for (const hour of hours) {
       if (hour.openTime >= hour.closeTime) {

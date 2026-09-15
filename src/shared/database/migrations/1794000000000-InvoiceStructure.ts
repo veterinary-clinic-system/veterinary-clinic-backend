@@ -1,34 +1,10 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Noi long cau truc Invoice - P8-T1, SRS FR-20.
- *
- * DAY LA THAY DOI PHA VO DUY NHAT CUA CA KE HOACH 10 PHASE, nen no di mot minh trong
- * mot migration rieng. `invoices.appointment_id` dang la NOT NULL + UNIQUE; POS ban cho
- * khach vang lai khong co lich hen nao de gan vao.
- *
- * Luat nghiep vu "mot lich hen chi mot hoa don" KHONG bi noi long - no chuyen tu rang
- * buoc UNIQUE sang chi muc unique CO DIEU KIEN. Hai hoa don POS cung mang NULL khong va
- * nhau (Postgres khong coi hai NULL la trung), nhung viet dieu kien ra van tot hon dua
- * vao dac tinh do: y dinh doc duoc ngay tren dinh nghia chi muc.
- *
- * BACKFILL PHAI KHONG LECH MOT DONG NAO. Bon con so tien duoc chot cung tu chinh cac
- * dong hoa don dang co (`SUM(price x quantity)`), giam gia va thue = 0 - tuc la dung so
- * ma man hinh hoa don van dang tinh dong va hien ra hom nay. Sau migration nay, moi cho
- * doc tien phai doc `total_amount`, khong tinh lai tu `items` nua.
- *
- * `invoice_code` duoc cap theo THU TU THOI GIAN TAO (`ORDER BY created_at`) chu khong
- * de `ALTER TABLE ... ADD COLUMN DEFAULT nextval(...)` tu dien: thu tu rewrite cua
- * Postgres la thu tu vat ly cua bang, nen ma hoa don se nhay lung tung so voi ngay lap.
- */
 export class InvoiceStructure1794000000000 implements MigrationInterface {
   name = 'InvoiceStructure1794000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // ------------------------------------------------- 1. Noi rang buoc appointment_id
 
-    // Ten rang buoc UNIQUE do TypeORM tu sinh (`REL_...`), khac nhau giua cac moi truong
-    // - tra ten tu catalog thay vi go cung mot chuoi bam.
     await queryRunner.query(`
       DO $$
       DECLARE constraint_name text;
@@ -55,8 +31,6 @@ export class InvoiceStructure1794000000000 implements MigrationInterface {
       WHERE "appointment_id" IS NOT NULL AND "deleted_at" IS NULL
     `);
 
-    // -------------------------------------------------------------- 2. Cot moi
-
     await queryRunner.query(`
       DO $$ BEGIN
         CREATE TYPE "invoices_source_enum" AS ENUM ('CLINIC', 'POS');
@@ -75,9 +49,6 @@ export class InvoiceStructure1794000000000 implements MigrationInterface {
         ADD COLUMN IF NOT EXISTS "total_amount"     bigint NOT NULL DEFAULT 0
     `);
 
-    // ------------------------------------------------------------- 3. Backfill
-
-    // Ma hoa don theo thu tu lap - xem comment dau lop.
     await queryRunner.query(`CREATE SEQUENCE IF NOT EXISTS "invoice_code_seq" START 1`);
     await queryRunner.query(`
       UPDATE "invoices" AS i
@@ -89,8 +60,6 @@ export class InvoiceStructure1794000000000 implements MigrationInterface {
       WHERE i."id" = numbered."id"
     `);
 
-    // Khach hang + chi nhanh cua hoa don kham: lay qua lich hen. Moi hoa don co truoc
-    // P8 deu co lich hen, nen sau buoc nay khong con dong nao thieu `branch_id`.
     await queryRunner.query(`
       UPDATE "invoices" AS i
       SET "customer_id" = p."owner_id",
@@ -100,7 +69,6 @@ export class InvoiceStructure1794000000000 implements MigrationInterface {
       WHERE a."id" = i."appointment_id"
     `);
 
-    // Chot cung so tien tu chinh cac dong dang co - dung so man hinh dang hien.
     await queryRunner.query(`
       UPDATE "invoices" AS i
       SET "subtotal"     = COALESCE(line.total, 0),
@@ -113,8 +81,6 @@ export class InvoiceStructure1794000000000 implements MigrationInterface {
       ) AS line
       WHERE line."invoice_id" = i."id"
     `);
-
-    // ------------------------------------------------- 4. Chot cac rang buoc con lai
 
     await queryRunner.query(`
       ALTER TABLE "invoices"
@@ -139,8 +105,6 @@ export class InvoiceStructure1794000000000 implements MigrationInterface {
           CHECK ("total_amount" = "subtotal" - "discount_amount" + "tax_amount")
     `);
 
-    // Hoa don POS luon phai co gio hang cua no; hoa don kham luon phai co lich hen.
-    // Rang buoc nay la cai giu cho `source` khong bao gio noi doi ve nguon goc.
     await queryRunner.query(`
       ALTER TABLE "invoices"
         ADD CONSTRAINT "chk_invoices_source_matches_appointment"
@@ -190,9 +154,6 @@ export class InvoiceStructure1794000000000 implements MigrationInterface {
     await queryRunner.query(`DROP TYPE IF EXISTS "invoices_source_enum"`);
     await queryRunner.query(`DROP SEQUENCE IF EXISTS "invoice_code_seq"`);
 
-    // Quay ve NOT NULL + UNIQUE chi lam duoc khi chua co hoa don POS nao. Neu da co thi
-    // du lieu do phai duoc xu ly bang tay truoc - mot migration khong duoc tu quyet dinh
-    // xoa hoa don ban hang.
     await queryRunner.query(`DROP INDEX IF EXISTS "uq_invoices_appointment"`);
     await queryRunner.query(`ALTER TABLE "invoices" ALTER COLUMN "appointment_id" SET NOT NULL`);
     await queryRunner.query(`

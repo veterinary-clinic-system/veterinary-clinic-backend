@@ -7,10 +7,6 @@ import { RequirePermissions } from '@/shared/common/decorators/require-permissio
 import { Permission } from '@/shared/common/enums/permission.enum';
 import { PrescreeningService } from '@/modules/triage/application/prescreening.service';
 
-/**
- * Tien chan doan AI la phan MO RONG ngoai SRS, gan chat voi lich hen nen dung chung
- * quyen `APPOINTMENT_VIEW` thay vi mo them mot nhom quyen rieng.
- */
 @ApiTags('prescreening')
 @Controller('appointments/:appointmentId/prescreening')
 @RequirePermissions(Permission.APPOINTMENT_VIEW)
@@ -26,7 +22,6 @@ export class PrescreeningController {
     return this.prescreeningService.findByAppointment(appointmentId);
   }
 
-  /** Re-runs the AI pipeline, e.g. after the receptionist adds late-arriving symptom photos. */
   @Post('run')
   async run(@Param('appointmentId', ParseUUIDPipe) appointmentId: string) {
     const appointment = await this.appointmentsRepository.findOne({

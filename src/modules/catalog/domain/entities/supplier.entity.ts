@@ -1,16 +1,9 @@
 import { Column, Entity } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
 
-/**
- * Nha cung cap - SRS FR-17.
- *
- * DAT TRONG `catalog` chu khong tach module `procurement` rieng. P6 se them
- * PurchaseOrder/GoodsReceipt; neu luc do thay phinh thi tach mot lan, con hon tao mot
- * module rong tu gio roi phai di lai qua no de doc mot bang duy nhat.
- */
 @Entity({ name: 'suppliers' })
 export class Supplier extends BaseEntity {
-  /** Ma nghiep vu (NCC0001) - do trigger `trg_assign_supplier_code` cap khi INSERT. */
+  
   @Column({ name: 'supplier_code', length: 32 })
   supplierCode: string;
 
@@ -26,7 +19,6 @@ export class Supplier extends BaseEntity {
   @Column({ name: 'address', type: 'text', nullable: true })
   address: string | null;
 
-  /** Nguoi lien he truc tiep ben nha cung cap. */
   @Column({ name: 'contact_person', type: 'varchar', length: 255, nullable: true })
   contactPerson: string | null;
 

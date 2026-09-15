@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  ConflictException,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@/shared/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/shared/common/decorators/require-permissions.decorator';
@@ -12,6 +23,10 @@ import { CancelInvoiceDto, RefundInvoiceDto } from './dto/refund-invoice.dto';
 import { ReplaceInvoiceItemsDto } from './dto/replace-invoice-items.dto';
 import { Audit } from '@/shared/common/decorators/audit.decorator';
 import { AuditAction } from '@/shared/common/enums/audit-action.enum';
+import PDFDocument from 'pdfkit';
+import type { Response } from 'express';
+import { InvoiceStatus } from '@/shared/common/enums/invoice-status.enum';
+import { renderInvoiceReceiptPdf } from '@/modules/billing/infrastructure/invoice-receipt-pdf.builder';
 
 @ApiTags('billing')
 @Controller('billing')
@@ -33,9 +48,6 @@ export class BillingController {
     return this.billingService.findAll(query);
   }
 
-  // Registered before ':id' - same convention as ExaminationsController - though Nest's
-  // router already disambiguates these by segment count (this path has one extra
-  // segment), so ordering here is for readability, not correctness.
   @RequirePermissions(Permission.INVOICE_VIEW)
   @Get('invoices/by-appointment/:appointmentId')
   findByAppointment(@Param('appointmentId', ParseUUIDPipe) appointmentId: string) {
@@ -59,20 +71,31 @@ export class BillingController {
     return this.billingService.pay(id, dto, actor.userId);
   }
 
-  /** Cac lan tra cua mot hoa don - FR-21. Cu nhat truoc, gom ca dong hoan tien. */
   @RequirePermissions(Permission.INVOICE_VIEW)
   @Get('invoices/:id/payments')
   findPayments(@Param('id', ParseUUIDPipe) id: string) {
     return this.paymentsService.findByInvoice(id);
   }
 
-  /**
-   * Sua cac dong hoa don - chi khi CHUA thu dong nao (BR-14).
-   *
-   * Dung `INVOICE_CREATE` chu khong them mot quyen rieng: ai lap duoc hoa don thi sua
-   * duoc hoa don chua thanh toan cua chinh minh, con hoa don da thu tien thi khong ai
-   * sua duoc ca - hang rao that nam o trang thai, khong o ma tran quyen.
-   */
+  @RequirePermissions(Permission.INVOICE_VIEW)
+  @Get('invoices/:id/receipt.pdf')
+  async receipt(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: false }) res: Response,
+  ): Promise<void> {
+    const invoice = await this.billingService.findOne(id);
+    if (invoice.status !== InvoiceStatus.PAID) {
+      throw new ConflictException('Chỉ xuất biên lai cho hóa đơn đã thanh toán đủ');
+    }
+    const payments = await this.paymentsService.findByInvoice(id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="receipt-${invoice.invoiceCode}.pdf"`);
+    const doc = new PDFDocument({ margin: 50 });
+    doc.pipe(res);
+    renderInvoiceReceiptPdf(doc, invoice, payments);
+    doc.end();
+  }
+
   @RequirePermissions(Permission.INVOICE_CREATE)
   @Audit({ action: AuditAction.UPDATE, entity: 'Invoice' })
   @Patch('invoices/:id/items')
@@ -80,7 +103,6 @@ export class BillingController {
     return this.billingService.replaceItems(id, dto.items);
   }
 
-  /** Hoan tien - BR-14. `PAYMENT_REFUND` chi MANAGER/ADMIN co (P8-T7). */
   @RequirePermissions(Permission.PAYMENT_REFUND)
   @Audit({ action: AuditAction.PAYMENT, entity: 'Invoice' })
   @Post('invoices/:id/refund')
@@ -92,7 +114,6 @@ export class BillingController {
     return this.billingService.refund(id, dto, actor.userId);
   }
 
-  /** Huy hoa don - chi khi chua thu dong nao, nguoc lai 409 huong dan dung refund. */
   @RequirePermissions(Permission.INVOICE_CREATE)
   @Audit({ action: AuditAction.CANCEL, entity: 'Invoice' })
   @Post('invoices/:id/cancel')

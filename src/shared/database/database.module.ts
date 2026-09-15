@@ -17,8 +17,7 @@ import * as entities from './entity-registry';
         database: config.get<string>('database.database'),
         entities: Object.values(entities),
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
-        // Never true outside local experimentation: schema changes must go through
-        // migrations so seed data and other environments stay reproducible.
+
         synchronize: config.get<boolean>('database.synchronize'),
         logging: config.get<boolean>('database.logging'),
       }),

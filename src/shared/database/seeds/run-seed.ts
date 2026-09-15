@@ -46,28 +46,15 @@ import { DOCTOR_AVATAR_FILES, SPECIES_CATALOG } from './reference-data';
 config();
 
 const BCRYPT_ROUNDS = 12;
-const WEEKDAYS = [1, 2, 3, 4, 5]; // Mon-Fri (JS Date#getDay()) - Section 5.1: closed Sat/Sun.
+const WEEKDAYS = [1, 2, 3, 4, 5];
 
-/**
- * Idempotent-ish demo seed for `docker compose up` + `npm run migration:run` +
- * `npm run seed` (Section 4.2: "populate a reasonable amount of realistic seed data...
- * so the system is demoable immediately"). Not fully idempotent (re-running inserts
- * duplicate rows for anything without a unique constraint) - intended to run once
- * against a freshly-migrated, empty database.
- */
 async function seed() {
   await dataSource.initialize();
   console.log('Connected. Seeding...');
 
-  // ---------------------------------------------------------------- Species / Breeds
-  //
-  // Danh muc loai/giong day du hon (phan hoi nghiem thu: "Phan du lieu ve cac loai,
-  // giong hoi it. Tao them du lieu."). Bieu mau dat lich va bieu mau tiep nhan khach
-  // vang lai deu doc thang tu day, nen hai loai + nam giong la khong du de dung that.
   const speciesRepo = dataSource.getRepository(Species);
   const breedRepo = dataSource.getRepository(Breed);
 
-  /** Tra loai/giong theo ten de phan seed ben duoi khong phu thuoc vao thu tu mang. */
   const speciesByName = new Map<string, Species>();
   const breedByName = new Map<string, Breed>();
 
@@ -77,7 +64,7 @@ async function seed() {
     const saved = await breedRepo.save(
       entry.breeds.map((breedName) => ({ breedName, speciesId: species.id })),
     );
-    // Ten giong "Giong khac" lap lai o moi loai - khoa theo "Loai / Giong" cho chac.
+    
     saved.forEach((breed) => breedByName.set(`${entry.name}/${breed.breedName}`, breed));
   }
 
@@ -95,7 +82,6 @@ async function seed() {
   const britishShorthair = requireBreed('Mèo/British Shorthair');
   const persian = requireBreed('Mèo/Mèo Ba Tư (Persian)');
 
-  // ---------------------------------------------------------------------- Branches
   const branchRepo = dataSource.getRepository(Branch);
   const [branch1, branch2] = await branchRepo.save([
     {
@@ -122,7 +108,6 @@ async function seed() {
     await operatingHourRepo.save(rows);
   }
 
-  // -------------------------------------------------------------- Admin / Receptionist
   const userRepo = dataSource.getRepository(User);
   const adminPasswordHash = await bcrypt.hash(
     process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345',
@@ -155,10 +140,7 @@ async function seed() {
       role: Role.RECEPTIONIST,
       branchId: branch2.id,
     },
-    // Duoc si - them o P7. Quay thuoc la vai tro DUY NHAT duoc cap phat thuoc
-    // (`PRESCRIPTION_DISPENSE`), nen khong co tai khoan nay thi khong ai thu duoc man
-    // hinh quay thuoc ngoai ADMIN - ma ADMIN co toan quyen nen khong the tay the
-    // kiem tra cheo giua nguoi ke va nguoi cap.
+
     {
       phone: '0900000004',
       email: 'duocsi.q1@vetclinic.local',
@@ -169,13 +151,9 @@ async function seed() {
     },
   ]);
 
-  // -------------------------------------------------------------------------- Doctors
   const doctorRepo = dataSource.getRepository(Doctor);
   const shiftRepo = dataSource.getRepository(DoctorShift);
 
-  // `avatarUrl` tro toi anh MINH HOA trong `veterinary-clinic-web/public/doctors/`
-  // (hinh ve phang, khong phai nguoi that). Xem README trong thu muc do de biet cach
-  // thay bang anh chan dung that cua phong kham.
   const doctorSeeds = [
     {
       phone: '0900000010',
@@ -256,7 +234,6 @@ async function seed() {
     await shiftRepo.save(shiftRows);
   }
 
-  // ------------------------------------------------------------------------ Catalog
   const itemRepo = dataSource.getRepository(Item);
   const serviceRepo = dataSource.getRepository(Service);
   const medicationRepo = dataSource.getRepository(Medication);
@@ -332,8 +309,6 @@ async function seed() {
     );
   }
 
-  // Vaccine (P9-T1) - danh muc tiem chung. `speciesApplicable` rong o vaccine dai vi no
-  // dung cho moi loai; hai cai con lai gan dich danh cho va meo.
   const vaccineRepo = dataSource.getRepository(Vaccine);
   const vaccineSeeds = [
     {
@@ -389,17 +364,12 @@ async function seed() {
     const inventoryItems = await inventoryRepo.save(
       allItems.map((item) => ({ itemId: item.id, branchId: branch.id, inventoryQuantity: 50 })),
     );
-    // MOT LO CHO MOI DONG TON. Truoc P9 seed chi ghi `inventory_quantity` va bo trong
-    // `inventory_batches`, tuc la vi pham quyet dinh (B) cua P6: so tong la ban cache cua
-    // SUM(batches.quantity). Hau qua khong lo ra ngay - man hinh kho van hien 50 - nhung
-    // FEFO khong tim thay lo nao de xuat, nen cap phat thuoc, ban POS va tiem vaccine tren
-    // du lieu seed deu bao "khong du ton kho" du so tren man hinh la 50.
+
     await batchRepo.save(
       inventoryItems.map((inventoryItem) => ({
         inventoryItemId: inventoryItem.id,
         batchNo: 'SEED-001',
-        // Han dung con xa: lo seed khong duoc phep het han giua ky demo, va cung khong
-        // duoc "khong han" - de con cho ma kiem thu BR-11 nhin thay mot ngay that.
+
         expiryDate: '2028-12-31',
         quantity: 50,
         costPrice: 0,
@@ -407,7 +377,6 @@ async function seed() {
     );
   }
 
-  // ------------------------------------------------------------------------ Diseases
   const diseaseRepo = dataSource.getRepository(Disease);
   const diseases = await diseaseRepo.save([
     { diseaseName: 'Dị ứng da', commonSymptoms: [CommonSymptom.SKIN_ALLERGY] },
@@ -420,7 +389,6 @@ async function seed() {
     { diseaseName: 'Khám định kỳ', commonSymptoms: [] },
   ]);
 
-  // ------------------------------------------------------------------- Pet owners + pets
   const ownerPasswordHash = await bcrypt.hash('Owner@12345', BCRYPT_ROUNDS);
   const ownerSeeds = [
     { phone: '0911111111', fullName: 'Nguyễn Văn Bình', email: 'binh.nguyen@example.com' },
@@ -489,7 +457,6 @@ async function seed() {
     },
   ]);
 
-  // ------------------------------------------------------------------- Appointments
   const appointmentRepo = dataSource.getRepository(Appointment);
   const preScreeningRepo = dataSource.getRepository(PreScreeningResult);
   const medicalRecordRepo = dataSource.getRepository(MedicalRecord);
@@ -508,19 +475,17 @@ async function seed() {
     return date;
   }
 
-  /** Cot `date` cua Postgres (vi du `treatments.start_date`) nhan chuoi `YYYY-MM-DD`. */
   function toDateOnly(date: Date): string {
     const month = `${date.getMonth() + 1}`.padStart(2, '0');
     const day = `${date.getDate()}`.padStart(2, '0');
     return `${date.getFullYear()}-${month}-${day}`;
   }
 
-  // A completed visit from a few days ago, with a full exam + prescription + paid invoice.
   const pastAppointment = await appointmentRepo.save({
     doctorId: doctors[0].id,
     branchId: branch1.id,
     petId: pets[0].id,
-    serviceId: services[1].id, // Khám da liễu
+    serviceId: services[1].id, 
     startAt: atTime(-3, '09:00'),
     endAt: atTime(-3, '09:30'),
     status: AppointmentStatus.COMPLETED,
@@ -540,8 +505,7 @@ async function seed() {
     overallConfidence: 0.72,
     rawAiResponse: null,
   });
-  // Ho so benh an (P4) la lop boc ngoai: phieu kham la phan sinh hieu, con chan doan /
-  // dieu tri / don thuoc / xet nghiem deu treo duoi ho so.
+
   const pastRecord = await medicalRecordRepo.save({
     appointmentId: pastAppointment.id,
     petId: pets[0].id,
@@ -602,12 +566,11 @@ async function seed() {
     { invoiceId: pastInvoice.id, itemId: medications[1].item.id, price: 15_000, quantity: 5 },
   ]);
 
-  // An urgent (RED) walk-in from yesterday, completed, to show the triage queue in action.
   const urgentAppointment = await appointmentRepo.save({
     doctorId: doctors[2].id,
     branchId: branch2.id,
     petId: pets[4].id,
-    serviceId: services[3].id, // Phẫu thuật nhỏ
+    serviceId: services[3].id, 
     startAt: atTime(-1, '08:00'),
     endAt: atTime(-1, '09:00'),
     status: AppointmentStatus.COMPLETED,
@@ -628,7 +591,6 @@ async function seed() {
     rawAiResponse: null,
   });
 
-  // Upcoming appointments (PENDING/CONFIRMED) across different triage colors, for the calendar demo.
   await appointmentRepo.save([
     {
       doctorId: doctors[0].id,

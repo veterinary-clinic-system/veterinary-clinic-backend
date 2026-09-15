@@ -1,13 +1,4 @@
-/**
- * Danh muc loai va giong thu cung dung chung cho ca hai script seed.
- *
- * Tach ra file rieng vi `run-seed.ts` (CSDL trong) va `top-up-reference-data.ts` (CSDL
- * dang chay) deu can dung mot danh sach. Nhan doi no sang hai cho la hai cho phai nho
- * sua moi lan phong kham bo sung mot giong moi - va sau vai lan chung se lech nhau.
- *
- * Moi loai co mot muc "Giong khac / chua xac dinh": phan lon thu cung tai Viet Nam la
- * giong lai, va bat le tan chon mot giong sai con te hon la de ho chon "chua xac dinh".
- */
+
 export interface SpeciesCatalogEntry {
   name: string;
   breeds: string[];
@@ -121,11 +112,6 @@ export const SPECIES_CATALOG: SpeciesCatalogEntry[] = [
   },
 ];
 
-/**
- * Anh MINH HOA cua bac si (hinh ve phang, khong phai nguoi that) nam trong
- * `veterinary-clinic-web/public/doctors/`. Xem README o thu muc do de biet cach thay
- * bang anh chan dung that cua phong kham.
- */
 export const DOCTOR_AVATAR_FILES = [
   '/doctors/doctor-1.svg',
   '/doctors/doctor-2.svg',

@@ -8,25 +8,6 @@ import { InvoiceSource } from '@/shared/common/enums/invoice-source.enum';
 import { PaymentMethod } from '@/shared/common/enums/payment-method.enum';
 import { PosService } from './pos.service';
 
-/**
- * Test cho `PosService.checkout` - buoc tien va kho gap nhau (P8-T5, UC-04).
- *
- * KHONG dung CSDL, cung ly le voi `prescriptions.service.spec.ts` cua P7: cai can khang
- * dinh o day la LUAT DIEU PHOI, khong phai hanh vi cua Postgres. Bon dieu, deu quan sat
- * duoc qua `InventoryService` va `PaymentsService` gia:
- *
- *   1. Mot dong thieu ton -> KHONG dong nao bi tru va KHONG hoa don nao duoc lap
- *      (BR-09). Transaction that se rollback, nen mot test tich hop chi nhin ton cuoi
- *      cung co the KHONG bat duoc loi "kiem den dau tru den do".
- *   2. Gia tren hoa don la gia LUC THANH TOAN doc tu danh muc, khong phai gia da luu
- *      trong gio (acceptance P8-T5).
- *   3. Thu tu bat buoc: lap hoa don -> ghi tien -> tru kho (BR-12). Tru kho truoc khi
- *      biet tien co thu duoc khong la cach nhanh nhat de mat hang.
- *   4. Giam gia vuot tam tinh -> 409, khong tru kho (P8-T6).
- *
- * Phan con lai - rollback that va advisory lock chan hai quay ban cung mot mon cuoi
- * cung - can Postgres that moi kiem chung duoc; do la viec cua smoke test bang API that.
- */
 describe('PosService.checkout', () => {
   const CART_ID = 'cart-1';
   const BRANCH_ID = 'branch-1';
@@ -35,7 +16,7 @@ describe('PosService.checkout', () => {
     itemId: string;
     itemName: string;
     quantity: number;
-    /** Gia da luu trong gio - CO Y khac gia danh muc de test snapshot gia. */
+    
     cartPrice: number;
     catalogPrice: number;
     available: number;
@@ -164,7 +145,7 @@ describe('PosService.checkout', () => {
     const invoice = harness.savedInvoices[0];
     expect(invoice.source).toBe(InvoiceSource.POS);
     expect(invoice.appointmentId).toBeNull();
-    // 2 x 350 (gia danh muc) + 1 x 100 = 800, chu khong phai 2 x 300 + 100 = 700.
+    
     expect(invoice.subtotal).toBe(800);
     expect(invoice.totalAmount).toBe(800);
     expect(invoice.items?.map((line) => line.price)).toEqual([350, 100]);
@@ -206,10 +187,6 @@ describe('PosService.checkout', () => {
     expect(harness.recordedPayments[0].amount).toBe(600);
   });
 
-  /**
-   * Giam gia 100% van phai ban duoc. Truoc khi sua, checkout chet o buoc ghi tien:
-   * `PaymentsService.record` tu choi so tien 0, va ca don hang bi rollback.
-   */
   it('giam gia 100% -> khong ghi dong thanh toan nao nhung van tru kho va dong gio', async () => {
     const harness = buildHarness(twoLines, { discountAmount: 800 });
 

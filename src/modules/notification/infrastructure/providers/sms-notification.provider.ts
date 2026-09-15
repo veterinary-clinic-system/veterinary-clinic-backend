@@ -6,13 +6,6 @@ import {
   NotificationSendResult,
 } from '@/modules/notification/application/ports/notification.port';
 
-/**
- * Generic REST SMS gateway integration (the exact vendor - eSMS/Speedsms/Twilio/etc -
- * is a `SMS_API_URL` + API-key deployment detail, left open by prompt.md; this posts a
- * conventional {to, sender, message, apiKey} JSON body). Real credentials are required
- * to actually deliver anything; without them this fails closed with a clear error
- * rather than silently pretending to send.
- */
 @Injectable()
 export class SmsNotificationProvider implements NotificationProvider {
   private readonly logger = new Logger('NotificationProvider:sms');

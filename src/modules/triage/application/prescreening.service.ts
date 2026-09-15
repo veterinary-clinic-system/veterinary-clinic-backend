@@ -25,14 +25,6 @@ export class PrescreeningService {
     private readonly aiProvider: AiPredictionProvider,
   ) {}
 
-  /**
-   * Runs the AI pipeline for an appointment's symptom text/photos and stores the
-   * result. Called automatically right after a booking is created (AppointmentsService)
-   * and can be re-run manually (e.g. once photos are added) via the controller.
-   * Never throws on AI failure to the caller of `runForAppointmentSafely` - a booking
-   * must still succeed even if pre-screening is temporarily unavailable, per Section 6
-   * ("Doctor/Receptionist retain full authority... never treat the AI output as final").
-   */
   async runForAppointment(appointment: Appointment, pet: Pet): Promise<PreScreeningResult> {
     const symptomText = [appointment.commonSymptoms.join(', '), appointment.otherSymptoms ?? '']
       .filter(Boolean)
@@ -67,8 +59,6 @@ export class PrescreeningService {
     });
     const saved = await this.resultsRepository.save(result);
 
-    // Seed Appointment.priorityColor from the AI suggestion; staff remain free to
-    // override it afterwards via UpdateAppointmentDto - this only sets the starting point.
     await this.appointmentsRepository.update(appointment.id, {
       priorityColor: saved.aiPriorityColor,
     });
@@ -87,7 +77,10 @@ export class PrescreeningService {
   }
 
   async findByAppointment(appointmentId: string): Promise<PreScreeningResult> {
-    const result = await this.resultsRepository.findOne({ where: { appointmentId } });
+    const result = await this.resultsRepository.findOne({
+      where: { appointmentId },
+      relations: ['aiSuspectedDiseaseGroups'],
+    });
     if (!result) {
       throw new NotFoundException('No pre-screening result for this appointment yet');
     }

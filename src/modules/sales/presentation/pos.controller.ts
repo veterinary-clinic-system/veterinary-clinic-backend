@@ -24,20 +24,11 @@ import { QueryCartsDto } from './dto/query-carts.dto';
 import { SearchPosProductsDto } from './dto/search-pos-products.dto';
 import { SetCartDiscountDto } from './dto/set-cart-discount.dto';
 
-/**
- * Ban hang tai quay - SRS muc 15 (`/api/pos`), FR-19.
- *
- * Toan bo be mat nay dung MOT quyen `POS_SELL` (STAFF, RECEPTIONIST, MANAGER, ADMIN).
- * Khong tach quyen rieng cho "sua gio" va "thanh toan": o quay chi co mot nguoi lam ca
- * hai viec, tach ra chi tao ra mot ma tran quyen khong ai cau hinh dung. Cai PHAI tach
- * la hoan tien - no nam o `BillingController` voi `PAYMENT_REFUND`.
- */
 @ApiTags('pos')
 @Controller('pos')
 export class PosController {
   constructor(private readonly posService: PosService) {}
 
-  /** O tim san pham cua man hinh POS - tra ve SO BAN DUOC, khong phai so ton tong. */
   @RequirePermissions(Permission.POS_SELL)
   @Get('products')
   searchProducts(@Query() query: SearchPosProductsDto) {
@@ -87,7 +78,6 @@ export class PosController {
     return this.posService.removeItem(id, itemId);
   }
 
-  /** Giam gia thu cong muc gio hang - P8-T6. Nguoi ap duoc ghi lai cho audit (P10). */
   @RequirePermissions(Permission.POS_SELL)
   @Patch('carts/:id/discount')
   setDiscount(
@@ -98,18 +88,6 @@ export class PosController {
     return this.posService.setDiscount(id, dto, actor.userId);
   }
 
-  /**
-   * UC-04 - mot transaction: kiem ton, lap hoa don, ghi tien, tru kho.
-   *
-   * `@Audit` voi `snapshot: false` (P10-T8): thuc the bi tac dong la HOA DON vua duoc
-   * tao ra trong chinh handler nay, nen khong co gi de chup TRUOC - `:id` tren duong
-   * dan la gio hang chu khong phai hoa don. Interceptor tu lay id hoa don tu ket qua
-   * tra ve va ghi lai body cua request.
-   *
-   * Truoc P10-T8 endpoint nay KHONG sinh dong audit nao, du no la duong thu tien chinh
-   * cua ca he thong - FR-26 liet ke `PAYMENT` dich danh, va mot lan ban hang tai quay
-   * khong luu vet la dung cho kiem toan vien can nhin nhat.
-   */
   @RequirePermissions(Permission.POS_SELL)
   @Audit({ action: AuditAction.PAYMENT, entity: 'Invoice', snapshot: false })
   @Post('carts/:id/checkout')

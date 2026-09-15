@@ -11,19 +11,8 @@ import {
 import { Role, STAFF_ROLES } from '@/shared/common/enums/role.enum';
 import { REDIS_CLIENT } from '@/shared/redis/redis.constants';
 
-/**
- * TTL ngan co chu dich. Doi mot dong phan quyen la viec hiem (vai lan mot nam), nen
- * cache lau khong dang de danh doi voi rui ro "da go quyen roi ma nguoi do van thao
- * tac duoc". 60 giay la muc chap nhan duoc, va `setRolePermissions` con chu dong xoa
- * cache nen truong hop thuong gap la co hieu luc NGAY.
- *
- * Vi sao van can TTL du da chu dong xoa: he thong co the chay nhieu tien trinh API,
- * nhung Redis la dung chung nen viec xoa co hieu luc voi tat ca. TTL o day la luoi an
- * toan cho truong hop Redis bi khoi dong lai giua chung hoac lenh xoa that bai.
- */
 const CACHE_TTL_SECONDS = 60;
 
-/** Mot dong cua ma tran phan quyen, phuc vu man hinh quan tri. */
 export interface RolePermissionMatrixRow {
   role: Role;
   permissions: Permission[];
@@ -43,13 +32,6 @@ export class PermissionsService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
-  /**
-   * Tap quyen cua mot vai tro. Duoc goi tren MOI request co `@RequirePermissions`,
-   * nen bat buoc phai qua cache - neu khong, moi request se them mot truy van CSDL.
-   *
-   * Redis chet thi rot ve doc thang CSDL, khong chan request: phan quyen la duong di
-   * bat buoc cua moi thao tac, khong the phu thuoc vao mot thanh phan cache.
-   */
   async getPermissionsForRole(role: Role): Promise<Set<Permission>> {
     const cacheKey = this.cacheKey(role);
 
@@ -68,7 +50,6 @@ export class PermissionsService {
     return new Set(permissions);
   }
 
-  /** Ma tran day du cho man hinh quan tri - doc thang CSDL, khong qua cache. */
   async getMatrix(): Promise<RolePermissionMatrixRow[]> {
     const rows = await this.rolePermissionsRepository.find();
     return STAFF_ROLES.map((role) => ({
@@ -77,7 +58,6 @@ export class PermissionsService {
     }));
   }
 
-  /** Danh muc quyen kem cach nhom - phuc vu hien thi, khong phai du lieu CSDL. */
   getCatalog(): PermissionCatalogEntry[] {
     return Object.entries(PERMISSION_GROUPS).map(([group, permissions]) => ({
       group,
@@ -85,16 +65,6 @@ export class PermissionsService {
     }));
   }
 
-  /**
-   * Thay toan bo tap quyen cua mot vai tro (xoa het roi ghi lai) trong mot transaction.
-   *
-   * Hai rao chan co chu dich:
-   *   1. Khong sua duoc quyen cua ADMIN. BR-16 giao viec quan ly phan quyen cho Admin;
-   *      neu cho phep go quyen cua chinh Admin thi quan tri vien co the tu khoa minh
-   *      ra ngoai va khong con duong nao vao lai ngoai viec sua truc tiep CSDL.
-   *   2. Khong sua duoc quyen cua PET_OWNER: chu thu cung khong di qua endpoint nhan
-   *      vien nao, ma tran nay khong ap dung cho ho.
-   */
   async setRolePermissions(role: Role, permissions: Permission[]): Promise<Permission[]> {
     if (role === Role.ADMIN) {
       throw new BadRequestException(
@@ -121,7 +91,6 @@ export class PermissionsService {
     return unique;
   }
 
-  /** Tra mot vai tro ve ma tran mac dinh cua SRS (nut "khoi phuc mac dinh"). */
   async resetRoleToDefault(role: Role): Promise<Permission[]> {
     return this.setRolePermissions(role, DEFAULT_ROLE_PERMISSIONS[role] ?? []);
   }

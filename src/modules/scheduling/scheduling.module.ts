@@ -27,8 +27,6 @@ import { QueueService } from '@/modules/scheduling/application/queue.service';
       QueueEntry,
       User,
       Pet,
-      // Doc-only: doi chieu giong <-> loai khi tao ho so thu cung ngay trong luong dat
-      // lich / tiep nhan khach vang lai (muc 16 SRS).
       Breed,
       Doctor,
       Service,
