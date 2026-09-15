@@ -1,5 +1,15 @@
 import { plainToInstance } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  Min,
+  ValidateIf,
+  validateSync,
+} from 'class-validator';
 
 class EnvironmentVariables {
   @IsIn(['development', 'production', 'test'])
@@ -26,10 +36,21 @@ class EnvironmentVariables {
   @IsString()
   DB_DATABASE: string;
 
+  @IsOptional()
+  @IsString()
+  @Matches(/^rediss?:\/\/\S+$/, {
+    message: 'REDIS_URL must start with redis:// or rediss://',
+  })
+  REDIS_URL: string;
+
+  @ValidateIf((environment: EnvironmentVariables) => !environment.REDIS_URL)
   @IsString()
   REDIS_HOST: string;
 
+  @ValidateIf((environment: EnvironmentVariables) => !environment.REDIS_URL)
   @IsInt()
+  @Min(1)
+  @Max(65535)
   REDIS_PORT: number;
 
   @IsString()
