@@ -16,7 +16,9 @@ export interface DiagnosisRequest {
 export interface DiagnosisDisease {
   disease: string;
   disease_name?: string | null;
-  prevalence_rate: number;
+  prevalence_rate?: number;
+  /** Backward compatibility for the misspelling used by the old sample contract. */
+  revalence_rate?: number;
 }
 
 export interface DiagnosisDetailedResponse {

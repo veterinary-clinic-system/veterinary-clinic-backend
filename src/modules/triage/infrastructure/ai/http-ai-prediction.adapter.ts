@@ -106,12 +106,12 @@ export class HttpAiPredictionAdapter implements AiPredictionProvider {
     symptomLabels: Map<string, string>,
   ): AiTriageResult {
     const priorityColor = response.triage_result.color_code as PriorityColor;
-    const topConfidence = response.diseases[0]?.prevalence_rate ?? 0;
+    const topConfidence = predictionRate(response.diseases[0]);
     return {
       priorityColor,
       suspectedGroups: response.diseases.map((item) => ({
         name: item.disease_name?.trim() || item.disease,
-        confidence: item.prevalence_rate,
+        confidence: predictionRate(item),
       })),
       extractedKeywords: (response.compiled.symptoms ?? []).map((item) => {
         const label = symptomLabels.get(item.symptom);
@@ -132,6 +132,10 @@ export class HttpAiPredictionAdapter implements AiPredictionProvider {
       return new Map();
     }
   }
+}
+
+function predictionRate(item: DiagnosisDetailedResponse['diseases'][number] | undefined): number {
+  return item?.prevalence_rate ?? item?.revalence_rate ?? 0;
 }
 
 function extractPetContext(text: string): {
@@ -185,7 +189,7 @@ function buildChatReply(response: DiagnosisDetailedResponse): string {
   const color = response.triage_result.color_code as PriorityColor;
   const diseaseLines = response.diseases.slice(0, 3).map((item, index) => {
     const name = item.disease_name?.trim() || item.disease;
-    return `${index + 1}. ${name} (${Math.round(item.prevalence_rate * 100)}%)`;
+    return `${index + 1}. ${name} (${Math.round(predictionRate(item) * 100)}%)`;
   });
   const possibleDiseases = diseaseLines.length
     ? `\n\nCác khả năng tham khảo từ mô hình:\n${diseaseLines.join('\n')}`

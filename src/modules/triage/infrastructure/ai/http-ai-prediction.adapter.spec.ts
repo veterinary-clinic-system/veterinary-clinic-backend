@@ -106,6 +106,24 @@ describe('HttpAiPredictionAdapter', () => {
     expect(result.sessionId).toBeTruthy();
   });
 
+  it('accepts the legacy misspelled disease-rate field', async () => {
+    const { client, adapter } = setup();
+    client.diagnose.mockResolvedValue({
+      ...response,
+      diseases: [{ disease: 'DI001', disease_name: 'Viêm dạ dày', revalence_rate: 0.95 }],
+    });
+
+    const result = await adapter.triage({
+      symptomText: 'Nôn nhiều',
+      symptomCodes: ['SY025'],
+      photoUrls: [],
+      videoUrls: [],
+    });
+
+    expect(result.suspectedGroups[0].confidence).toBe(0.95);
+    expect(result.overallConfidence).toBe(0.95);
+  });
+
   it('sends doctor-confirmed diseases as ground truth for online learning', async () => {
     const { client, adapter } = setup();
 
