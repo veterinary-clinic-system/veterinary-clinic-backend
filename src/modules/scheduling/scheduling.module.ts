@@ -19,6 +19,7 @@ import { AppointmentsService } from '@/modules/scheduling/application/appointmen
 import { AvailabilityService } from '@/modules/scheduling/application/availability.service';
 import { PartyResolverService } from '@/modules/scheduling/application/party-resolver.service';
 import { QueueService } from '@/modules/scheduling/application/queue.service';
+import { BillingModule } from '@/modules/billing/billing.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { QueueService } from '@/modules/scheduling/application/queue.service';
     ]),
     NotificationModule,
     TriageModule,
+    BillingModule,
   ],
   controllers: [AppointmentsController, QueueController],
   providers: [AppointmentsService, AvailabilityService, PartyResolverService, QueueService],

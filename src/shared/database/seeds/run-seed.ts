@@ -19,6 +19,7 @@ import {
   MedicalRecord,
   Medication,
   OperatingHour,
+  Payment,
   Pet,
   PreScreeningResult,
   Prescription,
@@ -37,6 +38,8 @@ import { CommonSymptom } from '@/shared/common/enums/common-symptom.enum';
 import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import { AppointmentStatus } from '@/shared/common/enums/appointment-status.enum';
 import { PaymentMethod } from '@/shared/common/enums/payment-method.enum';
+import { PaymentStatus } from '@/shared/common/enums/payment-status.enum';
+import { InvoiceStatus } from '@/shared/common/enums/invoice-status.enum';
 import {
   DiagnosisSeverity,
   MedicalRecordStatus,
@@ -305,7 +308,14 @@ async function seed() {
       unitPrice: m.price,
     });
     medications.push(
-      await medicationRepo.save({ itemId: item.id, item, unit: m.unit, activeIngredient: null }),
+      await medicationRepo.save({
+        itemId: item.id,
+        item,
+        unit: m.unit,
+        activeIngredient: null,
+        costPrice: 0,
+        minimumStock: 0,
+      }),
     );
   }
 
@@ -353,6 +363,7 @@ async function seed() {
       intervalDays: v.intervalDays,
       boosterIntervalDays: v.boosterIntervalDays,
       speciesApplicable: v.species,
+      costPrice: 0,
       minimumStock: 5,
     });
   }
@@ -466,6 +477,7 @@ async function seed() {
   const prescriptionRepo = dataSource.getRepository(Prescription);
   const prescriptionItemRepo = dataSource.getRepository(PrescriptionItem);
   const invoiceRepo = dataSource.getRepository(Invoice);
+  const paymentRepo = dataSource.getRepository(Payment);
 
   function atTime(daysFromNow: number, hhmm: string): Date {
     const [h, m] = hhmm.split(':').map(Number);
@@ -557,6 +569,13 @@ async function seed() {
   });
   const pastInvoice = await invoiceRepo.save({
     appointmentId: pastAppointment.id,
+    customerId: owners[0].id,
+    branchId: branch1.id,
+    subtotal: 275_000,
+    discountAmount: 0,
+    taxAmount: 0,
+    totalAmount: 275_000,
+    status: InvoiceStatus.PAID,
     paymentMethod: PaymentMethod.CASH,
     paid: true,
     paidAt: atTime(-3, '09:35'),
@@ -565,6 +584,16 @@ async function seed() {
     { invoiceId: pastInvoice.id, itemId: services[1].item.id, price: 200_000, quantity: 1 },
     { invoiceId: pastInvoice.id, itemId: medications[1].item.id, price: 15_000, quantity: 5 },
   ]);
+  await paymentRepo.save({
+    invoiceId: pastInvoice.id,
+    amount: 275_000,
+    method: PaymentMethod.CASH,
+    status: PaymentStatus.SUCCESS,
+    paidAt: pastInvoice.paidAt,
+    referenceCode: 'SEED-CASH-001',
+    receivedByUserId: null,
+    note: 'Giao dịch mẫu được tạo bởi seed',
+  });
 
   const urgentAppointment = await appointmentRepo.save({
     doctorId: doctors[2].id,

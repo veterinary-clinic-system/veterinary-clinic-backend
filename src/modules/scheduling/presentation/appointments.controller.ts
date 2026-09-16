@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   ParseUUIDPipe,
@@ -31,6 +32,9 @@ import { QueryWeekDto } from './dto/query-week.dto';
 import { QueryDayDto, QueryMonthDto } from './dto/query-calendar.dto';
 import { Audit } from '@/shared/common/decorators/audit.decorator';
 import { AuditAction } from '@/shared/common/enums/audit-action.enum';
+import { BillingService } from '@/modules/billing/application/billing.service';
+import { SepayService } from '@/modules/billing/application/sepay.service';
+import { CreateBookingCheckoutDto } from './dto/create-booking-checkout.dto';
 
 @ApiTags('appointments')
 @Controller('appointments')
@@ -38,6 +42,8 @@ export class AppointmentsController {
   constructor(
     private readonly appointmentsService: AppointmentsService,
     private readonly partyResolver: PartyResolverService,
+    private readonly billingService: BillingService,
+    private readonly sepayService: SepayService,
   ) {}
 
   @Public()
@@ -46,6 +52,23 @@ export class AppointmentsController {
   @Post()
   createPublicBooking(@Body() dto: CreateBookingDto) {
     return this.appointmentsService.createBooking(dto, null);
+  }
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post(':id/checkout')
+  async createPublicBookingCheckout(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateBookingCheckoutDto,
+  ) {
+    const appointment = await this.appointmentsService.findOne(id);
+    if (this.normalizePhone(appointment.pet.owner.phone) !== this.normalizePhone(dto.phone)) {
+      throw new ForbiddenException('Số điện thoại không khớp với lịch hẹn');
+    }
+
+    const invoice = await this.billingService.generateForAppointment(id);
+    return this.sepayService.createQrTicket(invoice.id);
   }
 
   @RequirePermissions(Permission.APPOINTMENT_CREATE)
@@ -191,5 +214,9 @@ export class AppointmentsController {
     @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.appointmentsService.scheduleFollowUp(id, dto, actor);
+  }
+
+  private normalizePhone(phone: string): string {
+    return phone.replace(/\D/g, '').replace(/^84/, '0');
   }
 }

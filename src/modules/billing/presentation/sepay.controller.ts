@@ -50,6 +50,14 @@ export class SepayController {
     return this.sepayService.getTicketStatus(paymentId);
   }
 
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Get('public/tickets/:paymentId')
+  getPublicTicket(@Param('paymentId', ParseUUIDPipe) paymentId: string) {
+    return this.sepayService.getTicketStatus(paymentId);
+  }
+
   @RequirePermissions(Permission.INVOICE_VIEW)
   @Sse('tickets/:paymentId/events')
   ticketEvents(@Param('paymentId', ParseUUIDPipe) paymentId: string) {
