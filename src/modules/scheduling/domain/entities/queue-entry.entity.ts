@@ -72,6 +72,9 @@ export class QueueEntry extends BaseEntity {
   @Column({ name: 'photo_urls', type: 'text', array: true, default: [] })
   photoUrls: string[];
 
+  @Column({ name: 'video_urls', type: 'text', array: true, default: [] })
+  videoUrls: string[];
+
   @Column({ name: 'note', type: 'text', nullable: true })
   note: string | null;
 

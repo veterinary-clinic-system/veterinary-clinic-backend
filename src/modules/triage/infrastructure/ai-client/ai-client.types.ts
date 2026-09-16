@@ -1,16 +1,16 @@
-
 export interface DiagnosisRequest {
   'pet-info': {
     breed: string;
     specie?: string;
     gender: string;
-    weight: number;
-    age: number;
+    weight: number | null;
+    age: number | null;
   };
   symptoms: string[];
   describe?: string;
   images: string[];
   videos?: string[];
+  diseases?: string[];
 }
 
 export interface DiagnosisDisease {
@@ -31,4 +31,17 @@ export interface DiagnosisDetailedResponse {
     triage_result?: { color_code: string; reasoning: string };
   };
   weight_adjustments?: Array<Record<string, unknown>> | null;
+}
+
+export interface AiSymptomCatalogItem {
+  symptom_id: string;
+  symptom_name: string;
+  describe?: string | null;
+  common_symptom: boolean;
+}
+
+export interface AiDiseaseCatalogItem {
+  disease_id: string;
+  disease_name: string;
+  describe?: string | null;
 }

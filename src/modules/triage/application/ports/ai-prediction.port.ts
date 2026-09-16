@@ -4,7 +4,9 @@ export const AI_PREDICTION_PROVIDER = Symbol('AI_PREDICTION_PROVIDER');
 
 export interface AiTriageInput {
   symptomText: string;
+  symptomCodes: string[];
   photoUrls: string[];
+  videoUrls: string[];
   petSpecies?: string;
   petBreed?: string;
   petGender?: string;
@@ -22,12 +24,12 @@ export interface AiTriageResult {
   suspectedGroups: AiSuspectedGroup[];
   extractedKeywords: string[];
   nlpConfidence: number;
-  
+
   cvConfidence: number | null;
   overallConfidence: number;
-  
+
   raw: Record<string, unknown>;
-  
+
   modelVersion: string;
 }
 
@@ -46,4 +48,5 @@ export interface AiChatResult {
 export interface AiPredictionProvider {
   triage(input: AiTriageInput): Promise<AiTriageResult>;
   chat(input: AiChatInput): Promise<AiChatResult>;
+  learn(input: AiTriageInput, confirmedDiseaseNames: string[]): Promise<void>;
 }

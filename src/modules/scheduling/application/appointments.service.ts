@@ -61,12 +61,12 @@ const SORTABLE_COLUMNS = new Set(['startAt', 'endAt', 'status', 'priorityColor',
 export interface SlotAppointmentDetail {
   id: string;
   petName: string;
-  
+
   petBreedName: string | null;
   petSpeciesName: string | null;
   ownerName: string;
   ownerPhone: string;
-  
+
   serviceName: string | null;
   commonSymptoms: Appointment['commonSymptoms'];
   otherSymptoms: string | null;
@@ -88,8 +88,7 @@ function stripToFreeBusy(days: DayAvailability[], minStartAt: Date): DayAvailabi
       end: slot.end,
       startAt: slot.startAt,
       endAt: slot.endAt,
-      status:
-        slot.startAt.getTime() < minStartAt.getTime() ? SlotStatus.PAST : slot.status,
+      status: slot.startAt.getTime() < minStartAt.getTime() ? SlotStatus.PAST : slot.status,
     })),
   }));
 }
@@ -161,6 +160,7 @@ export class AppointmentsService {
           commonSymptoms: dto.commonSymptoms ?? [],
           otherSymptoms: dto.otherSymptoms ?? null,
           photoUrls: dto.photoUrls ?? [],
+          videoUrls: dto.videoUrls ?? [],
           address: dto.address ?? null,
         });
         const saved = await manager.save(entity);
@@ -193,7 +193,8 @@ export class AppointmentsService {
     if (
       appointment.commonSymptoms.length > 0 ||
       appointment.otherSymptoms ||
-      appointment.photoUrls.length > 0
+      appointment.photoUrls.length > 0 ||
+      appointment.videoUrls.length > 0
     ) {
       const petWithBreed = await this.petsRepository.findOne({
         where: { id: pet.id },
@@ -271,7 +272,7 @@ export class AppointmentsService {
       branchId?: string;
       doctorId?: string;
       status?: AppointmentStatus;
-      
+
       date?: string;
     },
   ): Promise<PaginatedResultDto<Appointment>> {
@@ -290,7 +291,6 @@ export class AppointmentsService {
       qb.andWhere('appointment.doctorId = :doctorId', { doctorId: query.doctorId });
     if (query.status) qb.andWhere('appointment.status = :status', { status: query.status });
     if (query.date) {
-
       qb.andWhere(
         "appointment.startAt >= CAST(:date AS date) AND appointment.startAt < CAST(:date AS date) + INTERVAL '1 day'",
         { date: query.date },
@@ -386,7 +386,14 @@ export class AppointmentsService {
     if (appointmentIds.length > 0) {
       const appointments = await this.appointmentsRepository.find({
         where: appointmentIds.map((id) => ({ id })),
-        relations: ['pet', 'pet.owner', 'pet.breed', 'pet.breed.species', 'service', 'service.item'],
+        relations: [
+          'pet',
+          'pet.owner',
+          'pet.breed',
+          'pet.breed.species',
+          'service',
+          'service.item',
+        ],
       });
       appointments.forEach((appointment) => byId.set(appointment.id, appointment));
     }
@@ -485,7 +492,6 @@ export class AppointmentsService {
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
       });
       if (dto.status) {
-        
         await this.availabilityService.invalidateDoctorDay(
           appointment.doctorId,
           appointment.branchId,
@@ -505,7 +511,7 @@ export class AppointmentsService {
     actor: AuthenticatedUser,
   ): Promise<Appointment> {
     if (actor.role === Role.PET_OWNER) {
-      await this.findOneForOwner(id, actor); 
+      await this.findOneForOwner(id, actor);
     }
     return this.finishAbnormally(id, AppointmentStatus.CANCELLED, dto.reason, actor);
   }
@@ -603,7 +609,7 @@ export class AppointmentsService {
       this.doctorBreaksRepository.create({
         doctorId: doctor.id,
         date: dto.date,
-        
+
         startTime: '00:00',
         endTime: '23:59',
         reason: dto.reason?.trim() || 'Bác sĩ nghỉ đột xuất',
@@ -630,7 +636,8 @@ export class AppointmentsService {
     }[] = [];
 
     for (const appointment of affected) {
-      const replacement = dto.reassign === false ? null : await this.findReplacementDoctor(appointment, doctor.id);
+      const replacement =
+        dto.reassign === false ? null : await this.findReplacementDoctor(appointment, doctor.id);
 
       if (!replacement) {
         unresolved.push({
@@ -643,7 +650,6 @@ export class AppointmentsService {
       }
 
       try {
-
         await this.update(appointment.id, { doctorId: replacement.id }, actor);
         reassigned.push({
           appointmentId: appointment.id,
@@ -755,7 +761,6 @@ export class AppointmentsService {
     endAt: Date,
     excludeAppointmentId?: string,
   ): Promise<void> {
-
     if (startAt.getTime() < Date.now()) {
       throw new BadRequestException('Không thể đặt lịch hẹn vào thời điểm trong quá khứ');
     }
@@ -803,7 +808,7 @@ export class AppointmentsService {
     appointment: Appointment,
     actor: AuthenticatedUser,
   ): Promise<void> {
-    if (actor.role === Role.PET_OWNER) return; 
+    if (actor.role === Role.PET_OWNER) return;
 
     const label = appointment.priorityColor ? ` Mức độ ưu tiên: ${appointment.priorityColor}.` : '';
     const message =

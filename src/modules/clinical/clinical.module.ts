@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CatalogModule } from '@/modules/catalog/catalog.module';
 import { NotificationModule } from '@/modules/notification/notification.module';
+import { TriageModule } from '@/modules/triage/triage.module';
 import { Medication } from '@/modules/catalog/domain/entities/medication.entity';
 import { Vaccine } from '@/modules/catalog/domain/entities/vaccine.entity';
 import { Examination } from '@/modules/clinical/domain/entities/examination.entity';
@@ -52,7 +53,8 @@ import { VaccinationReminderService } from '@/modules/clinical/application/vacci
     ]),
 
     CatalogModule,
-    
+    TriageModule,
+
     NotificationModule,
   ],
   controllers: [

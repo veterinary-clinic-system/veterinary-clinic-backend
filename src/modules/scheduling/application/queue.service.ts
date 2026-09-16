@@ -118,6 +118,8 @@ export class QueueService {
         priorityColor: dto.priorityColor ?? appointment.priorityColor,
         commonSymptoms: appointment.commonSymptoms,
         reason: appointment.otherSymptoms,
+        photoUrls: appointment.photoUrls,
+        videoUrls: appointment.videoUrls,
         note: dto.note ?? null,
         checkedInAt: new Date(),
         createdByUserId: actor.userId,
@@ -184,6 +186,7 @@ export class QueueService {
         reason: dto.reason ?? null,
         note: dto.note ?? null,
         photoUrls: dto.photoUrls ?? [],
+        videoUrls: dto.videoUrls ?? [],
         checkedInAt: new Date(),
         createdByUserId: actor.userId,
       });
@@ -213,9 +216,7 @@ export class QueueService {
           { doctorId: candidate.doctorId, startAt: candidate.startAt.toISOString() },
           actor,
         );
-      } catch {
-        
-      }
+      } catch {}
     }
 
     if (entry.priorityColor === PriorityColor.RED) {
@@ -257,7 +258,6 @@ export class QueueService {
 
     await mapAppointmentOverlapError(() =>
       this.dataSource.transaction(async (manager) => {
-
         await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [doctor.id]);
         await this.assertSlotIsFree(manager, doctor.id, startAt, endAt, entry.appointmentId);
 
@@ -285,6 +285,7 @@ export class QueueService {
               otherSymptoms: entry.reason,
 
               photoUrls: entry.photoUrls ?? [],
+              videoUrls: entry.videoUrls ?? [],
             }),
           );
           await manager.update(QueueEntry, entry.id, { appointmentId: appointment.id });
@@ -415,7 +416,7 @@ export class QueueService {
     const row = await manager
       .createQueryBuilder(QueueEntry, 'queue')
       .select('COALESCE(MAX(queue.ticket_number), 0)', 'max')
-      
+
       .withDeleted()
       .where('queue.branchId = :branchId', { branchId })
       .andWhere('queue.queueDate = :queueDate', { queueDate })
@@ -513,7 +514,6 @@ export class QueueService {
     });
 
     for (const victim of victims) {
-      
       if (victim.priorityColor === PriorityColor.RED) continue;
 
       const victimDuration = victim.service?.durationMinutes ?? 30;
@@ -526,11 +526,7 @@ export class QueueService {
       ).catch(() => null);
       if (!newStart || newStart.getTime() === freedStart.getTime()) continue;
 
-      await this.appointmentsService.update(
-        victim.id,
-        { startAt: newStart.toISOString() },
-        actor,
-      );
+      await this.appointmentsService.update(victim.id, { startAt: newStart.toISOString() }, actor);
 
       try {
         return await this.assignDoctor(
@@ -539,16 +535,13 @@ export class QueueService {
           actor,
         );
       } catch {
-
         try {
           await this.appointmentsService.update(
             victim.id,
             { startAt: freedStart.toISOString() },
             actor,
           );
-        } catch {
-
-        }
+        } catch {}
         continue;
       }
     }
@@ -570,7 +563,7 @@ export class QueueService {
 
     for (const slot of day.slots) {
       if (slot.status !== SlotStatus.FREE) continue;
-      
+
       if (slot.endAt.getTime() <= now.getTime()) continue;
 
       const covered = slotsCovering(

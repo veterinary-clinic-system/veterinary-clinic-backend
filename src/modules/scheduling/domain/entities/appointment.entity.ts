@@ -71,6 +71,9 @@ export class Appointment extends BaseEntity {
   @Column({ name: 'photo_urls', type: 'text', array: true, default: [] })
   photoUrls: string[];
 
+  @Column({ name: 'video_urls', type: 'text', array: true, default: [] })
+  videoUrls: string[];
+
   @Column({ type: 'enum', enum: CommonSymptom, array: true, default: [] })
   commonSymptoms: CommonSymptom[];
 

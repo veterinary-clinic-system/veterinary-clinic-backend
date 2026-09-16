@@ -20,7 +20,21 @@ describe('HttpAiPredictionAdapter', () => {
   };
 
   function setup() {
-    const client = { diagnose: jest.fn().mockResolvedValue(response) };
+    const client = {
+      diagnose: jest.fn().mockResolvedValue(response),
+      getSymptomLabels: jest.fn().mockResolvedValue(
+        new Map([
+          ['SY001', 'Chưa tiêm vaccin'],
+          ['SY002', 'Ăn bậy'],
+        ]),
+      ),
+      getDiseaseCodes: jest.fn().mockResolvedValue(
+        new Map([
+          ['viem da day', 'DI001'],
+          ['suy than cap', 'DI002'],
+        ]),
+      ),
+    };
     return {
       client,
       adapter: new HttpAiPredictionAdapter(client as unknown as AiClientService),
@@ -32,7 +46,9 @@ describe('HttpAiPredictionAdapter', () => {
 
     const result = await adapter.triage({
       symptomText: 'Nôn và bỏ ăn hai ngày',
+      symptomCodes: ['SY025', 'SY011'],
       photoUrls: ['https://example.test/pet.jpg'],
+      videoUrls: [],
       petSpecies: 'Chó',
       petBreed: 'Poodle',
       petGender: 'FEMALE',
@@ -42,13 +58,13 @@ describe('HttpAiPredictionAdapter', () => {
 
     expect(client.diagnose).toHaveBeenCalledWith({
       'pet-info': {
-        breed: 'Poodle',
-        specie: 'Chó',
-        gender: 'FEMALE',
+        breed: 'Chó',
+        specie: 'Poodle',
+        gender: 'F',
         weight: 5,
         age: 2,
       },
-      symptoms: [],
+      symptoms: ['SY025', 'SY011'],
       describe: 'Nôn và bỏ ăn hai ngày',
       images: ['https://example.test/pet.jpg'],
       videos: [],
@@ -58,7 +74,10 @@ describe('HttpAiPredictionAdapter', () => {
       { name: 'Viêm dạ dày', confidence: 0.82 },
       { name: 'DI002', confidence: 0.45 },
     ]);
-    expect(result.extractedKeywords).toEqual(['SY001', 'SY002']);
+    expect(result.extractedKeywords).toEqual([
+      'Chưa tiêm vaccin (SY001) - mức 2/3',
+      'Ăn bậy (SY002) - mức 1/3',
+    ]);
     expect(result.overallConfidence).toBe(0.82);
   });
 
@@ -73,8 +92,8 @@ describe('HttpAiPredictionAdapter', () => {
     expect(client.diagnose).toHaveBeenCalledWith(
       expect.objectContaining({
         'pet-info': expect.objectContaining({
-          specie: 'Chó',
-          gender: 'FEMALE',
+          breed: 'Chó',
+          gender: 'F',
           weight: 5,
           age: 2,
         }),
@@ -85,5 +104,26 @@ describe('HttpAiPredictionAdapter', () => {
     expect(result.reply).toContain('không thay thế chẩn đoán');
     expect(result.suggestBooking).toBe(true);
     expect(result.sessionId).toBeTruthy();
+  });
+
+  it('sends doctor-confirmed diseases as ground truth for online learning', async () => {
+    const { client, adapter } = setup();
+
+    await adapter.learn(
+      {
+        symptomText: 'Nôn và bỏ ăn hai ngày',
+        symptomCodes: ['SY025', 'SY011'],
+        photoUrls: [],
+        videoUrls: [],
+        petSpecies: 'Chó',
+        petBreed: 'Poodle',
+        petGender: 'MALE',
+        petWeight: 5,
+        petAgeYears: 2,
+      },
+      ['Viêm dạ dày', 'Bệnh không có trong AI'],
+    );
+
+    expect(client.diagnose).toHaveBeenCalledWith(expect.objectContaining({ diseases: ['DI001'] }));
   });
 });

@@ -9,7 +9,16 @@ import {
   AiTriageResult,
 } from '@/modules/triage/application/ports/ai-prediction.port';
 import { AiClientService } from '@/modules/triage/infrastructure/ai-client/ai-client.service';
-import { DiagnosisDetailedResponse } from '@/modules/triage/infrastructure/ai-client/ai-client.types';
+import {
+  DiagnosisDetailedResponse,
+  DiagnosisRequest,
+} from '@/modules/triage/infrastructure/ai-client/ai-client.types';
+import {
+  normalizeGenderForAi,
+  normalizeSpeciesForAi,
+  validAiImageUrls,
+  validAiVideoUrls,
+} from '@/modules/triage/application/ai-input.mapper';
 
 const PRIORITY_LABEL: Record<PriorityColor, string> = {
   [PriorityColor.RED]: 'Cấp cứu ngay',
@@ -24,27 +33,48 @@ export class HttpAiPredictionAdapter implements AiPredictionProvider {
   constructor(private readonly client: AiClientService) {}
 
   async triage(input: AiTriageInput): Promise<AiTriageResult> {
-    const response = await this.client.diagnose({
-      'pet-info': {
-        breed: input.petBreed ?? input.petSpecies ?? 'Không xác định',
-        specie: input.petSpecies,
-        gender: input.petGender ?? 'Không xác định',
-        weight: input.petWeight ?? 0,
-        age: input.petAgeYears ?? 0,
-      },
-      // Clinic common-symptom values are not the AI catalog's SYxxx IDs.
-      // Let the extractor normalize the human-readable symptom text instead.
-      symptoms: [],
-      describe: input.symptomText,
-      images: input.photoUrls,
-      videos: [],
-    });
+    const response = await this.client.diagnose(this.buildTriageRequest(input));
 
-    return this.toTriageResult(response);
+    return this.toTriageResult(response, await this.loadSymptomLabels());
+  }
+
+  async learn(input: AiTriageInput, confirmedDiseaseNames: string[]): Promise<void> {
+    const diseaseCodes = await this.client.getDiseaseCodes();
+    const confirmedCodes = [
+      ...new Set(
+        confirmedDiseaseNames
+          .map((name) => diseaseCodes.get(normalizeCatalogName(name)))
+          .filter((code): code is string => !!code),
+      ),
+    ];
+    if (confirmedCodes.length === 0) return;
+    await this.client.diagnose({
+      ...this.buildTriageRequest(input),
+      diseases: confirmedCodes,
+    });
+  }
+
+  private buildTriageRequest(input: AiTriageInput): DiagnosisRequest {
+    return {
+      'pet-info': {
+        breed: normalizeSpeciesForAi(input.petSpecies, input.petBreed),
+        specie: input.petBreed,
+        gender: normalizeGenderForAi(input.petGender),
+        weight: input.petWeight ?? null,
+        age: input.petAgeYears ?? null,
+      },
+      symptoms: input.symptomCodes,
+      describe: input.symptomText,
+      images: validAiImageUrls(input.photoUrls),
+      videos: validAiVideoUrls(input.videoUrls),
+    };
   }
 
   async chat(input: AiChatInput): Promise<AiChatResult> {
-    const userContext = [...(input.history ?? []), { role: 'user' as const, content: input.message }]
+    const userContext = [
+      ...(input.history ?? []),
+      { role: 'user' as const, content: input.message },
+    ]
       .filter((entry) => entry.role === 'user')
       .slice(-6)
       .map((entry) => entry.content)
@@ -52,11 +82,11 @@ export class HttpAiPredictionAdapter implements AiPredictionProvider {
     const pet = extractPetContext(userContext);
     const response = await this.client.diagnose({
       'pet-info': {
-        breed: pet.breed ?? pet.species ?? 'Không xác định',
-        specie: pet.species,
-        gender: pet.gender ?? 'Không xác định',
-        weight: pet.weight ?? 0,
-        age: pet.ageYears ?? 0,
+        breed: normalizeSpeciesForAi(pet.species, pet.breed),
+        specie: pet.breed,
+        gender: normalizeGenderForAi(pet.gender),
+        weight: pet.weight ?? null,
+        age: pet.ageYears ?? null,
       },
       symptoms: [],
       describe: userContext,
@@ -71,7 +101,10 @@ export class HttpAiPredictionAdapter implements AiPredictionProvider {
     };
   }
 
-  private toTriageResult(response: DiagnosisDetailedResponse): AiTriageResult {
+  private toTriageResult(
+    response: DiagnosisDetailedResponse,
+    symptomLabels: Map<string, string>,
+  ): AiTriageResult {
     const priorityColor = response.triage_result.color_code as PriorityColor;
     const topConfidence = response.diseases[0]?.prevalence_rate ?? 0;
     return {
@@ -80,13 +113,24 @@ export class HttpAiPredictionAdapter implements AiPredictionProvider {
         name: item.disease_name?.trim() || item.disease,
         confidence: item.prevalence_rate,
       })),
-      extractedKeywords: (response.compiled.symptoms ?? []).map((item) => item.symptom),
+      extractedKeywords: (response.compiled.symptoms ?? []).map((item) => {
+        const label = symptomLabels.get(item.symptom);
+        return `${label ? `${label} (${item.symptom})` : item.symptom} - mức ${item.intensity}/3`;
+      }),
       nlpConfidence: topConfidence,
       cvConfidence: null,
       overallConfidence: topConfidence,
       raw: response as unknown as Record<string, unknown>,
       modelVersion: 'deepseek-v4.1-flash+symptom-matrix-v2',
     };
+  }
+
+  private async loadSymptomLabels(): Promise<Map<string, string>> {
+    try {
+      return await this.client.getSymptomLabels();
+    } catch {
+      return new Map();
+    }
   }
 }
 
@@ -127,6 +171,14 @@ function extractPetContext(text: string): {
         ? Number(monthMatch[1].replace(',', '.')) / 12
         : undefined,
   };
+}
+
+function normalizeCatalogName(value: string): string {
+  return value
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('vi-VN');
 }
 
 function buildChatReply(response: DiagnosisDetailedResponse): string {

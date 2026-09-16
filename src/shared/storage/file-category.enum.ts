@@ -1,4 +1,3 @@
-
 export enum FileCategory {
   PET_AVATAR = 'pet-avatars',
   DOCTOR_AVATAR = 'doctor-avatars',
@@ -6,6 +5,7 @@ export enum FileCategory {
   EMPLOYEE_AVATAR = 'employee-avatars',
   CATALOG_IMAGE = 'catalog-images',
   SYMPTOM_PHOTO = 'symptom-photos',
+  SYMPTOM_VIDEO = 'symptom-videos',
   EXAM_ATTACHMENT = 'exam-attachments',
   LAB_RESULT = 'lab-results',
 }

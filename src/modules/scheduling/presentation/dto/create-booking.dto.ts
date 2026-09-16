@@ -60,9 +60,15 @@ export class CreateBookingDto {
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(6)
+  @ArrayMaxSize(5)
   @IsString({ each: true })
   photoUrls?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(2)
+  @IsString({ each: true })
+  videoUrls?: string[];
 
   @IsOptional()
   @IsString()

@@ -34,4 +34,8 @@ export class StubAiPredictionAdapter implements AiPredictionProvider {
       sessionId: input.sessionId ?? 'stub-session',
     });
   }
+
+  learn(): Promise<void> {
+    return Promise.resolve();
+  }
 }

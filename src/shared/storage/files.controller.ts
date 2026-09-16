@@ -16,8 +16,17 @@ import { STORAGE_PROVIDER, StorageProvider } from './ports/storage.port';
 import { FileCategory } from './file-category.enum';
 import { Public } from '@/shared/common/decorators/public.decorator';
 
-const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+const MAX_STANDARD_FILE_SIZE_BYTES = 8 * 1024 * 1024;
+const MAX_VIDEO_FILE_SIZE_BYTES = 100 * 1024 * 1024;
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf',
+  'video/mp4',
+  'video/quicktime',
+  'video/webm',
+];
 
 @ApiTags('files')
 @Controller('files')
@@ -34,13 +43,10 @@ export class FilesController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: MAX_FILE_SIZE_BYTES },
+      limits: { fileSize: MAX_VIDEO_FILE_SIZE_BYTES },
     }),
   )
-  async upload(
-    @Query('category') category: string,
-    @UploadedFile() file: Express.Multer.File,
-  ) {
+  async upload(@Query('category') category: string, @UploadedFile() file: Express.Multer.File) {
     const fileCategory = parseFileCategory(category);
 
     if (!file) {
@@ -48,6 +54,19 @@ export class FilesController {
     }
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       throw new BadRequestException(`Unsupported file type: ${file.mimetype}`);
+    }
+    const maxSize =
+      fileCategory === FileCategory.SYMPTOM_VIDEO
+        ? MAX_VIDEO_FILE_SIZE_BYTES
+        : MAX_STANDARD_FILE_SIZE_BYTES;
+    if (file.size > maxSize) {
+      throw new BadRequestException(`File exceeds the ${maxSize / 1024 / 1024} MB limit`);
+    }
+    if (fileCategory === FileCategory.SYMPTOM_VIDEO && !file.mimetype.startsWith('video/')) {
+      throw new BadRequestException('Symptom video category only accepts video files');
+    }
+    if (file.mimetype.startsWith('video/') && fileCategory !== FileCategory.SYMPTOM_VIDEO) {
+      throw new BadRequestException('Video files must use the symptom-videos category');
     }
 
     return this.storage.save(fileCategory, file);

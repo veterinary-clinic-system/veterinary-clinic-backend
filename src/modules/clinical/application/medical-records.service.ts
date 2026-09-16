@@ -28,6 +28,7 @@ import { UpdateMedicalRecordDto } from '@/modules/clinical/presentation/dto/upda
 import { UpdateTreatmentDto } from '@/modules/clinical/presentation/dto/update-treatment.dto';
 import { AmendMedicalRecordDto } from '@/modules/clinical/presentation/dto/amend-medical-record.dto';
 import { Role } from '@/shared/common/enums/role.enum';
+import { PrescreeningService } from '@/modules/triage/application';
 
 const MEDICAL_RECORD_DETAIL_RELATIONS = [
   'appointment',
@@ -41,6 +42,7 @@ const MEDICAL_RECORD_DETAIL_RELATIONS = [
   'doctor.user',
   'examination',
   'diagnoses',
+  'diagnoses.disease',
   'treatments',
   'prescriptions',
   'prescriptions.items',
@@ -66,6 +68,7 @@ export class MedicalRecordsService {
     @InjectRepository(Doctor) private readonly doctorsRepository: Repository<Doctor>,
     @InjectRepository(Pet) private readonly petsRepository: Repository<Pet>,
     @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly prescreeningService: PrescreeningService,
   ) {}
 
   async openForAppointment(
@@ -196,7 +199,16 @@ export class MedicalRecordsService {
       }
     });
 
-    return this.findOne(id);
+    const completed = await this.findOne(id);
+    const confirmedDiseaseNames = (completed.diagnoses ?? [])
+      .map((diagnosis) => diagnosis.disease?.diseaseName)
+      .filter((name): name is string => !!name);
+    void this.prescreeningService.learnFromConfirmedDiagnoses(
+      completed.appointment,
+      completed.pet,
+      confirmedDiseaseNames,
+    );
+    return completed;
   }
 
   async getTimelineForPet(petId: string): Promise<MedicalRecord[]> {
@@ -217,7 +229,6 @@ export class MedicalRecordsService {
     this.assertEditable(record);
 
     return this.dataSource.transaction(async (manager) => {
-
       const existingCount = await manager.count(Diagnosis, { where: { medicalRecordId } });
       const isPrimary = dto.isPrimary ?? existingCount === 0;
 

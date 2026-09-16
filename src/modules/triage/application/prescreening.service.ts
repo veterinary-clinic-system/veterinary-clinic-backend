@@ -8,7 +8,12 @@ import { PreScreeningResult } from '@/modules/triage/domain/entities/pre-screeni
 import {
   AI_PREDICTION_PROVIDER,
   AiPredictionProvider,
+  AiTriageInput,
 } from '@/modules/triage/application/ports/ai-prediction.port';
+import {
+  buildClinicalDescription,
+  commonSymptomCodes,
+} from '@/modules/triage/application/ai-input.mapper';
 
 @Injectable()
 export class PrescreeningService {
@@ -26,19 +31,8 @@ export class PrescreeningService {
   ) {}
 
   async runForAppointment(appointment: Appointment, pet: Pet): Promise<PreScreeningResult> {
-    const symptomText = [appointment.commonSymptoms.join(', '), appointment.otherSymptoms ?? '']
-      .filter(Boolean)
-      .join('. ');
-
-    const aiResult = await this.aiProvider.triage({
-      symptomText,
-      photoUrls: appointment.photoUrls,
-      petSpecies: pet.breed?.species?.speciesName,
-      petBreed: pet.breed?.breedName,
-      petGender: pet.gender,
-      petWeight: pet.weight === null ? undefined : Number(pet.weight),
-      petAgeYears: this.ageInYears(pet.birthDate),
-    });
+    const aiInput = this.toAiInput(appointment, pet);
+    const aiResult = await this.aiProvider.triage(aiInput);
 
     const diseaseGroups = await Promise.all(
       aiResult.suspectedGroups.map((group) => this.findOrCreateDisease(group.name)),
@@ -51,7 +45,7 @@ export class PrescreeningService {
     const result = this.resultsRepository.create({
       ...(existing ? { id: existing.id } : {}),
       appointmentId: appointment.id,
-      symptomText,
+      symptomText: aiInput.symptomText,
       aiSuspectedDiseaseGroups: diseaseGroups,
       aiPriorityColor: aiResult.priorityColor,
       extractedSymptomKeywords: aiResult.extractedKeywords,
@@ -76,6 +70,21 @@ export class PrescreeningService {
     } catch (error) {
       this.logger.warn(
         `Pre-screening skipped for appointment ${appointment.id}: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async learnFromConfirmedDiagnoses(
+    appointment: Appointment,
+    pet: Pet,
+    confirmedDiseaseNames: string[],
+  ): Promise<void> {
+    if (confirmedDiseaseNames.length === 0) return;
+    try {
+      await this.aiProvider.learn(this.toAiInput(appointment, pet), confirmedDiseaseNames);
+    } catch (error) {
+      this.logger.warn(
+        `AI learning skipped for appointment ${appointment.id}: ${(error as Error).message}`,
       );
     }
   }
@@ -107,5 +116,26 @@ export class PrescreeningService {
     const timestamp = new Date(birthDate).getTime();
     if (Number.isNaN(timestamp)) return undefined;
     return Math.max(0, (Date.now() - timestamp) / (365.25 * 24 * 60 * 60 * 1000));
+  }
+
+  private toAiInput(appointment: Appointment, pet: Pet): AiTriageInput {
+    return {
+      symptomText: buildClinicalDescription({
+        commonSymptoms: appointment.commonSymptoms,
+        otherSymptoms: appointment.otherSymptoms,
+        chronicConditions: pet.chronicConditions,
+        allergies: pet.allergies,
+        petNotes: pet.notes,
+        appointmentNotes: appointment.notes,
+      }),
+      symptomCodes: commonSymptomCodes(appointment.commonSymptoms),
+      photoUrls: appointment.photoUrls,
+      videoUrls: appointment.videoUrls,
+      petSpecies: pet.breed?.species?.speciesName,
+      petBreed: pet.breed?.breedName,
+      petGender: pet.gender,
+      petWeight: pet.weight === null ? undefined : Number(pet.weight),
+      petAgeYears: this.ageInYears(pet.birthDate),
+    };
   }
 }
