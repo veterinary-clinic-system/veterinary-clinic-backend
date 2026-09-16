@@ -1,4 +1,4 @@
-import { plainToInstance } from 'class-transformer';
+import { plainToInstance, Transform } from 'class-transformer';
 import {
   IsIn,
   IsInt,
@@ -69,9 +69,33 @@ class EnvironmentVariables {
   @IsOptional()
   AI_PROVIDER: string;
 
-  @IsIn(['local', 's3'])
+  @IsIn(['cloudinary'])
   @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value !== 'string') return value;
+    return value.trim().toLowerCase() || undefined;
+  })
   STORAGE_PROVIDER: string;
+
+  @IsString()
+  @IsOptional()
+  CLOUDINARY_URL: string;
+
+  @IsString()
+  @IsOptional()
+  CLOUDINARY_CLOUD_NAME: string;
+
+  @IsString()
+  @IsOptional()
+  CLOUDINARY_API_KEY: string;
+
+  @IsString()
+  @IsOptional()
+  CLOUDINARY_API_SECRET: string;
+
+  @IsString()
+  @IsOptional()
+  CLOUDINARY_FOLDER: string;
 
   @IsIn(['manual', 'vnpay', 'sepay'])
   @IsOptional()

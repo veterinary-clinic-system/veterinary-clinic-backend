@@ -16,6 +16,7 @@ import {
 } from '@/shared/common/enums/employee-status.enum';
 import { BRANCH_SCOPED_ROLES, Role } from '@/shared/common/enums/role.enum';
 import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
+import { DEFAULT_STAFF_IMAGE } from '@/shared/storage/cloudinary-web-assets';
 import { CreateEmployeeDto } from '@/modules/identity/presentation/dto/create-employee.dto';
 import { UpdateEmployeeDto } from '@/modules/identity/presentation/dto/update-employee.dto';
 import { QueryEmployeesDto } from '@/modules/identity/presentation/dto/query-employees.dto';
@@ -73,7 +74,7 @@ export class EmployeesService {
           manager.create(User, {
             phone: dto.phone,
             fullName: dto.fullName,
-            avatarUrl: dto.avatarUrl ?? '/images/default-staff.svg',
+            avatarUrl: dto.avatarUrl ?? DEFAULT_STAFF_IMAGE,
             email: dto.email ?? null,
             passwordHash: await bcrypt.hash(dto.account.password, BCRYPT_ROUNDS),
             role: dto.account.role,
@@ -89,7 +90,7 @@ export class EmployeesService {
         manager.create(Employee, {
           userId,
           fullName: dto.fullName,
-          avatarUrl: dto.avatarUrl ?? '/images/default-staff.svg',
+          avatarUrl: dto.avatarUrl ?? DEFAULT_STAFF_IMAGE,
           phone: dto.phone,
           email: dto.email ?? null,
           address: dto.address ?? null,

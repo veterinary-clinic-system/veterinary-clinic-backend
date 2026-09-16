@@ -18,6 +18,7 @@ import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import { Role } from '@/shared/common/enums/role.enum';
 import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
 import { CreateCustomerDto } from '@/modules/identity/presentation/dto/create-customer.dto';
+import { DEFAULT_USER_IMAGE } from '@/shared/storage/cloudinary-web-assets';
 import { UpdateCustomerDto } from '@/modules/identity/presentation/dto/update-customer.dto';
 import { QueryCustomersDto } from '@/modules/identity/presentation/dto/query-customers.dto';
 
@@ -150,7 +151,7 @@ export class CustomersService {
       this.usersRepository.create({
         phone: dto.phone,
         fullName: dto.fullName,
-        avatarUrl: dto.avatarUrl ?? '/images/default-user.svg',
+        avatarUrl: dto.avatarUrl ?? DEFAULT_USER_IMAGE,
         email: dto.email ?? null,
 
         passwordHash: dto.password ? await bcrypt.hash(dto.password, BCRYPT_ROUNDS) : null,

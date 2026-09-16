@@ -16,6 +16,7 @@ import { DoctorShift } from '@/modules/scheduling/domain/entities/doctor-shift.e
 import { BRANCH_SCOPED_ROLES, Role } from '@/shared/common/enums/role.enum';
 import { PaginationQueryDto } from '@/shared/common/dto/pagination-query.dto';
 import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
+import { DEFAULT_DOCTOR_IMAGE, DEFAULT_STAFF_IMAGE } from '@/shared/storage/cloudinary-web-assets';
 import { CreateUserDto } from '@/modules/identity/presentation/dto/create-user.dto';
 import { UpdateUserDto } from '@/modules/identity/presentation/dto/update-user.dto';
 import { UpdatePasswordDto } from '@/modules/identity/presentation/dto/update-password.dto';
@@ -77,7 +78,7 @@ export class UsersService {
       const user = manager.create(User, {
         phone: dto.phone,
         fullName: dto.fullName,
-        avatarUrl: dto.avatarUrl ?? (dto.role === Role.DOCTOR ? '/images/default-doctor.svg' : '/images/default-staff.svg'),
+        avatarUrl: dto.avatarUrl ?? (dto.role === Role.DOCTOR ? DEFAULT_DOCTOR_IMAGE : DEFAULT_STAFF_IMAGE),
         email: dto.email ?? null,
         passwordHash,
         role: dto.role,
@@ -90,7 +91,7 @@ export class UsersService {
           userId: persistedUser.id,
           branchId: branchId as string,
           fullName: dto.fullName,
-          avatarUrl: dto.avatarUrl ?? '/images/default-doctor.svg',
+          avatarUrl: dto.avatarUrl ?? DEFAULT_DOCTOR_IMAGE,
           yearOfStart: dto.yearOfStart ?? null,
           specialization: dto.specialization ?? [],
         });

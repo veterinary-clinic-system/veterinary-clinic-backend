@@ -1,5 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
+import { DEFAULT_PET_IMAGE } from '@/shared/storage/cloudinary-web-assets';
 import { Breed } from './breed.entity';
 import { User } from '@/modules/identity/domain/entities/user.entity';
 import { Gender } from '@/shared/common/enums/gender.enum';
@@ -36,7 +37,7 @@ export class Pet extends BaseEntity {
   @Column({ name: 'color', type: 'varchar', length: 64, nullable: true })
   color: string | null;
 
-  @Column({ name: 'avatar_url', type: 'varchar', default: '/images/default-pet.svg' })
+  @Column({ name: 'avatar_url', type: 'varchar', default: DEFAULT_PET_IMAGE })
   avatarUrl: string;
 
   @Column({ name: 'notes', type: 'text', nullable: true })

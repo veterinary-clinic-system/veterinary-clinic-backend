@@ -1,5 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
+import { DEFAULT_ITEM_IMAGE } from '@/shared/storage/cloudinary-web-assets';
 import { moneyTransformer } from '@/shared/database/transformers/money.transformer';
 import { ItemType } from '@/shared/common/enums/item-type.enum';
 import { InvoiceItem } from '@/modules/billing/domain/entities/invoice-item.entity';
@@ -11,7 +12,7 @@ export class Item extends BaseEntity {
   @Column({ name: 'item_name', length: 255 })
   itemName: string;
 
-  @Column({ name: 'image_url', type: 'varchar', default: '/images/default-item.svg' })
+  @Column({ name: 'image_url', type: 'varchar', default: DEFAULT_ITEM_IMAGE })
   imageUrl: string;
 
   @Column({ name: 'code', length: 32 })

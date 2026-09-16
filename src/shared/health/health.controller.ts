@@ -46,7 +46,7 @@ export class HealthController {
   private async probeAuxiliary(): Promise<HealthIndicatorResult> {
     const results = await Promise.all([
       this.softCheck('redis', () => this.pingRedis()),
-      this.softCheck('minio', () => this.pingHttp(this.minioHealthUrl())),
+      this.softCheck('cloudinary', () => this.checkCloudinaryConfig()),
       this.softCheck('ai-service', () => this.pingHttp(this.aiHealthUrl())),
     ]);
 
@@ -83,9 +83,16 @@ export class HealthController {
     }
   }
 
-  private minioHealthUrl(): string | null {
-    const endpoint = this.configService.get<string>('files.s3.endpoint');
-    return endpoint ? `${endpoint.replace(/\/$/, '')}/minio/health/live` : null;
+  private checkCloudinaryConfig(): Promise<void> {
+    const cloudinaryUrl = this.configService.get<string>('CLOUDINARY_URL');
+    const cloudName = this.configService.get<string>('files.cloudinary.cloudName');
+    const apiKey = this.configService.get<string>('files.cloudinary.apiKey');
+    const apiSecret = this.configService.get<string>('files.cloudinary.apiSecret');
+
+    if (!cloudinaryUrl && (!cloudName || !apiKey || !apiSecret)) {
+      return Promise.reject(new Error('Chua cau hinh Cloudinary'));
+    }
+    return Promise.resolve();
   }
 
   private aiHealthUrl(): string | null {

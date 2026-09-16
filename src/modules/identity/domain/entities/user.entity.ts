@@ -1,5 +1,6 @@
 import { Column, Entity, Index, OneToMany, OneToOne } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
+import { DEFAULT_USER_IMAGE } from '@/shared/storage/cloudinary-web-assets';
 import { Role } from '@/shared/common/enums/role.enum';
 import { Doctor } from './doctor.entity';
 import { Pet } from '@/modules/pets/domain/entities/pet.entity';
@@ -28,7 +29,7 @@ export class User extends BaseEntity {
   @Column({ name: 'full_name', length: 255 })
   fullName: string;
 
-  @Column({ name: 'avatar_url', type: 'varchar', default: '/images/default-user.svg' })
+  @Column({ name: 'avatar_url', type: 'varchar', default: DEFAULT_USER_IMAGE })
   avatarUrl: string;
 
   @Column({ name: 'password_hash', type: 'varchar', select: false, nullable: true })

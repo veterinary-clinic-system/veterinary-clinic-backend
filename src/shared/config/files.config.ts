@@ -1,17 +1,11 @@
 import { registerAs } from '@nestjs/config';
 
 export default registerAs('files', () => ({
-  provider: process.env.STORAGE_PROVIDER ?? 'local',
-
-  storageRoot: process.env.FILE_STORAGE_ROOT ?? './uploads',
-  publicBaseUrl: process.env.FILE_PUBLIC_BASE_URL ?? 'http://localhost:3000/uploads',
-
-  s3: {
-    endpoint: process.env.STORAGE_ENDPOINT ?? 'http://localhost:9000',
-    bucket: process.env.STORAGE_BUCKET ?? 'vetcare',
-    region: process.env.STORAGE_REGION ?? 'us-east-1',
-    accessKeyId: process.env.STORAGE_ACCESS_KEY ?? 'vetclinic',
-    secretAccessKey: process.env.STORAGE_SECRET_KEY ?? 'vetclinic123',
-    forcePathStyle: process.env.STORAGE_FORCE_PATH_STYLE !== 'false',
+  provider: 'cloudinary',
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
+    folder: process.env.CLOUDINARY_FOLDER ?? 'vetcare',
   },
 }));

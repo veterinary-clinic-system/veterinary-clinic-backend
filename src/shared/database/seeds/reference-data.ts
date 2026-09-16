@@ -1,3 +1,4 @@
+import { cloudinaryWebImage } from '@/shared/storage/cloudinary-web-assets';
 
 export interface SpeciesCatalogEntry {
   name: string;
@@ -112,11 +113,6 @@ export const SPECIES_CATALOG: SpeciesCatalogEntry[] = [
   },
 ];
 
-export const DOCTOR_AVATAR_FILES = [
-  '/doctors/doctor-1.svg',
-  '/doctors/doctor-2.svg',
-  '/doctors/doctor-3.svg',
-  '/doctors/doctor-4.svg',
-  '/doctors/doctor-5.svg',
-  '/doctors/doctor-6.svg',
-];
+export const DOCTOR_AVATAR_FILES = [1, 2, 3, 4, 5, 6].map((index) =>
+  cloudinaryWebImage(`doctors/doctor-${index}.svg`),
+);

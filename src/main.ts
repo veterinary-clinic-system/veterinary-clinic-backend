@@ -5,7 +5,6 @@ import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
-import { join } from 'path';
 import { AppModule } from './app.module';
 import { formatValidationErrors } from './shared/common/validation/validation-error.formatter';
 
@@ -15,10 +14,6 @@ async function bootstrap() {
 
   app.use(helmet({ crossOriginResourcePolicy: false }));
   app.enableCors({ origin: config.get<string>('app.corsOrigin'), credentials: true });
-
-  app.useStaticAssets(join(process.cwd(), config.get<string>('files.storageRoot')!), {
-    prefix: '/uploads',
-  });
 
   app.setGlobalPrefix(config.get<string>('app.apiPrefix')!);
   app.useGlobalPipes(
@@ -42,10 +37,10 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
 
   const port = config.get<number>('app.port')!;
-  await app.listen(port);
-  
+  await app.listen(port, '0.0.0.0');
+
   console.log(
-    `veterinary-clinic-backend listening on http://localhost:${port}/${config.get('app.apiPrefix')}`,
+    `veterinary-clinic-backend listening on http://0.0.0.0:${port}/${config.get('app.apiPrefix')}`,
   );
 }
 

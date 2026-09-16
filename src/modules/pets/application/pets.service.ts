@@ -16,6 +16,7 @@ import { Appointment } from '@/modules/scheduling/domain/entities/appointment.en
 import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
 import { Role } from '@/shared/common/enums/role.enum';
 import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user.interface';
+import { DEFAULT_PET_IMAGE } from '@/shared/storage/cloudinary-web-assets';
 import { CreatePetDto } from '@/modules/pets/presentation/dto/create-pet.dto';
 import { UpdatePetDto } from '@/modules/pets/presentation/dto/update-pet.dto';
 import { QueryPetsDto } from '@/modules/pets/presentation/dto/query-pets.dto';
@@ -49,7 +50,7 @@ export class PetsService {
       birthDate: dto.birthDate ?? null,
       microchipId,
       color: dto.color ?? null,
-      avatarUrl: dto.avatarUrl ?? '/images/default-pet.svg',
+      avatarUrl: dto.avatarUrl ?? DEFAULT_PET_IMAGE,
       notes: dto.notes ?? null,
       allergies: dto.allergies ?? [],
       chronicConditions: dto.chronicConditions ?? [],

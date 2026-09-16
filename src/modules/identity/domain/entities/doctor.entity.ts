@@ -1,5 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
+import { DEFAULT_DOCTOR_IMAGE } from '@/shared/storage/cloudinary-web-assets';
 import { User } from './user.entity';
 import { Branch } from '@/modules/organization/domain/entities/branch.entity';
 import { Specialization } from '@/shared/common/enums/specialization.enum';
@@ -22,7 +23,7 @@ export class Doctor extends BaseEntity {
   @Column({ name: 'branch_id' })
   branchId: string;
 
-  @Column({ name: 'avatar_url', type: 'varchar', default: '/images/default-doctor.svg' })
+  @Column({ name: 'avatar_url', type: 'varchar', default: DEFAULT_DOCTOR_IMAGE })
   avatarUrl: string;
 
   @Column({ name: 'active', default: true })

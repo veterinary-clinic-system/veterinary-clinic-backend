@@ -8,6 +8,7 @@ import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
 import { CreateProductDto } from '@/modules/catalog/presentation/dto/create-product.dto';
 import { UpdateProductDto } from '@/modules/catalog/presentation/dto/update-product.dto';
 import { QueryProductsDto } from '@/modules/catalog/presentation/dto/query-products.dto';
+import { DEFAULT_ITEM_IMAGE } from '@/shared/storage/cloudinary-web-assets';
 
 const ITEM_SORT_COLUMNS = new Set(['itemName', 'unitPrice', 'code']);
 const PRODUCT_SORT_COLUMNS = new Set(['sku', 'brand', 'costPrice', 'createdAt', 'updatedAt']);
@@ -26,7 +27,7 @@ export class ProductsService {
       const item = await manager.save(
         manager.create(Item, {
           itemName: dto.itemName,
-          imageUrl: dto.imageUrl ?? '/images/default-item.svg',
+          imageUrl: dto.imageUrl ?? DEFAULT_ITEM_IMAGE,
           describe: dto.describe ?? null,
           itemType: ItemType.PRODUCT,
           unitPrice: dto.unitPrice,

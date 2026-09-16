@@ -8,6 +8,7 @@ import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
 import { CreateServiceDto } from '@/modules/catalog/presentation/dto/create-service.dto';
 import { UpdateServiceDto } from '@/modules/catalog/presentation/dto/update-service.dto';
 import { QueryCatalogEntryDto } from '@/modules/catalog/presentation/dto/query-catalog-entry.dto';
+import { DEFAULT_ITEM_IMAGE } from '@/shared/storage/cloudinary-web-assets';
 
 const ITEM_SORT_COLUMNS = new Set(['itemName', 'unitPrice']);
 const SERVICE_SORT_COLUMNS = new Set(['durationMinutes', 'createdAt', 'updatedAt']);
@@ -24,7 +25,7 @@ export class ServicesService {
       const item = await manager.save(
         manager.create(Item, {
           itemName: dto.itemName,
-          imageUrl: dto.imageUrl ?? '/images/default-item.svg',
+          imageUrl: dto.imageUrl ?? DEFAULT_ITEM_IMAGE,
           describe: dto.describe ?? null,
           itemType: ItemType.SERVICE,
           unitPrice: dto.unitPrice,
