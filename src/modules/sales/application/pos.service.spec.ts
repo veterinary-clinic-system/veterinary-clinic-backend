@@ -196,4 +196,17 @@ describe('PosService.checkout', () => {
     expect(harness.recordedPayments).toHaveLength(0);
     expect(harness.calls).toEqual(['save-invoice', 'issue', 'issue', 'close-cart']);
   });
+
+  it('amountPaid bang 0 -> tao hoa don chua thanh toan de mo phien VietQR', async () => {
+    const harness = buildHarness(twoLines);
+
+    await harness.service.checkout(CART_ID, {
+      paymentMethod: PaymentMethod.QR,
+      amountPaid: 0,
+    });
+
+    expect(harness.savedInvoices[0].totalAmount).toBe(800);
+    expect(harness.recordedPayments).toHaveLength(0);
+    expect(harness.calls).toEqual(['save-invoice', 'issue', 'issue', 'close-cart']);
+  });
 });

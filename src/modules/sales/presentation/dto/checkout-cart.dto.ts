@@ -7,7 +7,7 @@ export class CheckoutCartDto {
 
   @IsOptional()
   @IsInt()
-  @Min(1)
+  @Min(0)
   amountPaid?: number;
 
   @IsOptional()
