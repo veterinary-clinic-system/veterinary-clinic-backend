@@ -34,6 +34,10 @@ export class PrescreeningService {
       symptomText,
       photoUrls: appointment.photoUrls,
       petSpecies: pet.breed?.species?.speciesName,
+      petBreed: pet.breed?.breedName,
+      petGender: pet.gender,
+      petWeight: pet.weight === null ? undefined : Number(pet.weight),
+      petAgeYears: this.ageInYears(pet.birthDate),
     });
 
     const diseaseGroups = await Promise.all(
@@ -96,5 +100,12 @@ export class PrescreeningService {
     return this.diseasesRepository.save(
       this.diseasesRepository.create({ diseaseName: trimmed, commonSymptoms: [] }),
     );
+  }
+
+  private ageInYears(birthDate: string | null): number | undefined {
+    if (!birthDate) return undefined;
+    const timestamp = new Date(birthDate).getTime();
+    if (Number.isNaN(timestamp)) return undefined;
+    return Math.max(0, (Date.now() - timestamp) / (365.25 * 24 * 60 * 60 * 1000));
   }
 }

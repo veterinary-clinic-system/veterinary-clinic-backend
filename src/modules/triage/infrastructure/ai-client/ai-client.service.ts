@@ -3,7 +3,7 @@ import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
-import { ChatRequest, ChatResponse, TriageRequest, TriageResponse } from './ai-client.types';
+import { DiagnosisDetailedResponse, DiagnosisRequest } from './ai-client.types';
 
 @Injectable()
 export class AiClientService {
@@ -14,16 +14,12 @@ export class AiClientService {
     private readonly configService: ConfigService,
   ) {}
 
-  async triage(request: TriageRequest): Promise<TriageResponse> {
-    return this.post<TriageResponse>('/api/v1/triage', request);
-  }
-
-  async chat(request: ChatRequest): Promise<ChatResponse> {
-    return this.post<ChatResponse>('/api/v1/chat', request);
+  async diagnose(request: DiagnosisRequest): Promise<DiagnosisDetailedResponse> {
+    return this.post<DiagnosisDetailedResponse>('/api/v1/diagnose/detailed', request);
   }
 
   private async post<T>(path: string, body: unknown): Promise<T> {
-    const baseUrl = this.configService.get<string>('aiService.baseUrl');
+    const baseUrl = this.configService.get<string>('aiService.baseUrl')!.replace(/\/$/, '');
     const token = this.configService.get<string>('aiService.token');
     const timeout = this.configService.get<number>('aiService.timeoutMs');
 
@@ -31,13 +27,15 @@ export class AiClientService {
       const response = await firstValueFrom(
         this.httpService.post<T>(`${baseUrl}${path}`, body, {
           timeout,
-          headers: { Authorization: `Bearer ${token}` },
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         }),
       );
       return response.data;
     } catch (error) {
       const axiosError = error as AxiosError;
-      this.logger.error(`veterinary-clinic-ai call to ${path} failed: ${axiosError.message}`);
+      this.logger.error(
+        `veterinary-clinic-ai call to ${path} failed: ${axiosError.response?.status ?? 'network'} ${axiosError.message}`,
+      );
       throw new ServiceUnavailableException('The AI pre-screening service is unavailable');
     }
   }

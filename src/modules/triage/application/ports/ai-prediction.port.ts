@@ -6,7 +6,10 @@ export interface AiTriageInput {
   symptomText: string;
   photoUrls: string[];
   petSpecies?: string;
-  petAgeMonths?: number;
+  petBreed?: string;
+  petGender?: string;
+  petWeight?: number;
+  petAgeYears?: number;
 }
 
 export interface AiSuspectedGroup {

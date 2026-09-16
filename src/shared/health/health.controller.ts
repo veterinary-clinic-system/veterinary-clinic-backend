@@ -97,7 +97,7 @@ export class HealthController {
 
   private aiHealthUrl(): string | null {
     const baseUrl = this.configService.get<string>('aiService.baseUrl');
-    return baseUrl ? `${baseUrl.replace(/\/$/, '')}/health` : null;
+    return baseUrl ? `${baseUrl.replace(/\/$/, '')}/api/v1/health` : null;
   }
 
   private withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {

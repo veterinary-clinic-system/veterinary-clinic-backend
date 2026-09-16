@@ -1,38 +1,34 @@
 
-export interface TriageRequest {
-  symptom_text: string;
-  photo_urls: string[];
-  pet_species?: string;
-  pet_age_months?: number;
+export interface DiagnosisRequest {
+  'pet-info': {
+    breed: string;
+    specie?: string;
+    gender: string;
+    weight: number;
+    age: number;
+  };
+  symptoms: string[];
+  describe?: string;
+  images: string[];
+  videos?: string[];
 }
 
-export interface SuspectedDiseaseGroup {
-  name: string;
-  confidence: number;
+export interface DiagnosisDisease {
+  disease: string;
+  disease_name?: string | null;
+  prevalence_rate: number;
 }
 
-export interface TriageResponse {
-  priority_color: 'RED' | 'ORANGE' | 'YELLOW' | 'GREEN' | 'BLUE';
-  suspected_disease_groups: SuspectedDiseaseGroup[];
-  extracted_symptom_keywords: string[];
-  nlp_confidence: number;
-  cv_confidence: number | null;
-  overall_confidence: number;
-}
-
-export interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-export interface ChatRequest {
-  session_id?: string;
-  message: string;
-  history?: ChatMessage[];
-}
-
-export interface ChatResponse {
-  reply: string;
-  suggest_booking: boolean;
-  session_id: string;
+export interface DiagnosisDetailedResponse {
+  diseases: DiagnosisDisease[];
+  triage_result: {
+    color_code: 'RED' | 'ORANGE' | 'YELLOW' | 'GREEN' | 'BLUE';
+    reasoning: string;
+  };
+  compiled: {
+    'pet-info'?: Record<string, string>;
+    symptoms?: Array<{ symptom: string; intensity: number }>;
+    triage_result?: { color_code: string; reasoning: string };
+  };
+  weight_adjustments?: Array<Record<string, unknown>> | null;
 }
