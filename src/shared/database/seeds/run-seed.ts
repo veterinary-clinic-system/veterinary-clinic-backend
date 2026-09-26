@@ -52,6 +52,23 @@ const BCRYPT_ROUNDS = 12;
 const WEEKDAYS = [1, 2, 3, 4, 5];
 
 async function seed() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction && process.env.ALLOW_PRODUCTION_SEED !== 'true') {
+    throw new Error('Refusing to seed production without ALLOW_PRODUCTION_SEED=true.');
+  }
+
+  const adminPassword =
+    process.env.SEED_ADMIN_PASSWORD ?? (isProduction ? undefined : 'Admin@12345');
+  const staffPassword =
+    process.env.SEED_STAFF_PASSWORD ?? (isProduction ? undefined : 'Staff@12345');
+  const ownerPassword =
+    process.env.SEED_OWNER_PASSWORD ?? (isProduction ? undefined : 'Owner@12345');
+  if (!adminPassword || !staffPassword || !ownerPassword) {
+    throw new Error(
+      'Production seed requires SEED_ADMIN_PASSWORD, SEED_STAFF_PASSWORD, and SEED_OWNER_PASSWORD.',
+    );
+  }
+
   await dataSource.initialize();
   console.log('Connected. Seeding...');
 
@@ -67,7 +84,7 @@ async function seed() {
     const saved = await breedRepo.save(
       entry.breeds.map((breedName) => ({ breedName, speciesId: species.id })),
     );
-    
+
     saved.forEach((breed) => breedByName.set(`${entry.name}/${breed.breedName}`, breed));
   }
 
@@ -112,10 +129,7 @@ async function seed() {
   }
 
   const userRepo = dataSource.getRepository(User);
-  const adminPasswordHash = await bcrypt.hash(
-    process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345',
-    BCRYPT_ROUNDS,
-  );
+  const adminPasswordHash = await bcrypt.hash(adminPassword, BCRYPT_ROUNDS);
   await userRepo.save({
     phone: '0900000001',
     email: process.env.SEED_ADMIN_EMAIL ?? 'admin@vetclinic.local',
@@ -125,7 +139,7 @@ async function seed() {
     branchId: null,
   });
 
-  const staffPasswordHash = await bcrypt.hash('Staff@12345', BCRYPT_ROUNDS);
+  const staffPasswordHash = await bcrypt.hash(staffPassword, BCRYPT_ROUNDS);
   await userRepo.save([
     {
       phone: '0900000002',
@@ -400,7 +414,7 @@ async function seed() {
     { diseaseName: 'Khám định kỳ', commonSymptoms: [] },
   ]);
 
-  const ownerPasswordHash = await bcrypt.hash('Owner@12345', BCRYPT_ROUNDS);
+  const ownerPasswordHash = await bcrypt.hash(ownerPassword, BCRYPT_ROUNDS);
   const ownerSeeds = [
     { phone: '0911111111', fullName: 'Nguyễn Văn Bình', email: 'binh.nguyen@example.com' },
     { phone: '0911111112', fullName: 'Trần Thị Cẩm', email: 'cam.tran@example.com' },
@@ -497,7 +511,7 @@ async function seed() {
     doctorId: doctors[0].id,
     branchId: branch1.id,
     petId: pets[0].id,
-    serviceId: services[1].id, 
+    serviceId: services[1].id,
     startAt: atTime(-3, '09:00'),
     endAt: atTime(-3, '09:30'),
     status: AppointmentStatus.COMPLETED,
@@ -599,7 +613,7 @@ async function seed() {
     doctorId: doctors[2].id,
     branchId: branch2.id,
     petId: pets[4].id,
-    serviceId: services[3].id, 
+    serviceId: services[3].id,
     startAt: atTime(-1, '08:00'),
     endAt: atTime(-1, '09:00'),
     status: AppointmentStatus.COMPLETED,
@@ -665,12 +679,9 @@ async function seed() {
   console.log('Seed complete:');
   console.log(`  Branches: ${branch1.branchName}, ${branch2.branchName}`);
   console.log(
-    `  Admin login: phone 0900000001 / password ${process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345'}`,
+    '  Seeded login phones: admin 0900000001, staff 0900000002/0004/0010, owner 0911111111',
   );
-  console.log('  Receptionist login: phone 0900000002 / password Staff@12345');
-  console.log('  Doctor login: phone 0900000010 / password Staff@12345');
-  console.log('  Pharmacist login: phone 0900000004 / password Staff@12345');
-  console.log('  Pet owner login: phone 0911111111 / password Owner@12345');
+  console.log('  Password values are intentionally omitted from logs.');
 
   await dataSource.destroy();
 }

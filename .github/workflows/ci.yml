@@ -1,0 +1,63 @@
+name: Backend CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+      PORT: 3000
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: vetclinic
+      DB_PASSWORD: vetclinic
+      DB_DATABASE: veterinary_clinic
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      JWT_ACCESS_SECRET: ci-access-secret-at-least-32-characters-long
+      JWT_REFRESH_SECRET: ci-refresh-secret-at-least-32-characters-long
+      AI_SERVICE_BASE_URL: http://localhost:8000
+      AI_SERVICE_TOKEN: ci-token
+      AI_PROVIDER: stub
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vetclinic
+          POSTGRES_PASSWORD: vetclinic
+          POSTGRES_DB: veterinary_clinic
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vetclinic -d veterinary_clinic"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test -- --runInBand
+      - run: npm run build
+      - run: npm run migration:run
+      - run: npm run test:e2e

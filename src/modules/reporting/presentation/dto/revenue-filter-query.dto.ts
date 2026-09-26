@@ -1,13 +1,3 @@
-import { IsDateString, IsOptional, IsUUID } from 'class-validator';
+import { ReportFilterDto } from './report-filter.dto';
 
-export class RevenueFilterQueryDto {
-  @IsDateString()
-  from: string;
-
-  @IsDateString()
-  to: string;
-
-  @IsOptional()
-  @IsUUID()
-  branchId?: string;
-}
+export class RevenueFilterQueryDto extends ReportFilterDto {}

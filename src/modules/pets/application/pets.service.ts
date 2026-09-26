@@ -15,6 +15,7 @@ import { Pet } from '@/modules/pets/domain/entities/pet.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
 import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
 import { Role } from '@/shared/common/enums/role.enum';
+import { MedicalRecordStatus } from '@/shared/common/enums/medical-record-status.enum';
 import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user.interface';
 import { DEFAULT_PET_IMAGE } from '@/shared/storage/cloudinary-web-assets';
 import { CreatePetDto } from '@/modules/pets/presentation/dto/create-pet.dto';
@@ -164,19 +165,23 @@ export class PetsService {
   }
 
   async getTimeline(id: string, actor: AuthenticatedUser): Promise<Appointment[]> {
-    await this.findOneForActor(id, actor); 
+    await this.findOneForActor(id, actor);
 
-    return this.appointmentsRepository.find({
-      where: { petId: id },
-      relations: [
-        'doctor',
-        'examination',
+    return this.appointmentsRepository
+      .createQueryBuilder('appointment')
+      .leftJoinAndSelect('appointment.doctor', 'doctor')
+      .leftJoinAndSelect(
+        'appointment.medicalRecord',
         'medicalRecord',
-        'medicalRecord.diagnoses',
-        'medicalRecord.treatments',
-      ],
-      order: { startAt: 'DESC' },
-    });
+        'medicalRecord.status = :completedStatus',
+        { completedStatus: MedicalRecordStatus.COMPLETED },
+      )
+      .leftJoinAndSelect('appointment.examination', 'examination', 'medicalRecord.id IS NOT NULL')
+      .leftJoinAndSelect('medicalRecord.diagnoses', 'diagnoses')
+      .leftJoinAndSelect('medicalRecord.treatments', 'treatments')
+      .where('appointment.petId = :petId', { petId: id })
+      .orderBy('appointment.startAt', 'DESC')
+      .getMany();
   }
 
   private async loadPetOrThrow(id: string): Promise<Pet> {

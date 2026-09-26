@@ -41,6 +41,25 @@ export class PetsController {
     return this.petsService.findMine(actor);
   }
 
+  @Roles(Role.PET_OWNER)
+  @Get('mine/:id/health-record')
+  async findMyPetHealthRecord(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    await this.petsService.findOneForActor(id, actor);
+    const ownerVisibility = { completedOnly: true } as const;
+    const [medicalHistory, prescriptions, labTests, invoices, vaccinations] = await Promise.all([
+      this.petProfileService.findMedicalHistory(id, ownerVisibility),
+      this.petProfileService.findPrescriptions(id, ownerVisibility),
+      this.petProfileService.findLabTests(id, ownerVisibility),
+      this.petProfileService.findInvoices(id),
+      this.petProfileService.findVaccinations(id),
+    ]);
+
+    return { medicalHistory, prescriptions, labTests, invoices, vaccinations };
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthenticatedUser) {
     return this.petsService.findOneForActor(id, actor);

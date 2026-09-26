@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { InvoiceItem } from '@/modules/billing/domain/entities/invoice-item.entity';
 import { Diagnosis } from '@/modules/clinical/domain/entities/diagnosis.entity';
 import { PreScreeningResult } from '@/modules/triage/domain/entities/pre-screening-result.entity';
 import { ReportsController } from '@/modules/reporting/presentation/reports.controller';
@@ -9,7 +8,7 @@ import { DashboardService } from '@/modules/reporting/application/dashboard.serv
 import { OperationalReportsService } from '@/modules/reporting/application/operational-reports.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([InvoiceItem, Diagnosis, PreScreeningResult])],
+  imports: [TypeOrmModule.forFeature([Diagnosis, PreScreeningResult])],
   controllers: [ReportsController],
 
   providers: [ReportsService, DashboardService, OperationalReportsService],

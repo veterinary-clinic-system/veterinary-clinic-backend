@@ -1,8 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { endOfDay, startOfDay } from 'date-fns';
-import { InvoiceItem } from '@/modules/billing/domain/entities/invoice-item.entity';
 import { Diagnosis } from '@/modules/clinical/domain/entities/diagnosis.entity';
 import { PreScreeningResult } from '@/modules/triage/domain/entities/pre-screening-result.entity';
 import { ItemType } from '@/shared/common/enums/item-type.enum';
@@ -18,50 +17,50 @@ import {
   RevenueByPeriod,
   RevenueByService,
 } from './reports.types';
+import { getReportTimezone } from './report-timezone';
 
 @Injectable()
 export class ReportsService {
+  private readonly timezone = getReportTimezone();
+
   constructor(
-    @InjectRepository(InvoiceItem) private readonly invoiceItemRepository: Repository<InvoiceItem>,
+    @InjectDataSource() private readonly dataSource: DataSource,
     @InjectRepository(Diagnosis) private readonly diagnosisRepository: Repository<Diagnosis>,
     @InjectRepository(PreScreeningResult)
     private readonly preScreeningResultRepository: Repository<PreScreeningResult>,
   ) {}
 
   async getRevenue(query: RevenueQueryDto): Promise<RevenueByPeriod[]> {
-    const fromDate = startOfDay(new Date(query.from));
-    const toDate = endOfDay(new Date(query.to));
-    this.assertValidRange(fromDate, toDate);
-
+    this.assertValidDateStrings(query.from, query.to);
     const groupBy = query.groupBy ?? 'day';
     const dateFormat = groupBy === 'month' ? 'YYYY-MM' : 'YYYY-MM-DD';
-
-    const periodExpr = `TO_CHAR(invoice.paid_at, '${dateFormat}')`;
-
-    const qb = this.invoiceItemRepository
-      .createQueryBuilder('invoiceItem')
-      .innerJoin('invoiceItem.invoice', 'invoice')
-      .where('invoice.paid = :paid', { paid: true })
-      .andWhere('invoice.paidAt >= :from', { from: fromDate })
-      .andWhere('invoice.paidAt <= :to', { to: toDate });
-
-    if (query.branchId) {
-      qb.innerJoin('invoice.appointment', 'appointment').andWhere(
-        'appointment.branchId = :branchId',
-        {
-          branchId: query.branchId,
-        },
-      );
-    }
-
-    const rows = await qb
-      .select(periodExpr, 'period')
-      .addSelect('SUM(invoiceItem.price * invoiceItem.quantity)', 'totalRevenue')
-      .addSelect('COUNT(DISTINCT invoice.id)', 'invoiceCount')
-
-      .groupBy(periodExpr)
-      .orderBy(periodExpr, 'ASC')
-      .getRawMany<{ period: string; totalRevenue: string | null; invoiceCount: string }>();
+    const rows = await this.dataSource.query<
+      { period: string; totalRevenue: string | null; invoiceCount: string }[]
+    >(
+      `
+      SELECT TO_CHAR(p."paid_at" AT TIME ZONE $4, '${dateFormat}') AS "period",
+             COALESCE(SUM(p."amount"), 0)                         AS "totalRevenue",
+             COUNT(DISTINCT p."invoice_id")                       AS "invoiceCount"
+        FROM "payments" p
+        JOIN "invoices" i ON i."id" = p."invoice_id" AND i."deleted_at" IS NULL
+       WHERE p."deleted_at" IS NULL
+         AND p."status" IN ('SUCCESS', 'REFUNDED')
+         AND (p."paid_at" AT TIME ZONE $4)::date BETWEEN $1::date AND $2::date
+         AND ($3::uuid IS NULL OR i."branch_id" = $3::uuid)
+         AND ($5::text IS NULL OR p."method"::text = $5::text)
+         AND ($6::uuid IS NULL OR p."received_by_user_id" = $6::uuid)
+       GROUP BY "period"
+       ORDER BY "period"
+      `,
+      [
+        query.from,
+        query.to,
+        query.branchId ?? null,
+        this.timezone,
+        query.paymentMethod ?? null,
+        query.employeeUserId ?? null,
+      ],
+    );
 
     return rows.map((row) => ({
       period: row.period,
@@ -71,37 +70,51 @@ export class ReportsService {
   }
 
   async getRevenueByService(query: RevenueFilterQueryDto): Promise<RevenueByService[]> {
-    const fromDate = startOfDay(new Date(query.from));
-    const toDate = endOfDay(new Date(query.to));
-    this.assertValidRange(fromDate, toDate);
-
-    const qb = this.invoiceItemRepository
-      .createQueryBuilder('invoiceItem')
-      .innerJoin('invoiceItem.invoice', 'invoice')
-      .innerJoin('invoiceItem.item', 'item')
-      .where('invoice.paid = :paid', { paid: true })
-      .andWhere('item.itemType = :itemType', { itemType: ItemType.SERVICE })
-      .andWhere('invoice.paidAt >= :from', { from: fromDate })
-      .andWhere('invoice.paidAt <= :to', { to: toDate });
-
-    if (query.branchId) {
-      qb.innerJoin('invoice.appointment', 'appointment').andWhere(
-        'appointment.branchId = :branchId',
-        {
-          branchId: query.branchId,
-        },
-      );
-    }
-
-    const revenueExpr = 'SUM(invoiceItem.price * invoiceItem.quantity)';
-    const rows = await qb
-      .select('item.itemName', 'serviceName')
-      .addSelect(revenueExpr, 'totalRevenue')
-      .addSelect('COUNT(*)', 'count')
-      .groupBy('item.id')
-      .addGroupBy('item.itemName')
-      .orderBy(revenueExpr, 'DESC')
-      .getRawMany<{ serviceName: string; totalRevenue: string | null; count: string }>();
+    this.assertValidDateStrings(query.from, query.to);
+    const rows = await this.dataSource.query<
+      { serviceName: string; totalRevenue: string | null; count: string }[]
+    >(
+      `
+      WITH paid_per_invoice AS (
+        SELECT p."invoice_id", SUM(p."amount") AS "netPaid"
+          FROM "payments" p
+          JOIN "invoices" i ON i."id" = p."invoice_id" AND i."deleted_at" IS NULL
+         WHERE p."deleted_at" IS NULL
+           AND p."status" IN ('SUCCESS', 'REFUNDED')
+           AND (p."paid_at" AT TIME ZONE $4)::date BETWEEN $1::date AND $2::date
+           AND ($3::uuid IS NULL OR i."branch_id" = $3::uuid)
+           AND ($6::text IS NULL OR p."method"::text = $6::text)
+           AND ($7::uuid IS NULL OR p."received_by_user_id" = $7::uuid)
+         GROUP BY p."invoice_id"
+      ), invoice_gross AS (
+        SELECT ii."invoice_id", SUM(ii."price" * ii."quantity") AS "gross"
+          FROM "invoice_items" ii
+         WHERE ii."deleted_at" IS NULL
+         GROUP BY ii."invoice_id"
+      )
+      SELECT it."item_name" AS "serviceName",
+             COALESCE(SUM(
+               (ii."price" * ii."quantity")::numeric / NULLIF(g."gross", 0) * paid."netPaid"
+             ), 0) AS "totalRevenue",
+             SUM(ii."quantity")::int AS "count"
+        FROM paid_per_invoice paid
+        JOIN invoice_gross g ON g."invoice_id" = paid."invoice_id"
+        JOIN "invoice_items" ii ON ii."invoice_id" = paid."invoice_id" AND ii."deleted_at" IS NULL
+        JOIN "items" it ON it."id" = ii."item_id" AND it."deleted_at" IS NULL
+       WHERE it."itemType"::text = $5
+       GROUP BY it."id", it."item_name"
+       ORDER BY "totalRevenue" DESC
+      `,
+      [
+        query.from,
+        query.to,
+        query.branchId ?? null,
+        this.timezone,
+        ItemType.SERVICE,
+        query.paymentMethod ?? null,
+        query.employeeUserId ?? null,
+      ],
+    );
 
     return rows.map((row) => ({
       serviceName: row.serviceName,
@@ -111,38 +124,42 @@ export class ReportsService {
   }
 
   async getRevenueByDoctor(query: RevenueFilterQueryDto): Promise<RevenueByDoctor[]> {
-    const fromDate = startOfDay(new Date(query.from));
-    const toDate = endOfDay(new Date(query.to));
-    this.assertValidRange(fromDate, toDate);
-
-    const qb = this.invoiceItemRepository
-      .createQueryBuilder('invoiceItem')
-      .innerJoin('invoiceItem.invoice', 'invoice')
-      .innerJoin('invoice.appointment', 'appointment')
-      .innerJoin('appointment.doctor', 'doctor')
-      .where('invoice.paid = :paid', { paid: true })
-      .andWhere('invoice.paidAt >= :from', { from: fromDate })
-      .andWhere('invoice.paidAt <= :to', { to: toDate });
-
-    if (query.branchId) {
-      qb.andWhere('appointment.branchId = :branchId', { branchId: query.branchId });
-    }
-
-    const revenueExpr = 'SUM(invoiceItem.price * invoiceItem.quantity)';
-    const rows = await qb
-      .select('doctor.id', 'doctorId')
-      .addSelect('doctor.fullName', 'doctorName')
-      .addSelect(revenueExpr, 'totalRevenue')
-      .addSelect('COUNT(DISTINCT invoice.id)', 'appointmentCount')
-      .groupBy('doctor.id')
-      .addGroupBy('doctor.fullName')
-      .orderBy(revenueExpr, 'DESC')
-      .getRawMany<{
+    this.assertValidDateStrings(query.from, query.to);
+    const rows = await this.dataSource.query<
+      {
         doctorId: string;
         doctorName: string;
         totalRevenue: string | null;
         appointmentCount: string;
-      }>();
+      }[]
+    >(
+      `
+      SELECT d."id" AS "doctorId",
+             d."full_name" AS "doctorName",
+             COALESCE(SUM(p."amount"), 0) AS "totalRevenue",
+             COUNT(DISTINCT a."id") AS "appointmentCount"
+        FROM "payments" p
+        JOIN "invoices" i ON i."id" = p."invoice_id" AND i."deleted_at" IS NULL
+        JOIN "appointments" a ON a."id" = i."appointment_id" AND a."deleted_at" IS NULL
+        JOIN "doctors" d ON d."id" = a."doctor_id" AND d."deleted_at" IS NULL
+       WHERE p."deleted_at" IS NULL
+         AND p."status" IN ('SUCCESS', 'REFUNDED')
+         AND (p."paid_at" AT TIME ZONE $4)::date BETWEEN $1::date AND $2::date
+         AND ($3::uuid IS NULL OR i."branch_id" = $3::uuid)
+         AND ($5::text IS NULL OR p."method"::text = $5::text)
+         AND ($6::uuid IS NULL OR p."received_by_user_id" = $6::uuid)
+       GROUP BY d."id", d."full_name"
+       ORDER BY "totalRevenue" DESC
+      `,
+      [
+        query.from,
+        query.to,
+        query.branchId ?? null,
+        this.timezone,
+        query.paymentMethod ?? null,
+        query.employeeUserId ?? null,
+      ],
+    );
 
     return rows.map((row) => ({
       doctorId: row.doctorId,
@@ -160,7 +177,7 @@ export class ReportsService {
     const qb = this.diagnosisRepository
       .createQueryBuilder('diagnosis')
       .innerJoin('diagnosis.medicalRecord', 'medicalRecord')
-      
+
       .leftJoin('medicalRecord.examination', 'examination')
       .leftJoin('diagnosis.disease', 'disease')
       .select('COALESCE(disease.disease_name, diagnosis.diagnosis_text)', 'diseaseGroup')
@@ -250,6 +267,12 @@ export class ReportsService {
 
   private assertValidRange(fromDate?: Date, toDate?: Date): void {
     if (fromDate && toDate && fromDate > toDate) {
+      throw new BadRequestException('`from` must be on or before `to`');
+    }
+  }
+
+  private assertValidDateStrings(from: string, to: string): void {
+    if (from > to) {
       throw new BadRequestException('`from` must be on or before `to`');
     }
   }

@@ -27,14 +27,16 @@ async function bootstrap() {
     }),
   );
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('veterinary-clinic-backend')
-    .setDescription('Multi-branch veterinary clinic management API')
-    .setVersion('0.1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document);
+  if (config.get<boolean>('app.swaggerEnabled')) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('veterinary-clinic-backend')
+      .setDescription('Multi-branch veterinary clinic management API')
+      .setVersion('0.1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('docs', app, document);
+  }
 
   const port = config.get<number>('app.port')!;
   await app.listen(port, '0.0.0.0');

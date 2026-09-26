@@ -10,11 +10,14 @@ import {
   SalesReportRow,
   TopVeterinarian,
 } from './reports.types';
+import { getReportTimezone } from './report-timezone';
 
 const DEFAULT_EXPIRING_SOON_DAYS = 30;
 
 @Injectable()
 export class OperationalReportsService {
+  private readonly timezone = getReportTimezone();
+
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   private get expiringSoonDays(): number {
@@ -40,7 +43,7 @@ export class OperationalReportsService {
         FROM "payments" p
         JOIN "invoices" i ON i."id" = p."invoice_id" AND i."deleted_at" IS NULL
        WHERE p."deleted_at" IS NULL
-         AND p."paid_at"::date BETWEEN $1::date AND $2::date
+         AND (p."paid_at" AT TIME ZONE $6)::date BETWEEN $1::date AND $2::date
          AND ($3::uuid IS NULL OR i."branch_id" = $3::uuid)
          AND ($4::text IS NULL OR p."method"::text = $4::text)
          AND ($5::uuid IS NULL OR p."received_by_user_id" = $5::uuid)
@@ -51,6 +54,7 @@ export class OperationalReportsService {
         query.branchId ?? null,
         query.paymentMethod ?? null,
         query.employeeUserId ?? null,
+        this.timezone,
       ],
     );
 
@@ -68,10 +72,24 @@ export class OperationalReportsService {
         ) paid ON true
        WHERE i."deleted_at" IS NULL
          AND i."status" IN ('PENDING', 'PARTIALLY_PAID')
-         AND i."created_at"::date BETWEEN $1::date AND $2::date
+         AND (i."created_at" AT TIME ZONE $6)::date BETWEEN $1::date AND $2::date
          AND ($3::uuid IS NULL OR i."branch_id" = $3::uuid)
+         AND ($4::text IS NULL OR i."payment_method"::text = $4::text)
+         AND ($5::uuid IS NULL OR EXISTS (
+           SELECT 1 FROM "payments" receiver_payment
+            WHERE receiver_payment."invoice_id" = i."id"
+              AND receiver_payment."deleted_at" IS NULL
+              AND receiver_payment."received_by_user_id" = $5::uuid
+         ))
       `,
-      [query.from, query.to, query.branchId ?? null],
+      [
+        query.from,
+        query.to,
+        query.branchId ?? null,
+        query.paymentMethod ?? null,
+        query.employeeUserId ?? null,
+        this.timezone,
+      ],
     );
 
     return {
@@ -118,9 +136,11 @@ export class OperationalReportsService {
     const [batches] = await this.dataSource.query<[Record<string, string | null>]>(
       `
       SELECT
-        COUNT(*) FILTER (WHERE b."expiry_date" <  CURRENT_DATE)      AS "expired",
-        COUNT(*) FILTER (WHERE b."expiry_date" >= CURRENT_DATE
-                           AND b."expiry_date" <= CURRENT_DATE + ($2::int * INTERVAL '1 day'))
+        COUNT(*) FILTER (WHERE b."expiry_date" < (CURRENT_TIMESTAMP AT TIME ZONE $3)::date)
+                                                                     AS "expired",
+        COUNT(*) FILTER (WHERE b."expiry_date" >= (CURRENT_TIMESTAMP AT TIME ZONE $3)::date
+                           AND b."expiry_date" <= (CURRENT_TIMESTAMP AT TIME ZONE $3)::date
+                             + ($2::int * INTERVAL '1 day'))
                                                                      AS "expiringSoon"
         FROM "inventory_batches" b
         JOIN "inventory_items" inv ON inv."id" = b."inventory_item_id" AND inv."deleted_at" IS NULL
@@ -129,7 +149,7 @@ export class OperationalReportsService {
          AND b."expiry_date" IS NOT NULL
          AND ($1::uuid IS NULL OR inv."branch_id" = $1::uuid)
       `,
-      [branchId ?? null, this.expiringSoonDays],
+      [branchId ?? null, this.expiringSoonDays, this.timezone],
     );
 
     return {
@@ -159,12 +179,33 @@ export class OperationalReportsService {
         JOIN "items" it ON it."id" = ii."item_id"
        WHERE ii."deleted_at" IS NULL
          AND i."status" IN ('PAID', 'PARTIALLY_PAID')
-         AND i."created_at"::date BETWEEN $1::date AND $2::date
+         AND (i."created_at" AT TIME ZONE $6)::date BETWEEN $1::date AND $2::date
          AND ($3::uuid IS NULL OR i."branch_id" = $3::uuid)
+         AND ($4::text IS NULL OR EXISTS (
+           SELECT 1 FROM "payments" filtered_payment
+            WHERE filtered_payment."invoice_id" = i."id"
+              AND filtered_payment."deleted_at" IS NULL
+              AND filtered_payment."status" IN ('SUCCESS', 'REFUNDED')
+              AND filtered_payment."method"::text = $4::text
+         ))
+         AND ($5::uuid IS NULL OR EXISTS (
+           SELECT 1 FROM "payments" filtered_receiver
+            WHERE filtered_receiver."invoice_id" = i."id"
+              AND filtered_receiver."deleted_at" IS NULL
+              AND filtered_receiver."status" IN ('SUCCESS', 'REFUNDED')
+              AND filtered_receiver."received_by_user_id" = $5::uuid
+         ))
        GROUP BY it."id", it."code", it."item_name", it."itemType"
        ORDER BY SUM(ii."quantity") DESC, it."item_name" ASC
       `,
-      [query.from, query.to, query.branchId ?? null],
+      [
+        query.from,
+        query.to,
+        query.branchId ?? null,
+        query.paymentMethod ?? null,
+        query.employeeUserId ?? null,
+        this.timezone,
+      ],
     );
   }
 
@@ -183,11 +224,11 @@ export class OperationalReportsService {
         FROM "appointments" a
        WHERE a."deleted_at" IS NULL
          AND a."start_at" < now()
-         AND ($1::date IS NULL OR a."start_at"::date >= $1::date)
-         AND ($2::date IS NULL OR a."start_at"::date <= $2::date)
+         AND ($1::date IS NULL OR (a."start_at" AT TIME ZONE $4)::date >= $1::date)
+         AND ($2::date IS NULL OR (a."start_at" AT TIME ZONE $4)::date <= $2::date)
          AND ($3::uuid IS NULL OR a."branch_id" = $3::uuid)
       `,
-      [from, to, query.branchId ?? null],
+      [from, to, query.branchId ?? null, this.timezone],
     );
 
     const topVeterinarians: TopVeterinarian[] = await this.dataSource.query(
@@ -201,14 +242,14 @@ export class OperationalReportsService {
         JOIN "users" u ON u."id" = d."user_id"
        WHERE a."deleted_at" IS NULL
          AND a."start_at" < now()
-         AND ($1::date IS NULL OR a."start_at"::date >= $1::date)
-         AND ($2::date IS NULL OR a."start_at"::date <= $2::date)
+         AND ($1::date IS NULL OR (a."start_at" AT TIME ZONE $4)::date >= $1::date)
+         AND ($2::date IS NULL OR (a."start_at" AT TIME ZONE $4)::date <= $2::date)
          AND ($3::uuid IS NULL OR a."branch_id" = $3::uuid)
        GROUP BY d."id", u."full_name"
        ORDER BY COUNT(*) FILTER (WHERE a."status" = 'COMPLETED') DESC, u."full_name" ASC
        LIMIT 10
       `,
-      [from, to, query.branchId ?? null],
+      [from, to, query.branchId ?? null, this.timezone],
     );
 
     const total = Number(row.totalAppointments ?? 0);

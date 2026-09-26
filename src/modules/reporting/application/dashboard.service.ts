@@ -9,9 +9,10 @@ import {
   DashboardSeries,
   DashboardSeriesPoint,
 } from './dashboard.types';
+import { getReportTimezone } from './report-timezone';
 
 const CACHE_TTL_SECONDS = 60;
-const CACHE_PREFIX = 'dashboard:v1';
+const CACHE_PREFIX = 'dashboard:v2';
 
 const TREND_DAYS = 30;
 
@@ -22,6 +23,7 @@ const TOP_N = 5;
 @Injectable()
 export class DashboardService {
   private readonly logger = new Logger(DashboardService.name);
+  private readonly timezone = getReportTimezone();
 
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
@@ -61,7 +63,7 @@ export class DashboardService {
            JOIN "invoices" i ON i."id" = p."invoice_id" AND i."deleted_at" IS NULL
           WHERE p."deleted_at" IS NULL
             AND p."status" IN ('SUCCESS', 'REFUNDED')
-            AND p."paid_at"::date = CURRENT_DATE
+            AND (p."paid_at" AT TIME ZONE $2)::date = (CURRENT_TIMESTAMP AT TIME ZONE $2)::date
             AND ($1::uuid IS NULL OR i."branch_id" = $1::uuid))          AS "revenueToday",
 
         (SELECT COALESCE(SUM(p."amount"), 0)
@@ -69,25 +71,27 @@ export class DashboardService {
            JOIN "invoices" i ON i."id" = p."invoice_id" AND i."deleted_at" IS NULL
           WHERE p."deleted_at" IS NULL
             AND p."status" IN ('SUCCESS', 'REFUNDED')
-            AND p."paid_at"::date = CURRENT_DATE - 1
+            AND (p."paid_at" AT TIME ZONE $2)::date = (CURRENT_TIMESTAMP AT TIME ZONE $2)::date - 1
             AND ($1::uuid IS NULL OR i."branch_id" = $1::uuid))          AS "revenueYesterday",
 
         (SELECT COUNT(*) FROM "appointments" a
-          WHERE a."deleted_at" IS NULL AND a."start_at"::date = CURRENT_DATE
+          WHERE a."deleted_at" IS NULL
+            AND (a."start_at" AT TIME ZONE $2)::date = (CURRENT_TIMESTAMP AT TIME ZONE $2)::date
             AND ($1::uuid IS NULL OR a."branch_id" = $1::uuid))          AS "appointmentsToday",
         (SELECT COUNT(*) FROM "appointments" a
-          WHERE a."deleted_at" IS NULL AND a."start_at"::date = CURRENT_DATE - 1
+          WHERE a."deleted_at" IS NULL
+            AND (a."start_at" AT TIME ZONE $2)::date = (CURRENT_TIMESTAMP AT TIME ZONE $2)::date - 1
             AND ($1::uuid IS NULL OR a."branch_id" = $1::uuid))          AS "appointmentsYesterday",
 
         (SELECT COUNT(*) FROM "medical_records" r
            JOIN "appointments" a ON a."id" = r."appointment_id"
           WHERE r."deleted_at" IS NULL AND r."status" = 'COMPLETED'
-            AND r."completed_at"::date = CURRENT_DATE
+            AND (r."completed_at" AT TIME ZONE $2)::date = (CURRENT_TIMESTAMP AT TIME ZONE $2)::date
             AND ($1::uuid IS NULL OR a."branch_id" = $1::uuid))          AS "examsToday",
         (SELECT COUNT(*) FROM "medical_records" r
            JOIN "appointments" a ON a."id" = r."appointment_id"
           WHERE r."deleted_at" IS NULL AND r."status" = 'COMPLETED'
-            AND r."completed_at"::date = CURRENT_DATE - 1
+            AND (r."completed_at" AT TIME ZONE $2)::date = (CURRENT_TIMESTAMP AT TIME ZONE $2)::date - 1
             AND ($1::uuid IS NULL OR a."branch_id" = $1::uuid))          AS "examsYesterday",
 
         -- BA trang thai, khong phai hai: day dung la tap ma trang Hang cho hien mac
@@ -97,22 +101,26 @@ export class DashboardService {
         -- dashboard, du "dang trong phong kham" doi la khong con dung cho.
         (SELECT COUNT(*) FROM "queue_entries" q
           WHERE q."deleted_at" IS NULL
-            AND q."queue_date" = CURRENT_DATE
+            AND q."queue_date" = (CURRENT_TIMESTAMP AT TIME ZONE $2)::date
             AND q."status" IN ('WAITING', 'ASSIGNED', 'IN_ROOM')
             AND ($1::uuid IS NULL OR q."branch_id" = $1::uuid))          AS "waitingPatients",
 
         (SELECT COUNT(*) FROM "users" u
           WHERE u."deleted_at" IS NULL AND u."role" = 'PET_OWNER'
-            AND u."created_at"::date = CURRENT_DATE)                     AS "newCustomersToday",
+            AND (u."created_at" AT TIME ZONE $2)::date = (CURRENT_TIMESTAMP AT TIME ZONE $2)::date)
+                                                                          AS "newCustomersToday",
         (SELECT COUNT(*) FROM "users" u
           WHERE u."deleted_at" IS NULL AND u."role" = 'PET_OWNER'
-            AND u."created_at"::date = CURRENT_DATE - 1)                 AS "newCustomersYesterday",
+            AND (u."created_at" AT TIME ZONE $2)::date = (CURRENT_TIMESTAMP AT TIME ZONE $2)::date - 1)
+                                                                          AS "newCustomersYesterday",
 
         (SELECT COUNT(*) FROM "pets" p
-          WHERE p."deleted_at" IS NULL AND p."created_at"::date = CURRENT_DATE)
+          WHERE p."deleted_at" IS NULL
+            AND (p."created_at" AT TIME ZONE $2)::date = (CURRENT_TIMESTAMP AT TIME ZONE $2)::date)
                                                                           AS "newPetsToday",
         (SELECT COUNT(*) FROM "pets" p
-          WHERE p."deleted_at" IS NULL AND p."created_at"::date = CURRENT_DATE - 1)
+          WHERE p."deleted_at" IS NULL
+            AND (p."created_at" AT TIME ZONE $2)::date = (CURRENT_TIMESTAMP AT TIME ZONE $2)::date - 1)
                                                                           AS "newPetsYesterday",
 
         (SELECT COUNT(*) FROM "inventory_items" inv
@@ -129,7 +137,7 @@ export class DashboardService {
             AND inv."inventory_quantity" <= me."minimum_stock"
             AND ($1::uuid IS NULL OR inv."branch_id" = $1::uuid))         AS "lowStockMedicines"
       `,
-      [branchId],
+      [branchId, this.timezone],
     );
 
     const n = (key: string): number => Number(row[key] ?? 0);
@@ -216,7 +224,7 @@ export class DashboardService {
       label,
       value,
       format,
-      
+
       deltaRatio: previous === null || previous === 0 ? null : (value - previous) / previous,
       link,
     };
@@ -285,9 +293,13 @@ export class DashboardService {
       `
       SELECT to_char(d."day", 'DD/MM')                      AS "label",
              COALESCE(SUM(p."amount"), 0)::float8           AS "value"
-        FROM generate_series(CURRENT_DATE - ($2::int - 1), CURRENT_DATE, '1 day') AS d("day")
+        FROM generate_series(
+               (CURRENT_TIMESTAMP AT TIME ZONE $3)::date - ($2::int - 1),
+               (CURRENT_TIMESTAMP AT TIME ZONE $3)::date,
+               '1 day'
+             ) AS d("day")
         LEFT JOIN "payments" p
-               ON p."paid_at"::date = d."day"
+               ON (p."paid_at" AT TIME ZONE $3)::date = d."day"
               AND p."deleted_at" IS NULL
               AND p."status" IN ('SUCCESS', 'REFUNDED')
         LEFT JOIN "invoices" i
@@ -296,7 +308,7 @@ export class DashboardService {
        GROUP BY d."day"
        ORDER BY d."day"
       `,
-      [branchId, TREND_DAYS],
+      [branchId, TREND_DAYS, this.timezone],
     );
   }
 
@@ -306,12 +318,13 @@ export class DashboardService {
       SELECT to_char(d."month", 'MM/YYYY')                  AS "label",
              COALESCE(SUM(p."amount"), 0)::float8           AS "value"
         FROM generate_series(
-               date_trunc('month', CURRENT_DATE) - (($2::int - 1) || ' month')::interval,
-               date_trunc('month', CURRENT_DATE),
+               date_trunc('month', CURRENT_TIMESTAMP AT TIME ZONE $3)
+                 - (($2::int - 1) || ' month')::interval,
+               date_trunc('month', CURRENT_TIMESTAMP AT TIME ZONE $3),
                '1 month'
              ) AS d("month")
         LEFT JOIN "payments" p
-               ON date_trunc('month', p."paid_at") = d."month"
+               ON date_trunc('month', p."paid_at" AT TIME ZONE $3) = d."month"
               AND p."deleted_at" IS NULL
               AND p."status" IN ('SUCCESS', 'REFUNDED')
         LEFT JOIN "invoices" i
@@ -320,7 +333,7 @@ export class DashboardService {
        GROUP BY d."month"
        ORDER BY d."month"
       `,
-      [branchId, TREND_MONTHS],
+      [branchId, TREND_MONTHS, this.timezone],
     );
   }
 
@@ -329,9 +342,13 @@ export class DashboardService {
       `
       SELECT to_char(d."day", 'DD/MM')  AS "label",
              COUNT(r."id")::float8      AS "value"
-        FROM generate_series(CURRENT_DATE - ($2::int - 1), CURRENT_DATE, '1 day') AS d("day")
+        FROM generate_series(
+               (CURRENT_TIMESTAMP AT TIME ZONE $3)::date - ($2::int - 1),
+               (CURRENT_TIMESTAMP AT TIME ZONE $3)::date,
+               '1 day'
+             ) AS d("day")
         LEFT JOIN "medical_records" r
-               ON r."completed_at"::date = d."day"
+               ON (r."completed_at" AT TIME ZONE $3)::date = d."day"
               AND r."deleted_at" IS NULL
               AND r."status" = 'COMPLETED'
         LEFT JOIN "appointments" a ON a."id" = r."appointment_id"
@@ -339,7 +356,7 @@ export class DashboardService {
        GROUP BY d."day"
        ORDER BY d."day"
       `,
-      [branchId, TREND_DAYS],
+      [branchId, TREND_DAYS, this.timezone],
     );
   }
 
@@ -348,15 +365,19 @@ export class DashboardService {
       `
       SELECT to_char(d."day", 'DD/MM')  AS "label",
              COUNT(u."id")::float8      AS "value"
-        FROM generate_series(CURRENT_DATE - ($1::int - 1), CURRENT_DATE, '1 day') AS d("day")
+        FROM generate_series(
+               (CURRENT_TIMESTAMP AT TIME ZONE $2)::date - ($1::int - 1),
+               (CURRENT_TIMESTAMP AT TIME ZONE $2)::date,
+               '1 day'
+             ) AS d("day")
         LEFT JOIN "users" u
-               ON u."created_at"::date = d."day"
+               ON (u."created_at" AT TIME ZONE $2)::date = d."day"
               AND u."deleted_at" IS NULL
               AND u."role" = 'PET_OWNER'
        GROUP BY d."day"
        ORDER BY d."day"
       `,
-      [TREND_DAYS],
+      [TREND_DAYS, this.timezone],
     );
   }
 
@@ -365,13 +386,17 @@ export class DashboardService {
       `
       SELECT to_char(d."day", 'DD/MM')  AS "label",
              COUNT(p."id")::float8      AS "value"
-        FROM generate_series(CURRENT_DATE - ($1::int - 1), CURRENT_DATE, '1 day') AS d("day")
+        FROM generate_series(
+               (CURRENT_TIMESTAMP AT TIME ZONE $2)::date - ($1::int - 1),
+               (CURRENT_TIMESTAMP AT TIME ZONE $2)::date,
+               '1 day'
+             ) AS d("day")
         LEFT JOIN "pets" p
-               ON p."created_at"::date = d."day" AND p."deleted_at" IS NULL
+               ON (p."created_at" AT TIME ZONE $2)::date = d."day" AND p."deleted_at" IS NULL
        GROUP BY d."day"
        ORDER BY d."day"
       `,
-      [TREND_DAYS],
+      [TREND_DAYS, this.timezone],
     );
   }
 
@@ -386,13 +411,14 @@ export class DashboardService {
        WHERE ii."deleted_at" IS NULL
          AND it."itemType"::text = $2
          AND i."status" IN ('PAID', 'PARTIALLY_PAID')
-         AND i."created_at" >= CURRENT_DATE - ($3::int - 1)
+         AND (i."created_at" AT TIME ZONE $4)::date >=
+             (CURRENT_TIMESTAMP AT TIME ZONE $4)::date - ($3::int - 1)
          AND ($1::uuid IS NULL OR i."branch_id" = $1::uuid)
        GROUP BY it."id", it."item_name"
        ORDER BY SUM(ii."quantity") DESC
        LIMIT ${TOP_N}
       `,
-      [branchId, itemType, TREND_DAYS],
+      [branchId, itemType, TREND_DAYS, this.timezone],
     );
   }
 

@@ -8,6 +8,7 @@ import { Appointment } from '@/modules/scheduling/domain/entities/appointment.en
 import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
 import { Prescription } from '@/modules/clinical/domain/entities/prescription.entity';
 import { LabTestOrder } from '@/modules/clinical/domain/entities/lab-test-order.entity';
+import { Vaccination } from '@/modules/clinical/domain/entities/vaccination.entity';
 import { Invoice } from '@/modules/billing/domain/entities/invoice.entity';
 import { PetsController } from '@/modules/pets/presentation/pets.controller';
 import { PetsService } from '@/modules/pets/application/pets.service';
@@ -27,6 +28,7 @@ import { SpeciesService } from '@/modules/pets/application/species.service';
       MedicalRecord,
       Prescription,
       LabTestOrder,
+      Vaccination,
       Invoice,
     ]),
   ],

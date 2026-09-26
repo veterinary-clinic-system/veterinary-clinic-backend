@@ -6,6 +6,8 @@ import { Appointment } from '@/modules/scheduling/domain/entities/appointment.en
 import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
 import { Prescription } from '@/modules/clinical/domain/entities/prescription.entity';
 import { LabTestOrder } from '@/modules/clinical/domain/entities/lab-test-order.entity';
+import { Vaccination } from '@/modules/clinical/domain/entities/vaccination.entity';
+import { VaccinationDueStatus, classifyDueDate, toDateOnly } from '@/modules/clinical/application';
 import { Invoice } from '@/modules/billing/domain/entities/invoice.entity';
 import { AppointmentStatus } from '@/shared/common/enums/appointment-status.enum';
 import {
@@ -14,6 +16,7 @@ import {
 } from '@/shared/common/enums/medical-record-status.enum';
 import { LabTestStatus } from '@/shared/common/enums/lab-test-status.enum';
 import { PaymentMethod } from '@/shared/common/enums/payment-method.enum';
+import { InvoiceStatus } from '@/shared/common/enums/invoice-status.enum';
 import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 
 export interface PetAppointmentRow {
@@ -103,6 +106,16 @@ export interface PetInvoiceRow {
   paidAt: Date | null;
   paymentMethod: PaymentMethod | null;
   totalAmount: number;
+  status: InvoiceStatus;
+}
+
+export interface PetVaccinationRow {
+  vaccination: Vaccination;
+  dueStatus: VaccinationDueStatus;
+}
+
+interface OwnerVisibilityOptions {
+  completedOnly?: boolean;
 }
 
 @Injectable()
@@ -115,6 +128,8 @@ export class PetProfileService {
     @InjectRepository(Prescription)
     private readonly prescriptionsRepository: Repository<Prescription>,
     @InjectRepository(LabTestOrder) private readonly labTestsRepository: Repository<LabTestOrder>,
+    @InjectRepository(Vaccination)
+    private readonly vaccinationsRepository: Repository<Vaccination>,
     @InjectRepository(Invoice) private readonly invoicesRepository: Repository<Invoice>,
   ) {}
 
@@ -151,10 +166,13 @@ export class PetProfileService {
     }));
   }
 
-  async findMedicalHistory(petId: string): Promise<PetMedicalHistoryRow[]> {
+  async findMedicalHistory(
+    petId: string,
+    options: OwnerVisibilityOptions = {},
+  ): Promise<PetMedicalHistoryRow[]> {
     await this.assertPetExists(petId);
 
-    const rows = await this.medicalRecordsRepository
+    const qb = this.medicalRecordsRepository
       .createQueryBuilder('medicalRecord')
       .innerJoin('medicalRecord.appointment', 'appointment')
       .leftJoin('medicalRecord.doctor', 'doctor')
@@ -172,8 +190,15 @@ export class PetProfileService {
       .addSelect('branch.branch_name', 'branch_name')
       .addSelect(DIAGNOSES_JSON_SUBQUERY, 'diagnoses')
       .where('medicalRecord.pet_id = :petId', { petId })
-      .orderBy('COALESCE(examination.examined_at, medicalRecord.created_at)', 'DESC')
-      .getRawMany<RawPetMedicalHistoryRow>();
+      .orderBy('COALESCE(examination.examined_at, medicalRecord.created_at)', 'DESC');
+
+    if (options.completedOnly) {
+      qb.andWhere('medicalRecord.status = :completedStatus', {
+        completedStatus: MedicalRecordStatus.COMPLETED,
+      });
+    }
+
+    const rows = await qb.getRawMany<RawPetMedicalHistoryRow>();
 
     return rows.map((row) => ({
       medicalRecordId: row.medical_record_id,
@@ -190,10 +215,13 @@ export class PetProfileService {
     }));
   }
 
-  async findPrescriptions(petId: string): Promise<PetPrescriptionRow[]> {
+  async findPrescriptions(
+    petId: string,
+    options: OwnerVisibilityOptions = {},
+  ): Promise<PetPrescriptionRow[]> {
     await this.assertPetExists(petId);
 
-    const prescriptions = await this.prescriptionsRepository
+    const qb = this.prescriptionsRepository
       .createQueryBuilder('prescription')
       .innerJoinAndSelect('prescription.medicalRecord', 'medicalRecord')
       .leftJoinAndSelect('medicalRecord.doctor', 'doctor')
@@ -204,19 +232,26 @@ export class PetProfileService {
       .leftJoinAndSelect('item.medication', 'medication')
       .leftJoinAndSelect('medication.item', 'medicationItem')
       .where('medicalRecord.pet_id = :petId', { petId })
-      .orderBy('medicalRecord.created_at', 'DESC')
-      .getMany();
+      .orderBy('medicalRecord.created_at', 'DESC');
+
+    if (options.completedOnly) {
+      qb.andWhere('medicalRecord.status = :completedStatus', {
+        completedStatus: MedicalRecordStatus.COMPLETED,
+      });
+    }
+
+    const prescriptions = await qb.getMany();
 
     return prescriptions.map((prescription) => ({
       prescriptionId: prescription.id,
       medicalRecordId: prescription.medicalRecordId,
-      
+
       examinedAt: prescription.medicalRecord.examination?.examinedAt ?? prescription.createdAt,
       doctorName: prescription.medicalRecord.doctor?.fullName ?? null,
       notes: prescription.notes,
       items: (prescription.items ?? []).map((item) => ({
         id: item.id,
-        
+
         medicationName: item.medication?.item?.itemName ?? '—',
         unit: item.medication?.unit ?? '',
         dosage: item.dosage,
@@ -226,15 +261,25 @@ export class PetProfileService {
     }));
   }
 
-  async findLabTests(petId: string): Promise<PetLabTestRow[]> {
+  async findLabTests(
+    petId: string,
+    options: OwnerVisibilityOptions = {},
+  ): Promise<PetLabTestRow[]> {
     await this.assertPetExists(petId);
 
-    const orders = await this.labTestsRepository
+    const qb = this.labTestsRepository
       .createQueryBuilder('labTest')
       .innerJoin('labTest.medicalRecord', 'medicalRecord')
       .where('medicalRecord.pet_id = :petId', { petId })
-      .orderBy('labTest.created_at', 'DESC')
-      .getMany();
+      .orderBy('labTest.created_at', 'DESC');
+
+    if (options.completedOnly) {
+      qb.andWhere('medicalRecord.status = :completedStatus', {
+        completedStatus: MedicalRecordStatus.COMPLETED,
+      });
+    }
+
+    const orders = await qb.getMany();
 
     return orders.map((order) => ({
       labTestId: order.id,
@@ -253,17 +298,15 @@ export class PetProfileService {
     const rows = await this.invoicesRepository
       .createQueryBuilder('invoice')
       .innerJoin('invoice.appointment', 'appointment')
-      .leftJoin('invoice.items', 'invoiceItem')
       .select('invoice.id', 'invoice_id')
       .addSelect('appointment.id', 'appointment_id')
       .addSelect('appointment.start_at', 'visited_at')
       .addSelect('invoice.paid', 'paid')
       .addSelect('invoice.paid_at', 'paid_at')
       .addSelect('invoice.payment_method', 'payment_method')
-      .addSelect('COALESCE(SUM(invoiceItem.price * invoiceItem.quantity), 0)', 'total_amount')
+      .addSelect('invoice.total_amount', 'total_amount')
+      .addSelect('invoice.status', 'status')
       .where('appointment.petId = :petId', { petId })
-      .groupBy('invoice.id')
-      .addGroupBy('appointment.id')
       .orderBy('appointment.start_at', 'DESC')
       .getRawMany<RawPetInvoiceRow>();
 
@@ -275,6 +318,23 @@ export class PetProfileService {
       paidAt: row.paid_at ? new Date(row.paid_at) : null,
       paymentMethod: row.payment_method,
       totalAmount: Number(row.total_amount),
+      status: row.status,
+    }));
+  }
+
+  async findVaccinations(petId: string): Promise<PetVaccinationRow[]> {
+    await this.assertPetExists(petId);
+
+    const vaccinations = await this.vaccinationsRepository.find({
+      where: { petId },
+      relations: ['vaccine', 'vaccine.item', 'doctor', 'doctor.user'],
+      order: { vaccinatedAt: 'DESC' },
+    });
+
+    const today = toDateOnly(new Date());
+    return vaccinations.map((vaccination) => ({
+      vaccination,
+      dueStatus: classifyDueDate(vaccination.nextDueDate, today),
     }));
   }
 
@@ -319,4 +379,5 @@ interface RawPetInvoiceRow {
   paid_at: string | null;
   payment_method: PaymentMethod | null;
   total_amount: string;
+  status: InvoiceStatus;
 }
