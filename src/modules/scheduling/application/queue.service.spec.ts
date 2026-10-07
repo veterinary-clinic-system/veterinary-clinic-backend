@@ -61,6 +61,7 @@ describe('QueueService.findNextFreeStart', () => {
       availabilityService as never,
       null as never,
       null as never,
+      { emitQueueChanged: () => {}, emitAppointmentChanged: () => {} } as never,
     );
   }
 

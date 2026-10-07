@@ -57,6 +57,7 @@ describe('QueueService.findEarliestFreeDoctorSlot', () => {
       availabilityService as never,
       null as never,
       null as never,
+      { emitQueueChanged: () => {}, emitAppointmentChanged: () => {} } as never,
     );
   }
 

@@ -1,9 +1,8 @@
 import 'reflect-metadata';
-import { config } from 'dotenv';
+import 'dotenv/config';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import * as entities from './entity-registry';
 
-config();
 
 export const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',

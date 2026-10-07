@@ -36,6 +36,7 @@ import { NotificationModule } from '@/modules/notification/notification.module';
 import { ReportingModule } from '@/modules/reporting/reporting.module';
 import { StorageModule } from '@/shared/storage/storage.module';
 import { HealthModule } from '@/shared/health/health.module';
+import { RealtimeModule } from '@/shared/realtime/realtime.module';
 
 @Module({
   imports: [
@@ -83,6 +84,7 @@ import { HealthModule } from '@/shared/health/health.module';
     ReportingModule,
     StorageModule,
     HealthModule,
+    RealtimeModule,
   ],
   providers: [
 

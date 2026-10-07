@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 function cloudNameFromEnvironment(): string | undefined {
   const explicit = process.env.CLOUDINARY_CLOUD_NAME?.trim();
   if (explicit) return explicit;

@@ -1,3 +1,4 @@
+import { RealtimeGateway } from '@/shared/realtime/realtime.gateway';
 import {
   BadRequestException,
   ConflictException,
@@ -110,6 +111,7 @@ export class AppointmentsService {
     private readonly outboxService: OutboxService,
     private readonly staffNotificationsService: StaffNotificationsService,
     private readonly prescreeningService: PrescreeningService,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   async createBooking(dto: CreateBookingDto, bookedByUserId: string | null): Promise<Appointment> {
@@ -202,6 +204,12 @@ export class AppointmentsService {
       });
       await this.prescreeningService.runForAppointmentSafely(appointment, petWithBreed!);
     }
+    this.realtimeGateway.emitAppointmentChanged({
+      appointmentId: appointment.id,
+      branchId: appointment.branchId,
+      doctorId: appointment.doctorId,
+      date: format(appointment.startAt, 'yyyy-MM-dd'),
+    });
 
     return this.findOne(appointment.id);
   }
@@ -502,6 +510,12 @@ export class AppointmentsService {
 
     const updated = await this.findOne(id);
     await this.notifyOwnerOfUpdate(updated, actor);
+    this.realtimeGateway.emitAppointmentChanged({
+      appointmentId: updated.id,
+      branchId: updated.branchId,
+      doctorId: updated.doctorId,
+      date: format(updated.startAt, 'yyyy-MM-dd'),
+    });
     return updated;
   }
 

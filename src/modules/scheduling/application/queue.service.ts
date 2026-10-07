@@ -1,3 +1,4 @@
+import { RealtimeGateway } from '@/shared/realtime/realtime.gateway';
 import {
   BadRequestException,
   ConflictException,
@@ -68,6 +69,7 @@ export class QueueService {
     private readonly partyResolver: PartyResolverService,
 
     private readonly appointmentsService: AppointmentsService,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   async checkIn(dto: CheckInDto, actor: AuthenticatedUser): Promise<QueueEntry> {
@@ -139,6 +141,8 @@ export class QueueService {
       appointment.branchId,
       appointment.startAt,
     );
+    this.realtimeGateway.emitQueueChanged({ branchId: entry.branchId, queueDate: entry.queueDate, ticketNumber: entry.ticketNumber });
+    this.realtimeGateway.emitAppointmentChanged({ appointmentId: appointment.id, branchId: appointment.branchId, doctorId: appointment.doctorId });
 
     return this.findOne(entry.id);
   }
@@ -223,6 +227,8 @@ export class QueueService {
       const preempted = await this.preemptForEmergency(entry, branchId, durationMinutes, actor);
       if (preempted) return preempted;
     }
+    this.realtimeGateway.emitQueueChanged({ branchId: entry.branchId, queueDate: entry.queueDate, ticketNumber: entry.ticketNumber });
+    this.realtimeGateway.emitAppointmentChanged({ branchId: entry.branchId, doctorId: entry.doctorId ?? undefined });
 
     return this.findOne(entryId);
   }
@@ -365,6 +371,8 @@ export class QueueService {
     if (entry.doctorId && dto.status) {
       await this.availabilityService.invalidateDoctorDay(entry.doctorId, entry.branchId, now);
     }
+    this.realtimeGateway.emitQueueChanged({ branchId: entry.branchId, queueDate: entry.queueDate, ticketNumber: entry.ticketNumber });
+    this.realtimeGateway.emitAppointmentChanged({ appointmentId: entry.appointmentId ?? undefined, branchId: entry.branchId, doctorId: entry.doctorId ?? undefined });
 
     return this.findOne(id);
   }
