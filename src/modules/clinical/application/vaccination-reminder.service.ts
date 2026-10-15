@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { OutboxService } from '@/modules/notification/application';
+import { NotificationsService, OutboxService } from '@/modules/notification/application';
 import { toDateOnly } from '@/modules/clinical/domain/vaccination-schedule.util';
 
 const DEFAULT_REMINDER_LEAD_DAYS = 7;
@@ -14,6 +14,7 @@ interface DueVaccinationRow {
   ownerId: string;
   ownerName: string;
   ownerPhone: string;
+  ownerEmail?: string | null;
   vaccineName: string;
   diseasePrevented: string;
   doseNumber: number;
@@ -28,6 +29,7 @@ export class VaccinationReminderService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly outboxService: OutboxService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private get leadDays(): number {
@@ -42,9 +44,10 @@ export class VaccinationReminderService {
       return 0;
     }
 
+    const fresh: DueVaccinationRow[] = [];
     await this.dataSource.transaction(async (em) => {
       for (const row of rows) {
-        await this.outboxService.record(em, {
+        const inserted = await this.outboxService.record(em, {
           type: 'VACCINATION_DUE',
           dedupeKey: `vacc-due:${row.vaccinationId}:${row.nextDueDate}`,
           payload: {
@@ -53,6 +56,7 @@ export class VaccinationReminderService {
             petName: row.petName,
             ownerId: row.ownerId,
             recipientPhone: row.ownerPhone,
+            recipientEmail: row.ownerEmail,
             vaccineName: row.vaccineName,
             diseasePrevented: row.diseasePrevented,
             doseNumber: row.doseNumber,
@@ -64,10 +68,34 @@ export class VaccinationReminderService {
               'Vui long lien he phong kham de dat lich.',
           },
         });
+        if (inserted) fresh.push(row);
       }
     });
 
-    this.logger.log(`Da ghi ${rows.length} nhac lich tiem vao outbox (${toDateOnly(new Date())})`);
+    // Gửi cho chủ nuôi qua Zalo + Gmail SAU khi transaction commit, và chỉ cho mũi tiêm
+    // vừa ghi outbox lần đầu: cron quét cửa sổ `leadDays` ngày nên cùng một mũi tiêm
+    // khớp nhiều ngày liền - dedupeKey của outbox là thứ giữ cho khách chỉ nhận MỘT tin.
+    for (const row of fresh) {
+      try {
+        await this.notificationsService.sendVaccinationReminder({
+          petName: row.petName,
+          vaccineName: row.vaccineName,
+          diseasePrevented: row.diseasePrevented,
+          nextDueDate: row.nextDueDate,
+          recipientPhone: row.ownerPhone,
+          recipientEmail: row.ownerEmail,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Gửi nhắc lịch tiêm cho ${row.ownerPhone} thất bại: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `Da ghi ${rows.length} nhac lich tiem vao outbox, gui ${fresh.length} tin moi cho chu nuoi ` +
+        `(${toDateOnly(new Date())})`,
+    );
     return rows.length;
   }
 
@@ -82,6 +110,7 @@ export class VaccinationReminderService {
                owner."id"                                 AS "ownerId",
                owner."full_name"                          AS "ownerName",
                owner."phone"                              AS "ownerPhone",
+               owner."email"                              AS "ownerEmail",
                item."item_name"                           AS "vaccineName",
                vaccine."disease_prevented"                AS "diseasePrevented",
                v."dose_number"                            AS "doseNumber",

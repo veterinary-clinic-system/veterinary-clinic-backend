@@ -11,6 +11,7 @@ export default registerAs('notification', () => ({
   zalo: {
     oaAccessToken: process.env.ZALO_OA_ACCESS_TOKEN,
     oaId: process.env.ZALO_OA_ID,
+    znsTemplateId: process.env.ZALO_ZNS_TEMPLATE_ID,
   },
   
   email: {

@@ -31,6 +31,7 @@ import {
   OutboxService,
   StaffNotificationsService,
 } from '@/modules/notification/application';
+import type { DeliveryReport } from '@/modules/notification/application';
 import { StaffNotificationType } from '@/shared/common/enums/staff-notification.enum';
 import { PrescreeningService } from '@/modules/triage/application';
 import { CreateBookingDto } from '@/modules/scheduling/presentation/dto/create-booking.dto';
@@ -115,6 +116,18 @@ export class AppointmentsService {
   ) {}
 
   async createBooking(dto: CreateBookingDto, bookedByUserId: string | null): Promise<Appointment> {
+    return (await this.createBookingWithReport(dto, bookedByUserId)).appointment;
+  }
+
+  /**
+   * Như `createBooking`, kèm kết quả gửi tin xác nhận (Zalo/Gmail) - trợ lý AI cần nó để
+   * nói thật với khách là tin đã tới kênh nào, thay vì đoán theo việc khách có email hay
+   * không.
+   */
+  async createBookingWithReport(
+    dto: CreateBookingDto,
+    bookedByUserId: string | null,
+  ): Promise<{ appointment: Appointment; notifications: DeliveryReport | null }> {
     const branch = await this.branchesRepository.findOne({ where: { id: dto.branchId } });
     if (!branch) {
       throw new BadRequestException('Branch not found');
@@ -122,6 +135,7 @@ export class AppointmentsService {
 
     const service = await this.servicesRepository.findOne({
       where: { id: dto.serviceId, active: true },
+      relations: ['item'],
     });
     if (!service) {
       throw new BadRequestException('Selected service is not available');
@@ -192,6 +206,20 @@ export class AppointmentsService {
       petName: pet.name,
     });
 
+    // Tin xác nhận không được làm hỏng một lịch hẹn ĐÃ lưu: lỗi nhà cung cấp đã nằm
+    // trong DeliveryReport, còn lỗi bất ngờ (DB...) chỉ làm mất báo cáo, không mất lịch.
+    const notifications = await this.notificationsService
+      .confirmAppointment({
+        appointment,
+        recipientPhone: owner.phone,
+        recipientEmail: owner.email,
+        petName: pet.name,
+        branchName: branch.branchName,
+        branchAddress: branch.address,
+        serviceName: service.item?.itemName,
+      })
+      .catch(() => null);
+
     if (
       appointment.commonSymptoms.length > 0 ||
       appointment.otherSymptoms ||
@@ -211,7 +239,7 @@ export class AppointmentsService {
       date: format(appointment.startAt, 'yyyy-MM-dd'),
     });
 
-    return this.findOne(appointment.id);
+    return { appointment: await this.findOne(appointment.id), notifications };
   }
 
   private async pickAvailableDoctor(
@@ -493,6 +521,17 @@ export class AppointmentsService {
         appointment.startAt,
       );
       await this.availabilityService.invalidateDoctorDay(doctorId, appointment.branchId, startAt);
+
+      if (startAt.getTime() !== appointment.startAt.getTime()) {
+        await this.notificationsService.cancelPendingReminders(appointment.id);
+        await this.notificationsService.scheduleAppointmentReminder({
+          appointment: { ...appointment, startAt } as Appointment,
+          recipientPhone: appointment.pet.owner.phone,
+          recipientEmail: appointment.pet.owner.email,
+          petName: appointment.pet.name,
+          isFollowUp: !!appointment.parentAppointmentId,
+        });
+      }
     } else {
       await this.appointmentsRepository.update(id, {
         ...(dto.status ? { status: dto.status } : {}),
@@ -581,6 +620,7 @@ export class AppointmentsService {
       appointment.branchId,
       appointment.startAt,
     );
+    await this.notificationsService.cancelPendingReminders(id);
 
     const updated = await this.findOne(id);
     await this.notifyOwnerOfUpdate(updated, actor);
@@ -736,7 +776,10 @@ export class AppointmentsService {
     if (!doctor || doctor.branchId !== dto.branchId) {
       throw new BadRequestException('Selected doctor does not work at the selected branch');
     }
-    const service = await this.servicesRepository.findOne({ where: { id: dto.serviceId } });
+    const service = await this.servicesRepository.findOne({
+      where: { id: dto.serviceId },
+      relations: ['item'],
+    });
     if (!service) {
       throw new BadRequestException('Selected service is not available');
     }
@@ -765,7 +808,39 @@ export class AppointmentsService {
 
     await this.availabilityService.invalidateDoctorDay(doctor.id, dto.branchId, startAt);
 
-    return this.findOne(appointment.id);
+    const created = await this.findOne(appointment.id);
+    const owner = created.pet.owner;
+
+    // Lịch tái khám do bác sĩ/lễ tân đặt: khách cần biết NGAY (Zalo + Gmail) và được nhắc
+    // lại trước giờ hẹn - trước đây nhánh này không gửi gì cả.
+    await this.notificationsService.scheduleAppointmentReminder({
+      appointment: created,
+      recipientPhone: owner.phone,
+      recipientEmail: owner.email,
+      petName: created.pet.name,
+      isFollowUp: true,
+    });
+    await this.notificationsService
+      .confirmAppointment({
+        appointment: created,
+        recipientPhone: owner.phone,
+        recipientEmail: owner.email,
+        petName: created.pet.name,
+        branchName: created.branch.branchName,
+        branchAddress: created.branch.address,
+        serviceName: service.item?.itemName,
+        isFollowUp: true,
+      })
+      .catch(() => null);
+
+    this.realtimeGateway.emitAppointmentChanged({
+      appointmentId: created.id,
+      branchId: created.branchId,
+      doctorId: created.doctorId,
+      date: format(created.startAt, 'yyyy-MM-dd'),
+    });
+
+    return created;
   }
 
   private async assertSlotIsFree(

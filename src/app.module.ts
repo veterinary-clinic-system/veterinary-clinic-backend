@@ -29,6 +29,7 @@ import { PetsModule } from '@/modules/pets/pets.module';
 import { CatalogModule } from '@/modules/catalog/catalog.module';
 import { SchedulingModule } from '@/modules/scheduling/scheduling.module';
 import { TriageModule } from '@/modules/triage/triage.module';
+import { AssistantModule } from '@/modules/assistant/assistant.module';
 import { ClinicalModule } from '@/modules/clinical/clinical.module';
 import { BillingModule } from '@/modules/billing/billing.module';
 import { SalesModule } from '@/modules/sales/sales.module';
@@ -77,6 +78,7 @@ import { RealtimeModule } from '@/shared/realtime/realtime.module';
     CatalogModule,
     SchedulingModule,
     TriageModule,
+    AssistantModule,
     ClinicalModule,
     BillingModule,
     SalesModule,

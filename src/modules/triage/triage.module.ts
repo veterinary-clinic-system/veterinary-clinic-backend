@@ -8,14 +8,13 @@ import { PreScreeningResult } from '@/modules/triage/domain/entities/pre-screeni
 import { PrescreeningService } from '@/modules/triage/application/prescreening.service';
 import { AI_PREDICTION_PROVIDER } from '@/modules/triage/application/ports/ai-prediction.port';
 import { PrescreeningController } from '@/modules/triage/presentation/prescreening.controller';
-import { AiChatController } from '@/modules/triage/presentation/ai-chat.controller';
 import { AiClientService } from '@/modules/triage/infrastructure/ai-client/ai-client.service';
 import { HttpAiPredictionAdapter } from '@/modules/triage/infrastructure/ai/http-ai-prediction.adapter';
 import { StubAiPredictionAdapter } from '@/modules/triage/infrastructure/ai/stub-ai-prediction.adapter';
 
 @Module({
   imports: [HttpModule, TypeOrmModule.forFeature([PreScreeningResult, Disease, Appointment])],
-  controllers: [PrescreeningController, AiChatController],
+  controllers: [PrescreeningController],
   providers: [
     PrescreeningService,
     AiClientService,

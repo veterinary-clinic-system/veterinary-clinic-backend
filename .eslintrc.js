@@ -10,6 +10,7 @@ const MODULES = [
   'sales',
   'notification',
   'reporting',
+  'assistant',
 ];
 
 const crossModuleZones = MODULES.flatMap((target) =>
