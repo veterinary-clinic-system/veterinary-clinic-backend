@@ -26,6 +26,7 @@ jobs:
       AI_SERVICE_BASE_URL: http://localhost:8000
       AI_SERVICE_TOKEN: ci-token
       AI_PROVIDER: stub
+      CLOUDINARY_CLOUD_NAME: ci-cloud
     services:
       postgres:
         image: postgres:16-alpine
