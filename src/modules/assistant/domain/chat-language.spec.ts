@@ -9,6 +9,7 @@ import {
   matchOption,
   nameAliases,
   parseChoiceIndex,
+  hasInvalidDateText,
   parseDate,
   parseTime,
 } from './chat-language';
@@ -220,5 +221,46 @@ describe('chat-language', () => {
     expect(parseChoiceIndex('số 1')).toBe(0);
     expect(parseChoiceIndex('chọn 3')).toBe(2);
     expect(parseChoiceIndex('2 giờ chiều')).toBeUndefined();
+  });
+
+  describe('khách gõ không dấu / câu gộp (lỗi tìm được khi thử hội thoại thật)', () => {
+    const unaccented =
+      'dat lich kham cho meo ten Mimi, cai, q1, 9h sang mai, sdt 0987000444, ten Le Van Bao';
+
+    it('tên bé, giới tính, họ tên chủ khi gõ không dấu', () => {
+      expect(extractPetName(unaccented)).toBe('Mimi');
+      expect(detectGender(unaccented)).toBe('FEMALE');
+      expect(extractOwnerName(unaccented)).toBe('Le Van Bao');
+      expect(detectGender('cho duc')).toBe('MALE');
+    });
+
+    it('"bé Mướp cái, 09... tên Hồ Thị Dung"', () => {
+      const text = 'đặt lịch sáng mai ở quận 1 cho bé Mướp cái, 0987000446 tên Hồ Thị Dung';
+      expect(extractPetName(text)).toBe('Mướp');
+      expect(detectGender(text)).toBe('FEMALE');
+      expect(extractOwnerName(text)).toBe('Hồ Thị Dung');
+    });
+
+    it('"tên" đứng một mình nhưng chỉ một chữ (tên bé) thì không phải họ tên chủ', () => {
+      expect(extractOwnerName('đặt lịch cho bé tên Bông Hồng')).toBeUndefined();
+      expect(extractOwnerName('tên Milu')).toBeUndefined();
+      expect(detectGender('cái chân bé bị sưng')).toBeUndefined();
+    });
+
+    it('khách tên "Mai Lan" / "Ngọc Sáng": không thành ngày mai / buổi sáng', () => {
+      const text = 'đặt lịch bé Ki quận 1, email mai.lan@gmail.com, tôi tên Mai Lan';
+      expect(parseDate(text, NOW)).toBeUndefined();
+      expect(extractOwnerName(text)).toBe('Mai Lan');
+      expect(parseTime('họ tên: Ngọc Sáng, 9h').period).toBe('morning');
+      expect(parseTime('tên Ngọc Sáng').period).toBeUndefined();
+      expect(parseDate('Mai 9h nhé', NOW)).toBe('2026-10-16');
+      expect(parseDate('đặt lịch Thứ 6', NOW)).toBe('2026-10-16');
+    });
+
+    it('ngày không có trên lịch', () => {
+      expect(hasInvalidDateText('ngày 31/2 lúc 9h')).toBe(true);
+      expect(hasInvalidDateText('20/10')).toBe(false);
+      expect(hasInvalidDateText('0912345678')).toBe(false);
+    });
   });
 });

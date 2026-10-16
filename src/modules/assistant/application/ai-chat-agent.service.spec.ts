@@ -74,7 +74,12 @@ function daySlots(date: Date, busy: string[] = []) {
 describe('AiChatAgentService', () => {
   let busy: string[];
   let service: AiChatAgentService;
-  const aiProvider = { triage: jest.fn(), chat: jest.fn(), learn: jest.fn() };
+  const aiProvider = {
+    triage: jest.fn(),
+    chat: jest.fn(),
+    answerPetCareQuestion: jest.fn(),
+    learn: jest.fn(),
+  };
   const appointmentsService = { createBookingWithReport: jest.fn() };
   const availabilityService = {
     getDoctorDayAvailability: jest.fn((_doctorId: string, _branchId: string, date: Date) =>
@@ -388,6 +393,38 @@ describe('AiChatAgentService', () => {
     expect(named.missingFields).not.toContain('species');
     const renamed = await say('à nhầm, đặt cho bé tên Na', named);
     expect(renamed.missingFields).toContain('species');
+  });
+
+  it('câu hỏi chăm sóc chung: LLM trả lời thì dùng câu trả lời đó', async () => {
+    aiProvider.answerPetCareQuestion.mockResolvedValue({
+      answer: 'Dạ mèo nên được tắm khoảng 1-2 tháng một lần ạ.',
+      suggestVisit: false,
+    });
+    const reply = await say('mèo nên tắm bao lâu một lần');
+    expect(aiProvider.answerPetCareQuestion).toHaveBeenCalledWith({
+      question: 'mèo nên tắm bao lâu một lần',
+    });
+    expect(reply.intent).toBe('HELP');
+    expect(reply.reply).toBe('Dạ mèo nên được tắm khoảng 1-2 tháng một lần ạ.');
+    expect(reply.suggestBooking).toBe(false);
+  });
+
+  it('LLM khuyên đi khám: gợi ý đặt lịch', async () => {
+    aiProvider.answerPetCareQuestion.mockResolvedValue({
+      answer: 'Dạ bạn nên đưa bé đi khám sớm ạ.',
+      suggestVisit: true,
+    });
+    const reply = await say('tại sao chó nhà em thở rất gấp');
+    expect(reply.suggestBooking).toBe(true);
+    expect(reply.quickReplies).toContain('Đặt lịch khám');
+  });
+
+  it('LLM lỗi hoặc hết hạn key: giữ câu trả lời cố định của nhánh HELP', async () => {
+    aiProvider.answerPetCareQuestion.mockRejectedValue(new Error('401'));
+    const reply = await say('mèo nên tắm bao lâu một lần');
+    expect(reply.intent).toBe('HELP');
+    expect(reply.reply).toContain('em chưa hiểu rõ ý bạn');
+    expect(reply.suggestBooking).toBe(false);
   });
 
   it('huỷ giữa chừng: xoá thông tin đặt lịch', async () => {

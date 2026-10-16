@@ -21,6 +21,7 @@ import {
 import type { DeliveryReport } from '@/modules/notification/application';
 import {
   AI_PREDICTION_PROVIDER,
+  AiPetCareAnswer,
   AiPredictionProvider,
   AiTriageResult,
 } from '@/modules/triage/application';
@@ -41,6 +42,7 @@ import {
   nameAliases,
   normalizeText,
   parseChoiceIndex,
+  hasInvalidDateText,
   parseDate,
   parseTime,
   stripDiacritics,
@@ -287,7 +289,7 @@ export class AiChatAgentService {
     }
 
     if (bookingTurn) {
-      const outcome = await this.continueBooking(draft, ctx, now);
+      const outcome = await this.continueBooking(draft, ctx, now, message);
       return respond({
         intent: 'BOOKING',
         reply: assessment ? `${assessment}\n\n---\n\n${outcome.reply}` : outcome.reply,
@@ -333,6 +335,21 @@ export class AiChatAgentService {
       return respond({
         intent: 'THANKS',
         reply: 'Dạ không có gì ạ! Chúc bé luôn khoẻ mạnh. Cần gì bạn cứ nhắn em nhé 🐾',
+      });
+    }
+
+    // Tin rỗng/vô nghĩa ("   ", "?") không đáng một lượt gọi LLM.
+    const answer = /[\p{L}\d]{2,}/u.test(message)
+      ? await this.answerGeneralQuestion(message)
+      : null;
+    if (answer) {
+      return respond({
+        intent: 'HELP',
+        reply: answer.answer,
+        quickReplies: answer.suggestVisit
+          ? ['Đặt lịch khám', 'Lịch tiêm phòng của bé']
+          : ['Đặt lịch khám', 'Lịch tiêm phòng của bé', 'Kiểm tra lịch tái khám'],
+        suggestBooking: answer.suggestVisit,
       });
     }
 
@@ -596,14 +613,28 @@ export class AiChatAgentService {
     }
   }
 
+  /** Câu hỏi ngoài các ý định đã biết: nhờ LLM trả lời; lỗi thì để nhánh HELP dùng câu cố định. */
+  private async answerGeneralQuestion(question: string): Promise<AiPetCareAnswer | null> {
+    try {
+      return await this.aiProvider.answerPetCareQuestion({ question });
+    } catch (error) {
+      this.logger.warn(`AI hỏi đáp chung thất bại: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
   // ------------------------------------------------------------- đặt lịch
 
   private async continueBooking(
     draft: BookingDraft,
     ctx: ChatContext,
     now: Date,
+    message: string,
   ): Promise<BookingOutcome> {
     const notes: string[] = [];
+    if (hasInvalidDateText(message) && !parseDate(message, now)) {
+      notes.push('Ngày bạn nhập không có trên lịch, bạn kiểm tra lại giúp em nhé.');
+    }
 
     if (ctx.owner && ctx.pets.length === 1 && !draft.petId && !draft.petName) {
       this.applyExistingPet(draft, ctx.pets[0]);

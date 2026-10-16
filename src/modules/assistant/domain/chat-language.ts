@@ -121,7 +121,7 @@ const WEEKDAY_WORDS: Array<[string, number]> = [
  * lịch, để còn giải thích được cho khách thay vì lặng lẽ dời sang ngày khác.
  */
 export function parseDate(raw: string, now: Date = new Date()): string | undefined {
-  const text = removeContacts(raw);
+  const text = removeNames(removeContacts(raw));
   const t = normalizeText(text);
   const unaccented = isUnaccented(text);
   const plain = stripDiacritics(text);
@@ -197,13 +197,13 @@ export interface ParsedTime {
  * khi không nói giờ cụ thể. Phút được làm tròn XUỐNG lưới 30 phút của lịch khám.
  */
 export function parseTime(raw: string): ParsedTime {
-  const text = removeContacts(raw);
+  const text = removeNames(removeContacts(raw));
   const t = normalizeText(text);
   const plain = stripDiacritics(text);
   const unaccented = isUnaccented(text);
 
-  const afternoon = mentions(raw, ['chiều', 'tối', 'trưa']) || /\bpm\b/.test(plain);
-  const morning = mentions(raw, ['sáng']) || /\bam\b/.test(plain);
+  const afternoon = mentions(text, ['chiều', 'tối', 'trưa']) || /\bpm\b/.test(plain);
+  const morning = mentions(text, ['sáng']) || /\bam\b/.test(plain);
   const period: DayPeriod | undefined = afternoon ? 'afternoon' : morning ? 'morning' : undefined;
 
   const source = unaccented ? plain : t;
@@ -311,6 +311,24 @@ const NAME_STOP_WORDS = new Set(
   ].map((w) => w.normalize('NFC')),
 );
 
+const HARD_STOP_WORDS = new Set(
+  ['bé', 'mèo', 'chó', 'cún', 'con', 'sđt', 'số', 'email', 'gmail', 'chi', 'nhánh', 'quận'].map(
+    (w) => w.normalize('NFC'),
+  ),
+);
+
+/** Người/bé tên "Mai", "Sáng"...: bỏ tên riêng khỏi câu trước khi tìm ngày giờ. */
+function removeNames(text: string): string {
+  return (
+    text
+      // "tên (là) Mai Lan" - mọi chữ viết hoa ngay sau "tên".
+      .replace(/(?<![\p{L}])tên(?:\s+là|\s*:)?((?:\s+\p{Lu}[\p{L}'-]*)+)/gu, ' ')
+      // "chị Mai" - "Mai" viết hoa giữa câu là tên; đầu câu thì vẫn có thể là "Mai 9h".
+      // Chỉ riêng "Mai": "Thứ 6", "Ngày 20" viết hoa giữa câu vẫn là ngày.
+      .replace(/(?<=[\p{Ll}]\s+)Mai(?![\p{L}])/gu, ' ')
+  );
+}
+
 function cleanNameCandidate(raw: string, maxWords: number): string | undefined {
   const words = raw
     .split(/[,.;:!?\n()]/)[0]
@@ -320,7 +338,10 @@ function cleanNameCandidate(raw: string, maxWords: number): string | undefined {
   const kept: string[] = [];
   for (const word of words) {
     const lower = normalizeText(word);
-    if (NAME_STOP_WORDS.has(lower) || /\d/.test(word)) break;
+    // Từ VIẾT HOA là một phần của tên ("Mai Lan", "Ngọc Sáng"), trừ vài từ không bao giờ
+    // là tên người/bé. Hàm này chỉ chạy trên đoạn ngay sau "tên ..." nên không bắt nhầm.
+    const capitalizedName = /^\p{Lu}/u.test(word) && !HARD_STOP_WORDS.has(lower);
+    if ((NAME_STOP_WORDS.has(lower) && !capitalizedName) || /\d/.test(word)) break;
     if (!/^[\p{L}'-]+$/u.test(word)) break;
     kept.push(word);
     if (kept.length >= maxWords) break;
@@ -357,13 +378,43 @@ function bareAnswer(raw: string, maxWords: number, minWords = 1): string | undef
   return undefined;
 }
 
+/**
+ * Khách gõ không dấu ("meo ten Mimi", "ten Le Van Bao"): cho các từ khoá trong mẫu
+ * regex nhận thêm bản không dấu. Chỉ bật khi CẢ câu không dấu - "cho"/"con" có dấu
+ * mang nghĩa khác nên không được nới cho câu có dấu.
+ */
+const UNACCENTED_KEYWORDS: Record<string, string> = {
+  tên: '(?:tên|ten)',
+  bé: '(?:bé|be)',
+  cún: '(?:cún|cun)',
+  mèo: '(?:mèo|meo)',
+  của: '(?:của|cua)',
+  nhà: '(?:nhà|nha)',
+  mình: '(?:mình|minh)',
+  tôi: '(?:tôi|toi)',
+  là: '(?:là|la)',
+  họ: '(?:họ|ho)',
+  chủ: '(?:chủ|chu)',
+  chị: '(?:chị|chi)',
+};
+
+function namePattern(source: string, raw: string, flags: string): RegExp {
+  if (!isUnaccented(raw)) return new RegExp(source, flags);
+  const keys = Object.keys(UNACCENTED_KEYWORDS).sort((a, b) => b.length - a.length);
+  const widened = source.replace(
+    new RegExp(String.raw`(?<![\p{L}])(${keys.join('|')})(?![\p{L}])`, 'gu'),
+    (keyword) => UNACCENTED_KEYWORDS[keyword] ?? keyword,
+  );
+  return new RegExp(widened, flags);
+}
+
+const PET_NAMED_SOURCE = String.raw`(?:tên\s+(?:của\s+)?(?:bé|cún|mèo|con|chó)(?:\s+(?:nhà|của)\s+(?:em|mình|tôi))?\s*(?:là|:)?|(?:bé|cún|mèo|con|chó)(?:\s+(?:nhà|của)\s+(?:em|mình|tôi))?\s+tên(?:\s+là|\s*:)?)\s+([\p{L}][\p{L}'-]*(?:\s+\p{Lu}[\p{L}'-]*)?)`;
+
 export function extractPetName(raw: string, awaitingPetName = false): string | undefined {
   const text = removeContacts(raw);
 
-  const named = text.match(
-    // Không nhận "em tên ...": khách xưng "em" với phòng khám, đó là tên CHỦ chứ không phải tên bé.
-    /(?:tên\s+(?:của\s+)?(?:bé|cún|mèo|con|chó)(?:\s+(?:nhà|của)\s+(?:em|mình|tôi))?\s*(?:là|:)?|(?:bé|cún|mèo|con|chó)(?:\s+(?:nhà|của)\s+(?:em|mình|tôi))?\s+tên(?:\s+là|\s*:)?)\s+([\p{L}][\p{L}'-]*(?:\s+\p{Lu}[\p{L}'-]*)?)/iu,
-  );
+  // Không nhận "em tên ...": khách xưng "em" với phòng khám, đó là tên CHỦ chứ không phải tên bé.
+  const named = text.match(namePattern(PET_NAMED_SOURCE, text, 'iu'));
   if (named) {
     const name = cleanNameCandidate(named[1], 2);
     if (name) return name;
@@ -379,19 +430,28 @@ export function extractPetName(raw: string, awaitingPetName = false): string | u
   return awaitingPetName ? bareAnswer(text, 2) : undefined;
 }
 
+const OWNER_SELF_SOURCE = String.raw`(?<!(?:nhà|của)\s)(?:tôi|mình|em|anh|chị)\s+tên(?:\s+là|\s*:)?\s+([\p{L}][\p{L}\s'-]*)`;
+const OWNER_LABEL_SOURCE = String.raw`(?:họ\s*(?:và\s*)?tên|tên\s+(?:tôi|mình|chủ|người\s+đặt))\s*(?:là|:)?\s*([\p{L}][\p{L}\s'-]*)`;
+/**
+ * "..., 0912345678 tên Hồ Thị Dung": "tên" đứng một mình kèm họ tên VIẾT HOA từ 2 chữ trở
+ * lên. Không đứng sau "bé/con/mèo..." (đó là tên bé), và đòi 2 chữ nên "tên Milu" không lọt.
+ */
+const OWNER_BARE_SOURCE = String.raw`(?<!(?:bé|con|cún|mèo|chó)\s)(?<![\p{L}])tên(?:\s+là|\s*:)?\s+(\p{Lu}[\p{L}'-]*(?:\s+\p{Lu}[\p{L}'-]*){1,4})`;
+
 export function extractOwnerName(raw: string, awaitingOwnerName = false): string | undefined {
   const text = removeContacts(raw);
-  const match =
+  for (const [source, flags, minWords] of [
     // (?<!nhà |của ): "bé nhà mình tên Milu" là tên BÉ.
-    text.match(
-      /(?<!(?:nhà|của)\s)(?:tôi|mình|em|anh|chị)\s+tên(?:\s+là|\s*:)?\s+([\p{L}][\p{L}\s'-]*)/iu,
-    ) ??
-    text.match(
-      /(?:họ\s*(?:và\s*)?tên|tên\s+(?:tôi|mình|chủ|người\s+đặt))\s*(?:là|:)?\s*([\p{L}][\p{L}\s'-]*)/iu,
-    );
-  if (match) {
-    const name = cleanNameCandidate(match[1], 5);
-    if (name) return name;
+    [OWNER_SELF_SOURCE, 'iu', 1],
+    [OWNER_LABEL_SOURCE, 'iu', 1],
+    [OWNER_BARE_SOURCE, 'gu', 2],
+  ] as const) {
+    for (const match of text.matchAll(
+      new RegExp(namePattern(source, text, flags).source, `${flags.replace('g', '')}g`),
+    )) {
+      const name = cleanNameCandidate(match[1], 5);
+      if (name && name.split(' ').length >= minWords) return name;
+    }
   }
   return awaitingOwnerName ? bareAnswer(text, 5, 2) : undefined;
 }
@@ -399,14 +459,34 @@ export function extractOwnerName(raw: string, awaitingOwnerName = false): string
 export type PetGender = 'MALE' | 'FEMALE';
 
 export function detectGender(raw: string): PetGender | undefined {
-  if (mentions(raw, ['đực', 'giống đực', 'bé trai', 'con trai', 'male'])) return 'MALE';
+  const text = normalizeText(removeContacts(raw));
+  const plain = isUnaccented(raw) ? stripDiacritics(removeContacts(raw)) : '';
+  if (
+    mentions(raw, ['đực', 'giống đực', 'bé trai', 'con trai', 'male']) ||
+    (plain && hasWord(plain, 'duc'))
+  ) {
+    return 'MALE';
+  }
+  // "cái" đứng cuối một ý ("Mướp cái,", "mèo cái", "Cái") - không bắt "cái gì", "cái chân".
+  const trailingFemale = /(?<![\p{L}])cái(?=\s*(?:[,.;!?)]|$))/u;
   if (
     mentions(raw, ['bé gái', 'con gái', 'giống cái', 'con cái', 'mèo cái', 'chó cái', 'female']) ||
-    /^\s*(?:dạ\s+)?(?:là\s+)?cái\s*[.!]?\s*$/iu.test(raw)
+    trailingFemale.test(text) ||
+    (plain && /(?<![\p{L}])cai(?=\s*(?:[,.;!?)]|$))/u.test(plain))
   ) {
     return 'FEMALE';
   }
   return undefined;
+}
+
+/** Câu có dạng ngày (31/2, 30-02) mà không ra được ngày thật - để báo cho khách. */
+export function hasInvalidDateText(raw: string): boolean {
+  const text = removeContacts(raw);
+  const match = text.match(/(?<!\d)(\d{1,2})\s*[/-]\s*(\d{1,2})(?:\s*[/-]\s*(\d{2,4}))?(?!\d)/);
+  if (!match) return false;
+  const year = match[3] ? Number(match[3]) + (match[3].length <= 2 ? 2000 : 0) : 2024;
+  const date = new Date(year, Number(match[2]) - 1, Number(match[1]));
+  return date.getMonth() !== Number(match[2]) - 1 || date.getDate() !== Number(match[1]);
 }
 
 // ---------------------------------------------------------------- danh mục

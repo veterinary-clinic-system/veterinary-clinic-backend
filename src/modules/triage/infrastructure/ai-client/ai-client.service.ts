@@ -6,6 +6,8 @@ import { AxiosError } from 'axios';
 import {
   AiDiseaseCatalogItem,
   AiSymptomCatalogItem,
+  AskPetCareRequest,
+  AskPetCareResponse,
   DiagnosisDetailedResponse,
   DiagnosisRequest,
 } from './ai-client.types';
@@ -23,6 +25,10 @@ export class AiClientService {
 
   async diagnose(request: DiagnosisRequest): Promise<DiagnosisDetailedResponse> {
     return this.post<DiagnosisDetailedResponse>('/api/v1/diagnose/detailed', request);
+  }
+
+  async ask(request: AskPetCareRequest): Promise<AskPetCareResponse> {
+    return this.post<AskPetCareResponse>('/api/v1/ask', request);
   }
 
   async getSymptomLabels(): Promise<Map<string, string>> {

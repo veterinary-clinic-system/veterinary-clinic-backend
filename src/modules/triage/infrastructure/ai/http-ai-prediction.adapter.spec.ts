@@ -22,6 +22,9 @@ describe('HttpAiPredictionAdapter', () => {
   function setup() {
     const client = {
       diagnose: jest.fn().mockResolvedValue(response),
+      ask: jest
+        .fn()
+        .mockResolvedValue({ answer: ' Dạ nên tắm 1-2 tháng/lần ạ. ', suggest_visit: false }),
       getSymptomLabels: jest.fn().mockResolvedValue(
         new Map([
           ['SY001', 'Chưa tiêm vaccin'],
@@ -143,5 +146,24 @@ describe('HttpAiPredictionAdapter', () => {
     );
 
     expect(client.diagnose).toHaveBeenCalledWith(expect.objectContaining({ diseases: ['DI001'] }));
+  });
+
+  it('forwards a general pet-care question to the AI service', async () => {
+    const { client, adapter } = setup();
+
+    const result = await adapter.answerPetCareQuestion({ question: 'Mèo nên tắm bao lâu?' });
+
+    expect(client.ask).toHaveBeenCalledWith({
+      question: 'Mèo nên tắm bao lâu?',
+      history: undefined,
+    });
+    expect(result).toEqual({ answer: 'Dạ nên tắm 1-2 tháng/lần ạ.', suggestVisit: false });
+  });
+
+  it('rejects an empty pet-care answer so the caller can fall back', async () => {
+    const { client, adapter } = setup();
+    client.ask.mockResolvedValue({ answer: '  ', suggest_visit: false });
+
+    await expect(adapter.answerPetCareQuestion({ question: 'x' })).rejects.toThrow();
   });
 });

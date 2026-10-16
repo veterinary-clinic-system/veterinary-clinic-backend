@@ -4,6 +4,8 @@ import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import {
   AiChatInput,
   AiChatResult,
+  AiPetCareAnswer,
+  AiPetCareQuestionInput,
   AiPredictionProvider,
   AiTriageInput,
   AiTriageResult,
@@ -99,6 +101,17 @@ export class HttpAiPredictionAdapter implements AiPredictionProvider {
       suggestBooking: response.triage_result.color_code !== PriorityColor.BLUE,
       sessionId: input.sessionId ?? randomUUID(),
     };
+  }
+
+  async answerPetCareQuestion(input: AiPetCareQuestionInput): Promise<AiPetCareAnswer> {
+    const response = await this.client.ask({
+      // /api/v1/ask nhận tối đa 1000 ký tự; tin chat được tới 2000 - cắt thay vì để 422.
+      question: input.question.slice(0, 1000),
+      history: input.history?.slice(-6),
+    });
+    const answer = response.answer?.trim();
+    if (!answer) throw new Error('AI service returned an empty answer');
+    return { answer, suggestVisit: !!response.suggest_visit };
   }
 
   private toTriageResult(

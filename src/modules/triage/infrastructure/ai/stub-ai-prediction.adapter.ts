@@ -3,6 +3,7 @@ import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import {
   AiChatInput,
   AiChatResult,
+  AiPetCareAnswer,
   AiPredictionProvider,
   AiTriageInput,
   AiTriageResult,
@@ -33,6 +34,10 @@ export class StubAiPredictionAdapter implements AiPredictionProvider {
       suggestBooking: false,
       sessionId: input.sessionId ?? 'stub-session',
     });
+  }
+
+  answerPetCareQuestion(): Promise<AiPetCareAnswer> {
+    return Promise.reject(new Error('Stub adapter has no language model'));
   }
 
   learn(): Promise<void> {

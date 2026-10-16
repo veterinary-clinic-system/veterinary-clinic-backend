@@ -47,3 +47,13 @@ export interface AiDiseaseCatalogItem {
   disease_name: string;
   describe?: string | null;
 }
+
+export interface AskPetCareRequest {
+  question: string;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+}
+
+export interface AskPetCareResponse {
+  answer: string;
+  suggest_visit: boolean;
+}

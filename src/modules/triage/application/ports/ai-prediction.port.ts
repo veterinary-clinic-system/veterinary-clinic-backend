@@ -45,8 +45,20 @@ export interface AiChatResult {
   sessionId: string;
 }
 
+export interface AiPetCareQuestionInput {
+  question: string;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+}
+
+export interface AiPetCareAnswer {
+  answer: string;
+  suggestVisit: boolean;
+}
+
 export interface AiPredictionProvider {
   triage(input: AiTriageInput): Promise<AiTriageResult>;
   chat(input: AiChatInput): Promise<AiChatResult>;
+  /** Trả lời câu hỏi chăm sóc thú cưng tổng quát; ném lỗi nếu mô hình không khả dụng. */
+  answerPetCareQuestion(input: AiPetCareQuestionInput): Promise<AiPetCareAnswer>;
   learn(input: AiTriageInput, confirmedDiseaseNames: string[]): Promise<void>;
 }
