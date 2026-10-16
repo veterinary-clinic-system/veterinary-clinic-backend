@@ -8,10 +8,7 @@ import { AiChatController } from './ai-chat.controller';
 import { AiClientService } from './ai-client/ai-client.service';
 
 @Module({
-  imports: [
-    HttpModule,
-    TypeOrmModule.forFeature([PreScreeningResult, Disease, Appointment]),
-  ],
+  imports: [HttpModule, TypeOrmModule.forFeature([PreScreeningResult, Disease, Appointment])],
   controllers: [PrescreeningController, AiChatController],
   providers: [PrescreeningService, AiClientService],
   exports: [PrescreeningService, AiClientService],

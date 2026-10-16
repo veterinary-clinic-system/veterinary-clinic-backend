@@ -45,6 +45,7 @@ export class GoodsReceiptsService {
 
   async create(dto: CreateGoodsReceiptDto, receivedByUserId?: string): Promise<GoodsReceipt> {
     await this.assertReferencesExist(dto);
+    this.assertNotExpiredOnArrival(dto);
 
     const receiptId = await this.dataSource.transaction(async (em) => {
       const purchaseOrder = dto.purchaseOrderId
@@ -175,17 +176,17 @@ export class GoodsReceiptsService {
       throw new BadRequestException('Purchase order not found');
     }
     if (order.branchId !== branchId) {
-      throw new BadRequestException('Phieu nhap phai cung chi nhanh voi don dat hang');
+      throw new BadRequestException('Phiếu nhập phải cùng chi nhánh với đơn đặt hàng');
     }
     if (order.status === PurchaseOrderStatus.CANCELLED) {
-      throw new ConflictException(`Don ${order.poCode} da bi huy, khong nhan hang duoc`);
+      throw new ConflictException(`Đơn ${order.poCode} đã bị huỷ, không nhận hàng được`);
     }
     if (order.status === PurchaseOrderStatus.RECEIVED) {
-      throw new ConflictException(`Don ${order.poCode} da nhan du hang`);
+      throw new ConflictException(`Đơn ${order.poCode} đã nhận đủ hàng`);
     }
     if (order.status === PurchaseOrderStatus.DRAFT) {
       throw new ConflictException(
-        `Don ${order.poCode} chua gui nha cung cap - chuyen sang ORDERED truoc khi nhan hang`,
+        `Đơn ${order.poCode} chưa gửi nhà cung cấp - hãy gửi đơn trước khi nhận hàng`,
       );
     }
     return order;
@@ -199,11 +200,23 @@ export class GoodsReceiptsService {
     return new Map(lines.map((line) => [line.id, line]));
   }
 
+  /** Lô đã hết hạn tại ngày nhận không được vào kho (vẫn bị ghi giá trị dù không bán được). */
+  private assertNotExpiredOnArrival(dto: CreateGoodsReceiptDto): void {
+    const receivedDate = (dto.receivedDate ?? toDateOnly(new Date())).slice(0, 10);
+    const expired = dto.items.find(
+      (line) => line.expiryDate && line.expiryDate.slice(0, 10) <= receivedDate,
+    );
+    if (expired) {
+      throw new BadRequestException(
+        `Lô ${expired.batchNo} đã hết hạn (${expired.expiryDate!.slice(0, 10)}) tại ngày nhận — không thể nhập kho`,
+      );
+    }
+  }
+
   private assertNotOverReceiving(
     lines: readonly CreateGoodsReceiptItemDto[],
     orderLines: Map<string, PurchaseOrderItem>,
   ): void {
-    
     const receivingByOrderLine = new Map<string, number>();
 
     for (const line of lines) {
@@ -211,11 +224,11 @@ export class GoodsReceiptsService {
 
       const orderLine = orderLines.get(line.purchaseOrderItemId);
       if (!orderLine) {
-        throw new BadRequestException('Dong don dat hang khong thuoc don da chon');
+        throw new BadRequestException('Dòng đơn đặt hàng không thuộc đơn đã chọn');
       }
       if (orderLine.itemId !== line.itemId) {
         throw new BadRequestException(
-          'Mat hang cua dong nhap khong khop mat hang cua dong don dat',
+          'Mặt hàng của dòng nhập không khớp mặt hàng của dòng đơn đặt',
         );
       }
 
@@ -224,8 +237,8 @@ export class GoodsReceiptsService {
 
       if (orderLine.receivedQuantity + pending > orderLine.quantity) {
         throw new ConflictException(
-          `Nhan vuot so dat: dong dat ${orderLine.quantity}, da nhan ${orderLine.receivedQuantity}, ` +
-            `dang nhan them ${pending}`,
+          `Nhận vượt số đặt: dòng đặt ${orderLine.quantity}, đã nhận ${orderLine.receivedQuantity}, ` +
+            `đang nhận thêm ${pending}`,
         );
       }
     }
@@ -241,7 +254,7 @@ export class GoodsReceiptsService {
     const itemIds = [...new Set(dto.items.map((line) => line.itemId))];
     const found = await this.itemsRepository.count({ where: { id: In(itemIds) } });
     if (found !== itemIds.length) {
-      throw new BadRequestException('Mot hoac nhieu mat hang khong ton tai');
+      throw new BadRequestException('Một hoặc nhiều mặt hàng không tồn tại');
     }
   }
 }

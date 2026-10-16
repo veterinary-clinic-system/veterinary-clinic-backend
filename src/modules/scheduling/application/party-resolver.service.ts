@@ -24,7 +24,6 @@ export class PartyResolverService {
   async resolveOwner(phone: string, fullName?: string, email?: string): Promise<User> {
     const existing = await this.usersRepository.findOne({ where: { phone } });
     if (existing) {
-
       return assertCustomerCanOwnPets(existing);
     }
 

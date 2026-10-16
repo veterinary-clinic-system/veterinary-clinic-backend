@@ -19,7 +19,7 @@ export class VnpayPaymentAdapter implements PaymentProvider {
 
     if (!tmnCode || !hashSecret) {
       throw new InternalServerErrorException(
-        'Chua cau hinh VNPAY_TMN_CODE / VNPAY_HASH_SECRET - khong the tao URL thanh toan',
+        'Chưa cấu hình VNPAY_TMN_CODE / VNPAY_HASH_SECRET - không thể tạo URL thanh toán',
       );
     }
 
@@ -27,7 +27,7 @@ export class VnpayPaymentAdapter implements PaymentProvider {
       vnp_Version: '2.1.0',
       vnp_Command: 'pay',
       vnp_TmnCode: tmnCode,
-      
+
       vnp_Amount: String(request.amount * 100),
       vnp_CurrCode: 'VND',
       vnp_TxnRef: request.invoiceCode ?? request.invoiceId,

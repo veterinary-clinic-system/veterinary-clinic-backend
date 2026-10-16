@@ -2,7 +2,6 @@ import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-vali
 import { PaymentMethod } from '@/shared/common/enums/payment-method.enum';
 
 export class RefundInvoiceDto {
-  
   @IsString()
   @IsNotEmpty()
   reason: string;

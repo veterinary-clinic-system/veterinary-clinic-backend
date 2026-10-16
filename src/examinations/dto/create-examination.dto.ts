@@ -1,13 +1,4 @@
-import {
-  IsArray,
-  IsNumber,
-  IsInt,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsArray, IsNumber, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 
 /**
  * Doctor's exam-entry form (Section 4.1.4: "record actual symptoms, vital signs, and

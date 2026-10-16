@@ -13,6 +13,7 @@ import notificationConfig from './shared/config/notification.config';
 import filesConfig from './shared/config/files.config';
 import paymentConfig from './shared/config/payment.config';
 import throttleConfig from './shared/config/throttle.config';
+import webrtcConfig from './shared/config/webrtc.config';
 import { validateEnv } from './shared/config/env.validation';
 
 import { DatabaseModule } from './shared/database/database.module';
@@ -35,6 +36,7 @@ import { BillingModule } from '@/modules/billing/billing.module';
 import { SalesModule } from '@/modules/sales/sales.module';
 import { NotificationModule } from '@/modules/notification/notification.module';
 import { ReportingModule } from '@/modules/reporting/reporting.module';
+import { MessagingModule } from '@/modules/messaging/messaging.module';
 import { StorageModule } from '@/shared/storage/storage.module';
 import { HealthModule } from '@/shared/health/health.module';
 import { RealtimeModule } from '@/shared/realtime/realtime.module';
@@ -53,6 +55,7 @@ import { RealtimeModule } from '@/shared/realtime/realtime.module';
         filesConfig,
         paymentConfig,
         throttleConfig,
+        webrtcConfig,
       ],
       validate: validateEnv,
     }),
@@ -84,12 +87,12 @@ import { RealtimeModule } from '@/shared/realtime/realtime.module';
     SalesModule,
     NotificationModule,
     ReportingModule,
+    MessagingModule,
     StorageModule,
     HealthModule,
     RealtimeModule,
   ],
   providers: [
-
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

@@ -6,15 +6,14 @@ export const AUDIT_KEY = 'audit';
 export type AuditActionResolver = (body: unknown) => AuditAction | undefined;
 
 export interface AuditOptions {
-  
   action: AuditAction;
-  
+
   resolveAction?: AuditActionResolver;
-  
+
   entity: string;
-  
+
   idParam?: string;
-  
+
   snapshot?: boolean;
 }
 

@@ -23,7 +23,7 @@ describe('isValidQueueStatusTransition', () => {
       [QueueStatus.CANCELLED]: true,
     },
     [QueueStatus.ASSIGNED]: {
-      [QueueStatus.WAITING]: false, 
+      [QueueStatus.WAITING]: false,
       [QueueStatus.ASSIGNED]: true,
       [QueueStatus.IN_ROOM]: true,
       [QueueStatus.DONE]: true,
@@ -36,7 +36,7 @@ describe('isValidQueueStatusTransition', () => {
       [QueueStatus.DONE]: true,
       [QueueStatus.CANCELLED]: true,
     },
-    
+
     [QueueStatus.DONE]: {
       [QueueStatus.WAITING]: false,
       [QueueStatus.ASSIGNED]: false,

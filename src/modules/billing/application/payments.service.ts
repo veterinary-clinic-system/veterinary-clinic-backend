@@ -22,7 +22,7 @@ export interface RecordPaymentParams {
   invoiceId: string;
   amount: number;
   method: PaymentMethod;
-  
+
   status?: PaymentStatus;
   referenceCode?: string | null;
   receivedByUserId?: string | null;
@@ -31,9 +31,9 @@ export interface RecordPaymentParams {
 
 export interface InvoiceBalance {
   totalAmount: number;
-  
+
   paidAmount: number;
-  
+
   outstandingAmount: number;
   hasRefund: boolean;
   status: InvoiceStatus;
@@ -50,17 +50,17 @@ export class PaymentsService {
   async record(params: RecordPaymentParams, manager?: EntityManager): Promise<Payment> {
     return this.run(manager, async (em) => {
       if (!Number.isFinite(params.amount) || params.amount <= 0) {
-        throw new BadRequestException('So tien thanh toan phai lon hon 0');
+        throw new BadRequestException('Số tiền thanh toán phải lớn hơn 0');
       }
 
       await this.lock(em, params.invoiceId);
       const invoice = await this.loadInvoice(em, params.invoiceId);
 
       if (invoice.status === InvoiceStatus.CANCELLED) {
-        throw new ConflictException('Hoa don da bi huy, khong ghi nhan thanh toan duoc');
+        throw new ConflictException('Hoá đơn đã bị huỷ, không ghi nhận thanh toán được');
       }
       if (invoice.status === InvoiceStatus.REFUNDED) {
-        throw new ConflictException('Hoa don da hoan tien, khong ghi nhan thanh toan duoc');
+        throw new ConflictException('Hoá đơn đã hoàn tiền, không ghi nhận thanh toán được');
       }
 
       const status = params.status ?? PaymentStatus.SUCCESS;
@@ -70,7 +70,7 @@ export class PaymentsService {
         const remaining = invoice.totalAmount - paidAmount;
         if (params.amount > remaining) {
           throw new ConflictException(
-            `Tra du: hoa don ${invoice.invoiceCode} con phai thu ${remaining}, dang tra ${params.amount}`,
+            `Trả dư: hoá đơn ${invoice.invoiceCode} còn phải thu ${remaining}, đang trả ${params.amount}`,
           );
         }
       }
@@ -117,7 +117,7 @@ export class PaymentsService {
   ): Promise<Payment> {
     return this.run(manager, async (em) => {
       if (!Number.isFinite(params.amount) || params.amount <= 0) {
-        throw new BadRequestException('So tien hoan phai lon hon 0');
+        throw new BadRequestException('Số tiền hoàn phải lớn hơn 0');
       }
 
       await this.lock(em, params.invoiceId);
@@ -126,12 +126,12 @@ export class PaymentsService {
       const paidAmount = await this.paidAmountOf(em, invoice.id);
       if (paidAmount <= 0) {
         throw new ConflictException(
-          `Hoa don ${invoice.invoiceCode} chua thu duoc dong nao, khong co gi de hoan`,
+          `Hoá đơn ${invoice.invoiceCode} chưa thu được đồng nào, không có gì để hoàn`,
         );
       }
       if (params.amount > paidAmount) {
         throw new ConflictException(
-          `Hoan vuot so da thu: da thu ${paidAmount}, dang hoan ${params.amount}`,
+          `Hoàn vượt số đã thu: đã thu ${paidAmount}, đang hoàn ${params.amount}`,
         );
       }
 

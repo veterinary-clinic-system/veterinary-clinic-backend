@@ -3,7 +3,6 @@ import { PaginationQueryDto } from '@/shared/common/dto/pagination-query.dto';
 import { PrescriptionStatus } from '@/shared/common/enums/prescription-status.enum';
 
 export class QueryPrescriptionsDto extends PaginationQueryDto {
-  
   @IsOptional()
   @IsIn(['ASC', 'DESC'])
   sortOrder?: 'ASC' | 'DESC' = undefined;

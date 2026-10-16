@@ -18,7 +18,7 @@ export class StubAiPredictionAdapter implements AiPredictionProvider {
 
     return Promise.resolve({
       priorityColor: PriorityColor.YELLOW,
-      suspectedGroups: [{ name: 'Chua xac dinh (stub)', confidence: 0.5 }],
+      suspectedGroups: [{ name: 'Chưa xác định (stub)', confidence: 0.5 }],
       extractedKeywords: [],
       nlpConfidence: 0.5,
       cvConfidence: input.photoUrls.length > 0 ? 0.5 : null,

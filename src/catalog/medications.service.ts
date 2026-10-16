@@ -73,7 +73,10 @@ export class MedicationsService {
   }
 
   async findOne(id: string): Promise<Medication> {
-    const medication = await this.medicationsRepository.findOne({ where: { id }, relations: ['item'] });
+    const medication = await this.medicationsRepository.findOne({
+      where: { id },
+      relations: ['item'],
+    });
     if (!medication) {
       throw new NotFoundException('Medication not found');
     }
@@ -102,9 +105,11 @@ export class MedicationsService {
         await manager.update(Item, medication.itemId, itemUpdates);
       }
 
-      const medicationUpdates: Partial<Pick<Medication, 'unit' | 'activeIngredient' | 'active'>> = {};
+      const medicationUpdates: Partial<Pick<Medication, 'unit' | 'activeIngredient' | 'active'>> =
+        {};
       if (dto.unit !== undefined) medicationUpdates.unit = dto.unit;
-      if (dto.activeIngredient !== undefined) medicationUpdates.activeIngredient = dto.activeIngredient;
+      if (dto.activeIngredient !== undefined)
+        medicationUpdates.activeIngredient = dto.activeIngredient;
       if (dto.active !== undefined) medicationUpdates.active = dto.active;
       if (Object.keys(medicationUpdates).length > 0) {
         await manager.update(Medication, id, medicationUpdates);

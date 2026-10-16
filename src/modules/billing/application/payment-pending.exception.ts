@@ -5,7 +5,7 @@ export class PaymentPendingException extends HttpException {
     super(
       {
         statusCode: HttpStatus.PAYMENT_REQUIRED,
-        message: 'Hoa don dang cho thanh toan tai cong thanh toan',
+        message: 'Hoá đơn đang chờ thanh toán tại cổng thanh toán',
         redirectUrl,
       },
       HttpStatus.PAYMENT_REQUIRED,

@@ -14,9 +14,9 @@ export interface NotifyStaffParams {
   title: string;
   body: string;
   link?: string | null;
-  
+
   branchId?: string | null;
-  
+
   dedupeKey: string;
 }
 
@@ -66,7 +66,7 @@ export class StaffNotificationsService {
       return result.identifiers.filter(Boolean).length;
     } catch (error) {
       this.logger.error(
-        `Khong phat duoc thong bao ${params.type} (${params.dedupeKey}): ${(error as Error).message}`,
+        `Không phát được thông báo ${params.type} (${params.dedupeKey}): ${(error as Error).message}`,
       );
       return 0;
     }
@@ -113,7 +113,6 @@ export class StaffNotificationsService {
   }
 
   async markRead(userId: string, id: string): Promise<StaffNotification> {
-
     await this.repository.update(
       { id, recipientUserId: userId, readAt: IsNull() },
       { readAt: new Date() },

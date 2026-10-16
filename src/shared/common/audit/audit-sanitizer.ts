@@ -1,5 +1,3 @@
-
-
 export const REDACTED = '[REDACTED]';
 
 const SENSITIVE_PATTERNS = [

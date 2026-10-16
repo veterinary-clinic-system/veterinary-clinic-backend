@@ -68,7 +68,7 @@ export class BranchesService {
   }
 
   async replaceOpeningHours(branchId: string, hours: OperatingHourDto[]): Promise<OperatingHour[]> {
-    await this.findOne(branchId); 
+    await this.findOne(branchId);
 
     for (const hour of hours) {
       if (hour.openTime >= hour.closeTime) {

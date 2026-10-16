@@ -56,7 +56,6 @@ export class CategoriesService {
 
     const roots: CategoryTreeNode[] = [];
     for (const node of byId.values()) {
-
       const parent = node.parentId ? byId.get(node.parentId) : undefined;
       if (parent) {
         parent.children.push(node);

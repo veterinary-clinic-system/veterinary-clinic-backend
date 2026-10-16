@@ -4,7 +4,6 @@ export class ProductsAndSuppliers1791000003000 implements MigrationInterface {
   name = 'ProductsAndSuppliers1791000003000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "products" (
         "id"            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -27,12 +26,12 @@ export class ProductsAndSuppliers1791000003000 implements MigrationInterface {
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_products_sku"
       ON "products" ("sku") WHERE "deleted_at" IS NULL
     `);
-    
+
     await queryRunner.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_products_item"
       ON "products" ("item_id") WHERE "deleted_at" IS NULL
     `);
-    
+
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_products_sku" ON "products" ("sku")
     `);
@@ -65,7 +64,7 @@ export class ProductsAndSuppliers1791000003000 implements MigrationInterface {
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_suppliers_supplier_code"
       ON "suppliers" ("supplier_code") WHERE "deleted_at" IS NULL
     `);
-    
+
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_suppliers_name" ON "suppliers" ("name")
     `);

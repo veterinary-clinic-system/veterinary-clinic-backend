@@ -1,7 +1,6 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity({ name: 'outbox_events' })
-
 @Index('idx_outbox_unprocessed', ['createdAt'], { where: '"processed_at" IS NULL' })
 export class OutboxEvent {
   @PrimaryGeneratedColumn('uuid')

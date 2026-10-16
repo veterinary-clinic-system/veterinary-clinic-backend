@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -121,10 +117,7 @@ export class AuthService {
       const payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(refreshToken, {
         secret: this.configService.get<string>('jwt.refreshSecret'),
       });
-      await this.refreshTokensRepository.update(
-        { id: payload.jti },
-        { revokedAt: new Date() },
-      );
+      await this.refreshTokensRepository.update({ id: payload.jti }, { revokedAt: new Date() });
     } catch {
       // Already invalid/expired - logout is idempotent either way.
     }

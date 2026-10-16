@@ -71,7 +71,7 @@ export class Vaccines1796000001000 implements MigrationInterface {
         PRIMARY KEY ("vaccine_id", "species_id")
       )
     `);
-    
+
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_vaccine_species_species"
       ON "vaccine_species" ("species_id")

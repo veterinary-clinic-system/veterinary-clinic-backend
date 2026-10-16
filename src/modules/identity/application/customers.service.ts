@@ -28,7 +28,7 @@ const CUSTOMER_SORTABLE_COLUMNS = new Set(['createdAt', 'updatedAt', 'fullName',
 
 export interface CustomerListRow {
   id: string;
-  
+
   customerCode: string | null;
   phone: string;
   fullName: string;
@@ -46,24 +46,24 @@ export interface CustomerListRow {
 export interface CustomerDetail extends CustomerListRow {
   appointmentCount: number;
   completedAppointmentCount: number;
-  
+
   invoiceCount: number;
-  
+
   purchaseCount: number;
-  
+
   totalPaid: number;
-  
+
   totalUnpaid: number;
 }
 
 export interface CustomerPurchaseRow {
   invoiceId: string;
   invoiceCode: string;
-  
+
   purchasedAt: Date;
   branchName: string | null;
   status: InvoiceStatus;
-  
+
   itemSummary: string;
   itemCount: number;
   totalAmount: number;
@@ -108,7 +108,7 @@ export interface CustomerMedicalHistoryDiagnosis {
 export interface CustomerTransactionRow {
   invoiceId: string;
   appointmentId: string;
-  
+
   visitedAt: Date;
   petId: string;
   petName: string;
@@ -119,7 +119,7 @@ export interface CustomerTransactionRow {
   paid: boolean;
   paidAt: Date | null;
   paymentMethod: PaymentMethod | null;
-  
+
   totalAmount: number;
 }
 
@@ -138,12 +138,12 @@ export class CustomersService {
   async create(dto: CreateCustomerDto): Promise<CustomerDetail> {
     const existingPhone = await this.usersRepository.findOne({ where: { phone: dto.phone } });
     if (existingPhone) {
-      throw new ConflictException('So dien thoai nay da duoc su dung');
+      throw new ConflictException('Số điện thoại này đã được sử dụng');
     }
     if (dto.email) {
       const existingEmail = await this.usersRepository.findOne({ where: { email: dto.email } });
       if (existingEmail) {
-        throw new ConflictException('Email nay da duoc su dung');
+        throw new ConflictException('Email này đã được sử dụng');
       }
     }
 
@@ -172,7 +172,7 @@ export class CustomersService {
     if (dto.email !== undefined && dto.email !== customer.email) {
       const existing = await this.usersRepository.findOne({ where: { email: dto.email } });
       if (existing && existing.id !== id) {
-        throw new ConflictException('Email nay da duoc su dung');
+        throw new ConflictException('Email này đã được sử dụng');
       }
     }
 
@@ -211,7 +211,7 @@ export class CustomersService {
 
     if (upcoming > 0) {
       throw new ConflictException(
-        `Khach hang con ${upcoming} lich hen chua ket thuc - vui long huy hoac hoan tat cac lich hen do truoc khi ngung hoat dong.`,
+        `Khách hàng còn ${upcoming} lịch hẹn chưa kết thúc - vui lòng huỷ hoặc hoàn tất các lịch hẹn đó trước khi ngừng hoạt động.`,
       );
     }
 
@@ -258,7 +258,7 @@ export class CustomersService {
     ).getRawOne<RawCustomerRow>();
 
     if (!row) {
-      throw new NotFoundException('Khong tim thay khach hang');
+      throw new NotFoundException('Không tìm thấy khách hàng');
     }
 
     const stats = await this.appointmentsRepository
@@ -380,7 +380,7 @@ export class CustomersService {
       .innerJoin('medicalRecord.appointment', 'appointment')
       .innerJoin('medicalRecord.pet', 'pet')
       .leftJoin('medicalRecord.doctor', 'doctor')
-      
+
       .leftJoin('medicalRecord.examination', 'examination')
       .leftJoin('appointment.branch', 'branch')
       .select('medicalRecord.id', 'medical_record_id')
@@ -515,7 +515,7 @@ export class CustomersService {
       where: { id, role: Role.PET_OWNER },
     });
     if (!customer) {
-      throw new NotFoundException('Khong tim thay khach hang');
+      throw new NotFoundException('Không tìm thấy khách hàng');
     }
     return customer;
   }
@@ -533,7 +533,7 @@ export class CustomersService {
             .where('customer.fullName ILIKE :search', { search: `%${search}%` })
             .orWhere('customer.phone ILIKE :search', { search: `%${search}%` })
             .orWhere('customer.email ILIKE :search', { search: `%${search}%` })
-            
+
             .orWhere('customer.customerCode ILIKE :search', { search: `%${search}%` });
         }),
       );
@@ -566,7 +566,6 @@ export class CustomersService {
       qb.andWhere('customer.createdAt >= :createdFrom', { createdFrom: query.createdFrom });
     }
     if (query.createdTo) {
-      
       qb.andWhere("customer.createdAt < (CAST(:createdTo AS date) + INTERVAL '1 day')", {
         createdTo: query.createdTo,
       });
@@ -576,35 +575,33 @@ export class CustomersService {
   }
 
   private selectListColumns(qb: ReturnType<CustomersService['buildBaseQuery']>) {
-    return (
-      qb
-        .select('customer.id', 'id')
-        .addSelect('customer.customer_code', 'customer_code')
-        .addSelect('customer.phone', 'phone')
-        .addSelect('customer.full_name', 'full_name')
-        .addSelect('customer.avatar_url', 'avatar_url')
-        .addSelect('customer.email', 'email')
+    return qb
+      .select('customer.id', 'id')
+      .addSelect('customer.customer_code', 'customer_code')
+      .addSelect('customer.phone', 'phone')
+      .addSelect('customer.full_name', 'full_name')
+      .addSelect('customer.avatar_url', 'avatar_url')
+      .addSelect('customer.email', 'email')
 
-        .addSelect("TO_CHAR(customer.date_of_birth, 'YYYY-MM-DD')", 'date_of_birth')
-        .addSelect('customer.address', 'address')
-        .addSelect('customer.note', 'note')
-        .addSelect('customer.active', 'active')
-        .addSelect('customer.created_at', 'created_at')
-        .addSelect(
-          `(SELECT COUNT(*) FROM pets p WHERE p.owner_id = customer.id AND p.deleted_at IS NULL)`,
-          'pet_count',
-        )
-        .addSelect(
-          `(SELECT MAX(a.start_at)
+      .addSelect("TO_CHAR(customer.date_of_birth, 'YYYY-MM-DD')", 'date_of_birth')
+      .addSelect('customer.address', 'address')
+      .addSelect('customer.note', 'note')
+      .addSelect('customer.active', 'active')
+      .addSelect('customer.created_at', 'created_at')
+      .addSelect(
+        `(SELECT COUNT(*) FROM pets p WHERE p.owner_id = customer.id AND p.deleted_at IS NULL)`,
+        'pet_count',
+      )
+      .addSelect(
+        `(SELECT MAX(a.start_at)
             FROM appointments a
             JOIN pets p ON p.id = a.pet_id
            WHERE p.owner_id = customer.id
              AND a.status = '${AppointmentStatus.COMPLETED}'
              AND a.deleted_at IS NULL
              AND p.deleted_at IS NULL)`,
-          'last_visit_at',
-        )
-    );
+        'last_visit_at',
+      );
   }
 
   private toListRow(row: RawCustomerRow): CustomerListRow {

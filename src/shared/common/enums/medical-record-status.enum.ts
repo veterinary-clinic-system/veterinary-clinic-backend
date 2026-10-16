@@ -1,4 +1,3 @@
-
 export enum MedicalRecordStatus {
   DRAFT = 'DRAFT',
   COMPLETED = 'COMPLETED',

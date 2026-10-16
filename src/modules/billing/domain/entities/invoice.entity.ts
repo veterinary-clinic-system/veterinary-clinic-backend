@@ -14,7 +14,6 @@ import { Payment } from './payment.entity';
 @Index('idx_invoices_customer_created', ['customerId', 'createdAt'])
 @Index('idx_invoices_source_created', ['source', 'createdAt'])
 export class Invoice extends BaseEntity {
-  
   @Column({ name: 'invoice_code', length: 32, insert: false, update: false })
   invoiceCode: string;
 

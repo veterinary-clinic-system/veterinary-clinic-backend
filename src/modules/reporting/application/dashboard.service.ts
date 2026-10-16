@@ -427,7 +427,7 @@ export class DashboardService {
       const cached = await this.redis.get(key);
       return cached ? (JSON.parse(cached) as DashboardResponse) : null;
     } catch (error) {
-      this.logger.warn(`Khong doc duoc cache dashboard: ${(error as Error).message}`);
+      this.logger.warn(`Không đọc được cache dashboard: ${(error as Error).message}`);
       return null;
     }
   }
@@ -436,7 +436,7 @@ export class DashboardService {
     try {
       await this.redis.set(key, JSON.stringify(value), 'EX', CACHE_TTL_SECONDS);
     } catch (error) {
-      this.logger.warn(`Khong ghi duoc cache dashboard: ${(error as Error).message}`);
+      this.logger.warn(`Không ghi được cache dashboard: ${(error as Error).message}`);
     }
   }
 }

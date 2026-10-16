@@ -3,7 +3,6 @@ import { PaginationQueryDto } from '@/shared/common/dto/pagination-query.dto';
 import { ParseOptionalBoolean } from './transforms';
 
 export class QueryProductsDto extends PaginationQueryDto {
-  
   @IsOptional()
   @IsString()
   search?: string;

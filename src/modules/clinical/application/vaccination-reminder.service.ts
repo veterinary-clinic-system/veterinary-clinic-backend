@@ -63,9 +63,9 @@ export class VaccinationReminderService {
             nextDueDate: row.nextDueDate,
             branchId: row.branchId,
             message:
-              `Nhac lich tiem: ${row.petName} den han tiem ${row.vaccineName} ` +
-              `(${row.diseasePrevented}) ngay ${row.nextDueDate}. ` +
-              'Vui long lien he phong kham de dat lich.',
+              `Nhắc lịch tiêm: ${row.petName} đến hạn tiêm ${row.vaccineName} ` +
+              `(${row.diseasePrevented}) ngày ${row.nextDueDate}. ` +
+              'Vui lòng liên hệ phòng khám để đặt lịch.',
           },
         });
         if (inserted) fresh.push(row);
@@ -93,7 +93,7 @@ export class VaccinationReminderService {
     }
 
     this.logger.log(
-      `Da ghi ${rows.length} nhac lich tiem vao outbox, gui ${fresh.length} tin moi cho chu nuoi ` +
+      `Đã ghi ${rows.length} nhắc lịch tiêm vào outbox, gửi ${fresh.length} tin mới cho chủ nuôi ` +
         `(${toDateOnly(new Date())})`,
     );
     return rows.length;

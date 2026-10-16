@@ -15,7 +15,7 @@ export class UpdateQueueEntryDto {
   @IsString()
   note?: string;
 
-    @IsOptional()
+  @IsOptional()
   @IsString({ message: 'Lý do hủy không hợp lệ' })
   @MaxLength(500, { message: 'Lý do hủy không được vượt quá 500 ký tự' })
   reason?: string;

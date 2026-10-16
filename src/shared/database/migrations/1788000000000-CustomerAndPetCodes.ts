@@ -4,7 +4,6 @@ export class CustomerAndPetCodes1788000000000 implements MigrationInterface {
   name = 'CustomerAndPetCodes1788000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-
     await queryRunner.query(`CREATE SEQUENCE IF NOT EXISTS "customer_code_seq" START 1`);
     await queryRunner.query(
       `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "customer_code" varchar(32)`,

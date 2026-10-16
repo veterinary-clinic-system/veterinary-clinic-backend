@@ -1,8 +1,8 @@
 export const DEFAULT_SLOT_MINUTES = 30;
 
 export interface TimeRange {
-  start: string; 
-  end: string; 
+  start: string;
+  end: string;
 }
 
 export function toMinutes(hhmm: string): number {

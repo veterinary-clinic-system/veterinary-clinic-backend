@@ -47,8 +47,10 @@ export class ExaminationsService {
     @InjectRepository(Examination) private readonly examinationsRepository: Repository<Examination>,
     @InjectRepository(Appointment) private readonly appointmentsRepository: Repository<Appointment>,
     @InjectRepository(Doctor) private readonly doctorsRepository: Repository<Doctor>,
-    @InjectRepository(Prescription) private readonly prescriptionsRepository: Repository<Prescription>,
-    @InjectRepository(LabTestOrder) private readonly labTestOrdersRepository: Repository<LabTestOrder>,
+    @InjectRepository(Prescription)
+    private readonly prescriptionsRepository: Repository<Prescription>,
+    @InjectRepository(LabTestOrder)
+    private readonly labTestOrdersRepository: Repository<LabTestOrder>,
     @InjectRepository(Medication) private readonly medicationsRepository: Repository<Medication>,
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
@@ -108,10 +110,14 @@ export class ExaminationsService {
       ...(dto.diseaseGroups !== undefined ? { diseaseGroups: dto.diseaseGroups } : {}),
       ...(dto.diagnosisText !== undefined ? { diagnosisText: dto.diagnosisText } : {}),
       ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
-      ...(dto.temperatureCelsius !== undefined ? { temperatureCelsius: dto.temperatureCelsius } : {}),
+      ...(dto.temperatureCelsius !== undefined
+        ? { temperatureCelsius: dto.temperatureCelsius }
+        : {}),
       ...(dto.weightKg !== undefined ? { weightKg: dto.weightKg } : {}),
       ...(dto.heartRateBpm !== undefined ? { heartRateBpm: dto.heartRateBpm } : {}),
-      ...(dto.respiratoryRateBpm !== undefined ? { respiratoryRateBpm: dto.respiratoryRateBpm } : {}),
+      ...(dto.respiratoryRateBpm !== undefined
+        ? { respiratoryRateBpm: dto.respiratoryRateBpm }
+        : {}),
       ...(dto.attachmentUrls !== undefined ? { attachmentUrls: dto.attachmentUrls } : {}),
     });
 
@@ -214,7 +220,9 @@ export class ExaminationsService {
       ...(dto.resultFileUrls !== undefined ? { resultFileUrls: dto.resultFileUrls } : {}),
     });
 
-    return this.labTestOrdersRepository.findOne({ where: { id: labTestId } }) as Promise<LabTestOrder>;
+    return this.labTestOrdersRepository.findOne({
+      where: { id: labTestId },
+    }) as Promise<LabTestOrder>;
   }
 
   private async assertExists(examinationId: string): Promise<void> {

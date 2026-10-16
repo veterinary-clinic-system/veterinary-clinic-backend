@@ -13,7 +13,7 @@ export default registerAs('notification', () => ({
     oaId: process.env.ZALO_OA_ID,
     znsTemplateId: process.env.ZALO_ZNS_TEMPLATE_ID,
   },
-  
+
   email: {
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT ?? '587', 10),

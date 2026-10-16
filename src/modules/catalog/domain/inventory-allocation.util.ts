@@ -3,7 +3,7 @@ import { InventoryTransactionType } from '@/shared/common/enums/inventory-transa
 export interface AllocatableBatch {
   id: string;
   batchNo: string;
-  
+
   expiryDate: string | null;
   quantity: number;
   receivedAt: Date;
@@ -26,7 +26,7 @@ export class InsufficientStockError extends Error {
     readonly requested: number,
     readonly available: number,
   ) {
-    super(`Khong du ton kho: can ${requested}, kha dung ${available}`);
+    super(`Không đủ tồn kho: cần ${requested}, khả dụng ${available}`);
     this.name = 'InsufficientStockError';
   }
 }
@@ -63,7 +63,7 @@ export function allocateFefo(
   today: string,
 ): BatchAllocation[] {
   if (!Number.isInteger(quantity) || quantity <= 0) {
-    throw new RangeError('So luong xuat phai la so nguyen duong');
+    throw new RangeError('Số lượng xuất phải là số nguyên dương');
   }
 
   const usable = batches.filter((batch) => !isExpired(batch, today) && batch.quantity > 0);
@@ -91,7 +91,7 @@ export function planLedgerLines(
   return changes.map((change) => {
     running += change.quantityChange;
     if (running < 0) {
-      throw new RangeError('Ton kho khong duoc am');
+      throw new RangeError('Tồn kho không được âm');
     }
     return {
       batchId: change.batchId,

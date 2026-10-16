@@ -1,11 +1,8 @@
-
-
 export interface VaccineSchedule {
-  
   doseCount: number;
-  
+
   intervalDays: number | null;
-  
+
   boosterIntervalDays: number | null;
 }
 
@@ -30,7 +27,6 @@ export function computeNextDueDate(
   const withinCourse = doseNumber < schedule.doseCount;
 
   if (withinCourse) {
-
     return schedule.intervalDays ? addDays(vaccinatedAt, schedule.intervalDays) : null;
   }
 

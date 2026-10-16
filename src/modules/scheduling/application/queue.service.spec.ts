@@ -3,7 +3,6 @@ import { QueueService } from './queue.service';
 import { DayAvailability, SlotInfo, SlotStatus } from './availability.service';
 
 describe('QueueService.findNextFreeStart', () => {
-  
   const NOW = new Date(2026, 7, 4, 8, 0, 0);
   const DATE_STR = '2026-08-04';
 
@@ -82,7 +81,6 @@ describe('QueueService.findNextFreeStart', () => {
   });
 
   it('bo qua o da troi qua gio hien tai', async () => {
-    
     const service = makeService({
       slots: grid(7, [SlotStatus.FREE, SlotStatus.FREE, SlotStatus.FREE]),
     });
@@ -100,7 +98,6 @@ describe('QueueService.findNextFreeStart', () => {
 
   describe('dich vu dai hon mot slot', () => {
     it('doi HAI o lien ke deu trong voi dich vu 60 phut', async () => {
-
       const service = makeService({
         slots: grid(9, [SlotStatus.FREE, SlotStatus.BOOKED, SlotStatus.FREE, SlotStatus.FREE]),
       });
@@ -128,7 +125,6 @@ describe('QueueService.findNextFreeStart', () => {
     });
 
     it('tu choi khi khong con du o lien ke o cuoi ngay', async () => {
-      
       const service = makeService({
         slots: grid(9, [SlotStatus.BOOKED, SlotStatus.FREE]),
       });

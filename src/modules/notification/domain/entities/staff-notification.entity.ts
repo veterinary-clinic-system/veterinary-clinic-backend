@@ -4,7 +4,6 @@ import { User } from '@/modules/identity/domain/entities/user.entity';
 import { StaffNotificationType } from '@/shared/common/enums/staff-notification.enum';
 
 @Entity({ name: 'staff_notifications' })
-
 @Index('idx_staff_notif_recipient_unread', ['recipientUserId', 'readAt', 'createdAt'])
 export class StaffNotification extends BaseEntity {
   @ManyToOne(() => User, { onDelete: 'CASCADE' })

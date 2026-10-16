@@ -17,7 +17,7 @@ export async function mapAppointmentOverlapError<T>(operation: () => Promise<T>)
     return await operation();
   } catch (error) {
     if (isAppointmentOverlapError(error)) {
-      throw new ConflictException('Khung gio nay vua co nguoi dat - vui long chon khung gio khac');
+      throw new ConflictException('Khung giờ này vừa có người đặt - vui lòng chọn khung giờ khác');
     }
     throw error;
   }

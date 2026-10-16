@@ -19,7 +19,7 @@ const ORDER_RELATIONS = ['results', 'technician'];
 export interface LabTrendPoint {
   labTestOrderId: string;
   testName: string;
-  
+
   measuredAt: string;
   value: number;
   unit: string | null;
@@ -30,7 +30,7 @@ export interface LabTrendPoint {
 
 export interface LabTrendSeries {
   parameter: string;
-  
+
   unit: string | null;
   points: LabTrendPoint[];
 }
@@ -217,7 +217,7 @@ export class LaboratoriesService {
     const referenceMax = dto.referenceMax ?? null;
     if (!isValidReferenceRange({ referenceMin, referenceMax })) {
       throw new BadRequestException(
-        `Chi so "${dto.parameter}": can duoi cua khoang tham chieu lon hon can tren`,
+        `Chỉ số "${dto.parameter}": cận dưới của khoảng tham chiếu lớn hơn cận trên`,
       );
     }
 
@@ -241,7 +241,7 @@ export class LaboratoriesService {
       const parameter = this.normalizeParameter(result.parameter);
       if (seen.has(parameter)) {
         throw new BadRequestException(
-          `Chi so "${parameter}" xuat hien hai lan trong cung mot ket qua xet nghiem`,
+          `Chỉ số "${parameter}" xuất hiện hai lần trong cùng một kết quả xét nghiệm`,
         );
       }
       seen.add(parameter);

@@ -4,7 +4,6 @@ export class InvoiceStructure1794000000000 implements MigrationInterface {
   name = 'InvoiceStructure1794000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-
     await queryRunner.query(`
       DO $$
       DECLARE constraint_name text;

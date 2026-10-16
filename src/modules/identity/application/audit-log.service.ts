@@ -15,7 +15,6 @@ import { QueryAuditLogsDto } from '@/modules/identity/presentation/dto/query-aud
 import { AuditRecordParams, AuditRecorder } from '@/shared/common/audit/audit-recorder.port';
 
 export interface AuditLogView extends AuditLog {
-  
   actorName: string | null;
   actorPhone: string | null;
 }
@@ -42,7 +41,7 @@ export class AuditLogService implements AuditRecorder {
       })
       .catch((error: Error) => {
         this.logger.error(
-          `Khong ghi duoc nhat ky kiem toan (${params.action} ${params.entityName} ` +
+          `Không ghi được nhật ký kiểm toán (${params.action} ${params.entityName} ` +
             `${params.entityId ?? '-'}): ${error.message}`,
         );
       });

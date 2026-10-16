@@ -29,7 +29,7 @@ export class MedicationCatalogFields1791000004000 implements MigrationInterface 
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_medications_supplier" ON "medications" ("supplier_id")
     `);
-    
+
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_medications_generic_name" ON "medications" ("generic_name")
     `);

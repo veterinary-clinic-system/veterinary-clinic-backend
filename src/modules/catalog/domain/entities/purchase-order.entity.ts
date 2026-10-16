@@ -10,7 +10,6 @@ import { Supplier } from './supplier.entity';
 @Entity({ name: 'purchase_orders' })
 @Index('idx_purchase_orders_branch_status', ['branchId', 'status'])
 export class PurchaseOrder extends BaseEntity {
-  
   @Column({ name: 'po_code', length: 32 })
   poCode: string;
 

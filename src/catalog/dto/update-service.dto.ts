@@ -1,5 +1,15 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { Specialization } from '@/common/enums/specialization.enum';
 import { ParseOptionalBoolean } from './transforms';
 

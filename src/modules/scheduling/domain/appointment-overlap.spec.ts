@@ -42,7 +42,7 @@ describe('appointment-overlap', () => {
       });
 
       await expect(promise).rejects.toBeInstanceOf(ConflictException);
-      await expect(promise).rejects.toThrow('Khung gio nay vua co nguoi dat');
+      await expect(promise).rejects.toThrow('Khung giờ này vừa có người đặt');
     });
 
     it('nem lai nguyen ven moi loi khac - khong nuot loi ha tang', async () => {

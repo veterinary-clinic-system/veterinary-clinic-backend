@@ -8,7 +8,8 @@ import { IsIn, IsInt, Matches } from 'class-validator';
 export class CreateDoctorShiftDto {
   @IsInt()
   @IsIn([1, 2, 3, 4, 5], {
-    message: 'dayOfWeek must be Monday (1) through Friday (5) - the clinic is closed Saturday/Sunday',
+    message:
+      'dayOfWeek must be Monday (1) through Friday (5) - the clinic is closed Saturday/Sunday',
   })
   dayOfWeek: number;
 

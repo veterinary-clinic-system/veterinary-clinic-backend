@@ -1,12 +1,10 @@
-
 export enum EmployeeStatus {
-  
   PROBATION = 'PROBATION',
-  
+
   ACTIVE = 'ACTIVE',
-  
+
   SUSPENDED = 'SUSPENDED',
-  
+
   RESIGNED = 'RESIGNED',
 }
 

@@ -195,7 +195,10 @@ export class BillingService {
     const ids = pageRows.map((invoice) => invoice.id);
 
     const detailed = ids.length
-      ? await this.invoicesRepository.find({ where: { id: In(ids) }, relations: INVOICE_DETAIL_RELATIONS })
+      ? await this.invoicesRepository.find({
+          where: { id: In(ids) },
+          relations: INVOICE_DETAIL_RELATIONS,
+        })
       : [];
     const byId = new Map(detailed.map((invoice) => [invoice.id, invoice]));
     const data = ids.map((id) => byId.get(id)!);

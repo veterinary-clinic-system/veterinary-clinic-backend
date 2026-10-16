@@ -48,7 +48,7 @@ export interface PosProductRow {
   unitPrice: number;
   sku: string | null;
   unit: string | null;
-  
+
   availableQuantity: number;
 }
 
@@ -57,7 +57,7 @@ export interface CartItemStock {
   itemId: string;
   itemName: string;
   requested: number;
-  
+
   availableQuantity: number;
   insufficientStock: boolean;
 }
@@ -213,7 +213,7 @@ export class PosService {
 
   async setItemQuantity(cartId: string, itemId: string, quantity: number): Promise<CartView> {
     if (!Number.isInteger(quantity) || quantity <= 0) {
-      throw new BadRequestException('So luong phai la so nguyen duong');
+      throw new BadRequestException('Số lượng phải là số nguyên dương');
     }
 
     await this.dataSource.transaction(async (em) => {
@@ -222,7 +222,7 @@ export class PosService {
 
       const line = await em.findOne(CartItem, { where: { cartId, itemId } });
       if (!line) {
-        throw new NotFoundException('Dong hang khong co trong gio');
+        throw new NotFoundException('Dòng hàng không có trong giỏ');
       }
       const item = await this.loadSellableItem(em, itemId);
       await this.assertEnoughStock(em, cart.branchId, item, quantity);
@@ -243,7 +243,7 @@ export class PosService {
 
       const result = await em.delete(CartItem, { cartId, itemId });
       if (!result.affected) {
-        throw new NotFoundException('Dong hang khong co trong gio');
+        throw new NotFoundException('Dòng hàng không có trong giỏ');
       }
       await this.touch(em, cartId);
     });
@@ -257,7 +257,7 @@ export class PosService {
     actorUserId?: string,
   ): Promise<CartView> {
     if ((dto.amount === undefined) === (dto.percent === undefined)) {
-      throw new BadRequestException('Gui MOT trong hai: `amount` (so tien) hoac `percent` (%)');
+      throw new BadRequestException('Chỉ nhập MỘT trong hai: số tiền giảm hoặc phần trăm giảm');
     }
 
     await this.dataSource.transaction(async (em) => {
@@ -269,7 +269,7 @@ export class PosService {
 
       if (amount > subtotal) {
         throw new ConflictException(
-          `Giam gia ${amount} vuot qua tam tinh ${subtotal} cua gio hang`,
+          `Giảm giá ${amount} vượt quá tạm tính ${subtotal} của giỏ hàng`,
         );
       }
 
@@ -294,7 +294,7 @@ export class PosService {
       throw new NotFoundException('Cart not found');
     }
     if (cart.status !== CartStatus.OPEN) {
-      throw new ConflictException(`Gio hang dang o trang thai ${cart.status}, khong huy duoc`);
+      throw new ConflictException(`Giỏ hàng đang ở trạng thái ${cart.status}, không huỷ được`);
     }
     await this.cartsRepository.update({ id: cartId }, { status: CartStatus.ABANDONED });
     return this.viewOf(cartId);
@@ -314,12 +314,12 @@ export class PosService {
       }
       if (cart.status !== CartStatus.OPEN) {
         throw new ConflictException(
-          `Gio hang dang o trang thai ${cart.status}, khong thanh toan duoc nua`,
+          `Giỏ hàng đang ở trạng thái ${cart.status}, không thanh toán được nữa`,
         );
       }
       const lines = cart.items ?? [];
       if (lines.length === 0) {
-        throw new ConflictException('Gio hang trong, khong co gi de thanh toan');
+        throw new ConflictException('Giỏ hàng trống, không có gì để thanh toán');
       }
 
       const shortages: string[] = [];
@@ -330,7 +330,7 @@ export class PosService {
         }
       }
       if (shortages.length > 0) {
-        throw new ConflictException(`BR-09: khong du ton kho - ${shortages.join('; ')}`);
+        throw new ConflictException(`BR-09: không đủ tồn kho - ${shortages.join('; ')}`);
       }
 
       const priced = await Promise.all(
@@ -345,7 +345,7 @@ export class PosService {
 
       if (discountAmount > subtotal) {
         throw new ConflictException(
-          `Giam gia ${discountAmount} vuot qua tam tinh ${subtotal} - dat lai giam gia truoc khi thanh toan`,
+          `Giảm giá ${discountAmount} vượt quá tạm tính ${subtotal} - đặt lại giảm giá trước khi thanh toán`,
         );
       }
       const totalAmount = subtotal - discountAmount;
@@ -398,7 +398,7 @@ export class PosService {
             referenceType: InventoryReferenceType.INVOICE,
             referenceId: invoice.id,
             performedByUserId: staffUserId ?? null,
-            note: `Ban le theo hoa don ${invoiceCode}`,
+            note: `Bán lẻ theo hoá đơn ${invoiceCode}`,
           },
           em,
         );
@@ -436,7 +436,7 @@ export class PosService {
 
     if (result.affected) {
       this.logger.log(
-        `Da danh dau ${result.affected} gio hang bo do (khong dong gi qua ${CART_ABANDON_AFTER_HOURS}h)`,
+        `Đã đánh dấu ${result.affected} giỏ hàng bỏ dở (không động gì quá ${CART_ABANDON_AFTER_HOURS}h)`,
       );
     }
     return result.affected ?? 0;
@@ -501,7 +501,7 @@ export class PosService {
     const available = await this.inventoryService.getAvailable(item.id, branchId, em);
     if (available < quantity) {
       throw new ConflictException(
-        `BR-09: "${item.itemName}" chi con ${available} trong kho, khong ban duoc ${quantity}`,
+        `BR-09: "${item.itemName}" chỉ còn ${available} trong kho, không bán được ${quantity}`,
       );
     }
   }
@@ -513,7 +513,7 @@ export class PosService {
     }
     if (cart.status !== CartStatus.OPEN) {
       throw new ConflictException(
-        `Gio hang dang o trang thai ${cart.status}, khong sua duoc nua. Mo gio moi de ban tiep.`,
+        `Giỏ hàng đang ở trạng thái ${cart.status}, không sửa được nữa. Mở giỏ mới để bán tiếp.`,
       );
     }
     return cart;
@@ -525,12 +525,12 @@ export class PosService {
       throw new NotFoundException('Item not found');
     }
     if (!item.active) {
-      throw new ConflictException(`"${item.itemName}" da ngung kinh doanh`);
+      throw new ConflictException(`"${item.itemName}" đã ngừng kinh doanh`);
     }
     if (!SELLABLE_ITEM_TYPES.includes(item.itemType)) {
       throw new BadRequestException(
-        `"${item.itemName}" la ${item.itemType}, khong ban qua quay - dich vu va xet nghiem ` +
-          'di vao hoa don kham cua lich hen.',
+        `"${item.itemName}" là ${item.itemType}, không bán qua quầy - dịch vụ và xét nghiệm ` +
+          'đi vào hoá đơn khám của lịch hẹn.',
       );
     }
     return item;

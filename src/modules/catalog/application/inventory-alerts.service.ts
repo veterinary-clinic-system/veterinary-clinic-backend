@@ -19,7 +19,7 @@ export interface InventoryAlertRow {
   branchName: string;
   quantity: number;
   minimumStock: number;
-  
+
   batchId?: string;
   batchNo?: string;
   expiryDate?: string;
@@ -79,7 +79,6 @@ export class InventoryAlertsService {
     ]);
 
     return {
-
       outOfStock: stockRows.filter((row) => row.quantity === 0),
       lowStock: stockRows.filter((row) => row.quantity > 0 && row.quantity <= row.minimumStock),
       expiringSoon: expiryRows.filter((row) => (row.daysUntilExpiry ?? 0) >= 0),
@@ -125,7 +124,7 @@ export class InventoryAlertsService {
       }
     });
 
-    this.logger.log(`Da ghi ${events.length} canh bao ton kho vao outbox (${today})`);
+    this.logger.log(`Đã ghi ${events.length} cảnh báo tồn kho vào outbox (${today})`);
     return events.length;
   }
 

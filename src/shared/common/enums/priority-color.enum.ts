@@ -1,4 +1,3 @@
-
 export enum PriorityColor {
   RED = 'RED',
   ORANGE = 'ORANGE',

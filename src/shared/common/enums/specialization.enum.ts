@@ -1,4 +1,3 @@
-
 export enum Specialization {
   GENERAL_PRACTICE = 'GENERAL_PRACTICE',
   INTERNAL_MEDICINE = 'INTERNAL_MEDICINE',

@@ -8,7 +8,6 @@ import { Appointment } from '@/modules/scheduling/domain/entities/appointment.en
 
 @Entity({ name: 'pets' })
 export class Pet extends BaseEntity {
-  
   @Column({ name: 'pet_code', length: 32, insert: false, update: false })
   petCode: string;
 

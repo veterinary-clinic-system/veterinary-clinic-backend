@@ -33,7 +33,7 @@ export class Carts1795000000000 implements MigrationInterface {
       CREATE INDEX IF NOT EXISTS "idx_carts_branch_status"
       ON "carts" ("branch_id", "status")
     `);
-    
+
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_carts_open_updated"
       ON "carts" ("updated_at") WHERE "status" = 'OPEN' AND "deleted_at" IS NULL

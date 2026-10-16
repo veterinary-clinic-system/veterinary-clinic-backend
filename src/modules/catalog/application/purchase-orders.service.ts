@@ -109,11 +109,11 @@ export class PurchaseOrdersService {
 
     if (dto.status !== undefined && !USER_SETTABLE_STATUSES.includes(dto.status)) {
       throw new BadRequestException(
-        `Trang thai ${dto.status} do he thong tinh tu so da nhan, khong dat tay duoc`,
+        `Trạng thái ${dto.status} do hệ thống tính từ số đã nhận, không đặt tay được`,
       );
     }
     if (dto.items && order.status !== PurchaseOrderStatus.DRAFT) {
-      throw new ConflictException('Chi sua duoc cac dong hang khi don con o trang thai DRAFT');
+      throw new ConflictException('Chỉ sửa được các dòng hàng khi đơn còn ở trạng thái nháp');
     }
     if (dto.items) {
       await this.assertReferencesExist(order.supplierId, order.branchId, dto.items);
@@ -154,7 +154,9 @@ export class PurchaseOrdersService {
   async remove(id: string): Promise<void> {
     const order = await this.findOne(id);
     if (order.status !== PurchaseOrderStatus.DRAFT) {
-      throw new ConflictException('Chi xoa duoc don con o trang thai DRAFT - don da gui thi huy');
+      throw new ConflictException(
+        'Chỉ xoá được đơn còn ở trạng thái nháp - đơn đã gửi thì hãy huỷ',
+      );
     }
     await this.ordersRepository.softDelete(id);
   }
@@ -183,7 +185,7 @@ export class PurchaseOrdersService {
 
   private assertOpen(order: PurchaseOrder): void {
     if (CLOSED_PURCHASE_ORDER_STATUSES.includes(order.status)) {
-      throw new ConflictException(`Don ${order.poCode} da ${order.status}, khong sua duoc nua`);
+      throw new ConflictException(`Đơn ${order.poCode} đã ${order.status}, không sửa được nữa`);
     }
   }
 
@@ -204,12 +206,12 @@ export class PurchaseOrdersService {
 
     const itemIds = lines.map((line) => line.itemId);
     if (new Set(itemIds).size !== itemIds.length) {
-      throw new BadRequestException('Moi mat hang chi duoc xuat hien mot dong tren don');
+      throw new BadRequestException('Mỗi mặt hàng chỉ được xuất hiện một dòng trên đơn');
     }
 
     const found = await this.itemsRepository.count({ where: { id: In(itemIds) } });
     if (found !== new Set(itemIds).size) {
-      throw new BadRequestException('Mot hoac nhieu mat hang khong ton tai');
+      throw new BadRequestException('Một hoặc nhiều mặt hàng không tồn tại');
     }
   }
 }

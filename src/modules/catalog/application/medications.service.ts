@@ -93,7 +93,6 @@ export class MedicationsService {
     const medication = await this.findOne(id);
 
     await this.dataSource.transaction(async (manager) => {
-
       const itemUpdates: Partial<
         Pick<Item, 'itemName' | 'imageUrl' | 'describe' | 'unitPrice' | 'categoryId' | 'active'>
       > = {};

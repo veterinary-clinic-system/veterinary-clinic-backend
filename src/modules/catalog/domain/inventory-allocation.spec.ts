@@ -23,7 +23,6 @@ describe('inventory-allocation.util', () => {
 
   describe('allocateFefo', () => {
     it('lay het lo het han som nhat truoc roi moi sang lo sau', () => {
-      
       const batches = [
         batch({ id: 'b-06', expiryDate: '2027-06-30', quantity: 10 }),
         batch({ id: 'b-01', expiryDate: '2027-01-31', quantity: 10 }),
@@ -84,7 +83,6 @@ describe('inventory-allocation.util', () => {
     });
 
     it('thieu hang thi nem loi va KHONG phan bo mot phan nao', () => {
-
       const batches = [batch({ id: 'b1', quantity: 8 })];
 
       expect(() => allocateFefo(batches, 10, TODAY)).toThrow(InsufficientStockError);
@@ -128,7 +126,6 @@ describe('inventory-allocation.util', () => {
 
   describe('bat bien so cai', () => {
     it('ton sau cung = ton dau + SUM(quantityChange)', () => {
-
       const quantityBefore = 20;
       const changes = [
         { batchId: 'b1', quantityChange: +50 },

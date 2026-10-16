@@ -116,7 +116,6 @@ export class BillingService {
           if (matchedItem) {
             lines.push({ itemId: matchedItem.id, price: matchedItem.unitPrice, quantity: 1 });
           } else {
-
             this.logger.warn(
               `No active LAB_TEST item matches lab test order "${labTestOrder.testName}" ` +
                 `(order ${labTestOrder.id}) on appointment ${appointmentId} - skipping this line`,
@@ -173,7 +172,6 @@ export class BillingService {
     const qb = this.invoicesRepository.createQueryBuilder('invoice');
 
     if (query.branchId) {
-
       qb.andWhere('invoice.branchId = :branchId', { branchId: query.branchId });
     }
     if (query.source) {
@@ -234,7 +232,7 @@ export class BillingService {
     const balance = await this.paymentsService.balanceOf(id);
     const amount = dto.amount ?? balance.outstandingAmount;
     if (amount <= 0) {
-      throw new ConflictException('Hoa don khong con so du phai thu');
+      throw new ConflictException('Hoá đơn không còn số dư phải thu');
     }
 
     const result = await this.paymentProvider.charge({
@@ -261,7 +259,7 @@ export class BillingService {
 
   async replaceItems(id: string, lines: InvoiceLineInput[]): Promise<Invoice> {
     if (lines.length === 0) {
-      throw new BadRequestException('Hoa don phai co it nhat mot dong');
+      throw new BadRequestException('Hoá đơn phải có ít nhất một dòng');
     }
 
     await this.dataSource.transaction(async (manager) => {
@@ -276,7 +274,7 @@ export class BillingService {
       const itemIds = [...new Set(lines.map((line) => line.itemId))];
       const found = await manager.count(Item, { where: { id: In(itemIds) } });
       if (found !== itemIds.length) {
-        throw new BadRequestException('Mot hoac nhieu mat hang khong ton tai');
+        throw new BadRequestException('Một hoặc nhiều mặt hàng không tồn tại');
       }
 
       await manager.delete(InvoiceItem, { invoiceId: id });
@@ -322,7 +320,7 @@ export class BillingService {
         throw new NotFoundException('Invoice not found');
       }
       if (invoice.status === InvoiceStatus.CANCELLED) {
-        throw new ConflictException('Hoa don da huy, khong co gi de hoan');
+        throw new ConflictException('Hoá đơn đã huỷ, không có gì để hoàn');
       }
 
       const balance = await this.paymentsService.balanceOf(id, manager);
@@ -353,7 +351,7 @@ export class BillingService {
               referenceType: InventoryReferenceType.INVOICE,
               referenceId: invoice.id,
               performedByUserId: actorUserId ?? null,
-              note: `Hoan hang theo hoa don ${invoice.invoiceCode}: ${dto.reason}`,
+              note: `Hoàn hàng theo hoá đơn ${invoice.invoiceCode}: ${dto.reason}`,
             },
             manager,
           );
@@ -373,14 +371,14 @@ export class BillingService {
         throw new NotFoundException('Invoice not found');
       }
       if (invoice.status === InvoiceStatus.CANCELLED) {
-        throw new ConflictException('Hoa don da bi huy roi');
+        throw new ConflictException('Hoá đơn đã bị huỷ rồi');
       }
 
       const balance = await this.paymentsService.balanceOf(id, manager);
       if (balance.paidAmount > 0 || balance.hasRefund) {
         throw new ConflictException(
-          `BR-14: hoa don ${invoice.invoiceCode} da thu ${balance.paidAmount} - khong huy duoc, ` +
-            'dung nghiep vu hoan tien (POST /billing/invoices/:id/refund).',
+          `BR-14: hoá đơn ${invoice.invoiceCode} đã thu ${balance.paidAmount} - không huỷ được, ` +
+            'hãy dùng nghiệp vụ hoàn tiền.',
         );
       }
 
@@ -403,8 +401,8 @@ export class BillingService {
   private assertEditable(invoice: Invoice): void {
     if (LOCKED_INVOICE_STATUSES.has(invoice.status)) {
       throw new ConflictException(
-        `BR-14: hoa don ${invoice.invoiceCode} dang o trang thai ${invoice.status}, ` +
-          'khong sua truc tiep duoc. Dung nghiep vu hoan tien hoac huy hoa don.',
+        `BR-14: hoá đơn ${invoice.invoiceCode} đang ở trạng thái ${invoice.status}, ` +
+          'không sửa trực tiếp được. Hãy dùng nghiệp vụ hoàn tiền hoặc huỷ hoá đơn.',
       );
     }
   }

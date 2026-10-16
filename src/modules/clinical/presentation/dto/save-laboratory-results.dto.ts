@@ -11,7 +11,6 @@ import { LaboratoryResultDto } from './laboratory-result.dto';
 
 export class SaveLaboratoryResultsDto {
   @IsArray()
-
   @ArrayMaxSize(200)
   @ValidateNested({ each: true })
   @Type(() => LaboratoryResultDto)

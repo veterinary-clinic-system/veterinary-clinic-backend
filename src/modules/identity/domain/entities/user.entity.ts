@@ -8,7 +8,6 @@ import { RefreshToken } from './refresh-token.entity';
 
 @Entity({ name: 'users' })
 export class User extends BaseEntity {
-  
   @Column({
     name: 'customer_code',
     type: 'varchar',

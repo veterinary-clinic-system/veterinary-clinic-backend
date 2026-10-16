@@ -3,12 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
 import { format } from 'date-fns';
 import type Redis from 'ioredis';
-import {
-  Appointment,
-  DoctorBreak,
-  DoctorShift,
-  OperatingHour,
-} from '@/database/entities';
+import { Appointment, DoctorBreak, DoctorShift, OperatingHour } from '@/database/entities';
 import { SLOT_BLOCKING_STATUSES } from '@/common/enums/appointment-status.enum';
 import { REDIS_CLIENT } from '@/redis/redis.constants';
 import { generateSlots, rangesOverlap, TimeRange } from './slot-grid.util';
@@ -66,7 +61,11 @@ export class AvailabilityService {
    * slot as free for a few seconds after it's taken - it can never cause a double-booking.
    * Writes still proactively call `invalidateDoctorDay` so the common case is fresh.
    */
-  async getDoctorDayAvailability(doctorId: string, branchId: string, date: Date): Promise<DayAvailability> {
+  async getDoctorDayAvailability(
+    doctorId: string,
+    branchId: string,
+    date: Date,
+  ): Promise<DayAvailability> {
     const dateStr = format(date, 'yyyy-MM-dd');
     const cacheKey = this.cacheKey(doctorId, branchId, dateStr);
 
@@ -76,7 +75,9 @@ export class AvailabilityService {
     }
 
     const result = await this.computeDoctorDayAvailability(doctorId, branchId, date, dateStr);
-    await this.redis.set(cacheKey, JSON.stringify(result), 'EX', CACHE_TTL_SECONDS).catch(() => undefined);
+    await this.redis
+      .set(cacheKey, JSON.stringify(result), 'EX', CACHE_TTL_SECONDS)
+      .catch(() => undefined);
     return result;
   }
 

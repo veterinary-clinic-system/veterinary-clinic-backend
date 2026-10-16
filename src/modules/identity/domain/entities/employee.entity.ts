@@ -7,7 +7,6 @@ import { User } from './user.entity';
 
 @Entity({ name: 'employees' })
 export class Employee extends BaseEntity {
-  
   @Column({ name: 'employee_code', length: 32 })
   @Index({ unique: true })
   employeeCode: string;

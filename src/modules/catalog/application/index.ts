@@ -1,4 +1,3 @@
-
 export { InventoryService } from './inventory.service';
 export type { AdjustStockParams, IssueStockParams, ReceiveStockParams } from './inventory.service';
 export {

@@ -19,7 +19,12 @@ import { NotificationsService } from '@/notifications/notifications.service';
 import { PrescreeningService } from '@/prescreening/prescreening.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
-import { AvailabilityService, DayAvailability, SlotInfo, SlotStatus } from './scheduling/availability.service';
+import {
+  AvailabilityService,
+  DayAvailability,
+  SlotInfo,
+  SlotStatus,
+} from './scheduling/availability.service';
 import { startOfWeek } from 'date-fns';
 
 const SORTABLE_COLUMNS = new Set(['startAt', 'endAt', 'status', 'priorityColor', 'createdAt']);
@@ -78,7 +83,9 @@ export class AppointmentsService {
       throw new BadRequestException('Selected doctor does not work at the selected branch');
     }
 
-    const service = await this.servicesRepository.findOne({ where: { id: dto.serviceId, active: true } });
+    const service = await this.servicesRepository.findOne({
+      where: { id: dto.serviceId, active: true },
+    });
     if (!service) {
       throw new BadRequestException('Selected service is not available');
     }
@@ -119,7 +126,11 @@ export class AppointmentsService {
       petName: pet.name,
     });
 
-    if (appointment.commonSymptoms.length > 0 || appointment.otherSymptoms || appointment.photoUrls.length > 0) {
+    if (
+      appointment.commonSymptoms.length > 0 ||
+      appointment.otherSymptoms ||
+      appointment.photoUrls.length > 0
+    ) {
       const petWithBreed = await this.petsRepository.findOne({
         where: { id: pet.id },
         relations: ['breed', 'breed.species'],
@@ -160,7 +171,11 @@ export class AppointmentsService {
 
   /** Staff list view backing the Table basic component (Section 7.3). */
   async listForStaff(
-    query: PaginationQueryDto & { branchId?: string; doctorId?: string; status?: AppointmentStatus },
+    query: PaginationQueryDto & {
+      branchId?: string;
+      doctorId?: string;
+      status?: AppointmentStatus;
+    },
   ): Promise<PaginatedResultDto<Appointment>> {
     const qb = this.appointmentsRepository
       .createQueryBuilder('appointment')
@@ -171,8 +186,10 @@ export class AppointmentsService {
       .leftJoinAndSelect('appointment.service', 'service')
       .leftJoinAndSelect('service.item', 'item');
 
-    if (query.branchId) qb.andWhere('appointment.branchId = :branchId', { branchId: query.branchId });
-    if (query.doctorId) qb.andWhere('appointment.doctorId = :doctorId', { doctorId: query.doctorId });
+    if (query.branchId)
+      qb.andWhere('appointment.branchId = :branchId', { branchId: query.branchId });
+    if (query.doctorId)
+      qb.andWhere('appointment.doctorId = :doctorId', { doctorId: query.doctorId });
     if (query.status) qb.andWhere('appointment.status = :status', { status: query.status });
 
     // sortBy is caller-controlled input - never interpolate it unchecked into raw SQL.
@@ -198,7 +215,11 @@ export class AppointmentsService {
     includeDetail: boolean,
   ): Promise<DayAvailability[] | DayAvailabilityWithDetail[]> {
     const weekStart = startOfWeek(weekOf, { weekStartsOn: 1 });
-    const days = await this.availabilityService.getDoctorWeekAvailability(doctorId, branchId, weekStart);
+    const days = await this.availabilityService.getDoctorWeekAvailability(
+      doctorId,
+      branchId,
+      weekStart,
+    );
 
     if (includeDetail) {
       const appointmentIds = days
@@ -252,7 +273,11 @@ export class AppointmentsService {
     }));
   }
 
-  async update(id: string, dto: UpdateAppointmentDto, actor: AuthenticatedUser): Promise<Appointment> {
+  async update(
+    id: string,
+    dto: UpdateAppointmentDto,
+    actor: AuthenticatedUser,
+  ): Promise<Appointment> {
     const appointment = await this.findOne(id);
     const reschedule = dto.startAt !== undefined || dto.doctorId !== undefined;
 
@@ -260,9 +285,11 @@ export class AppointmentsService {
       const doctorId = dto.doctorId ?? appointment.doctorId;
       const doctor = await this.doctorsRepository.findOne({ where: { id: doctorId } });
       if (!doctor || doctor.branchId !== appointment.branchId) {
-        throw new BadRequestException('Doctor does not work at this appointment\'s branch');
+        throw new BadRequestException("Doctor does not work at this appointment's branch");
       }
-      const service = await this.servicesRepository.findOne({ where: { id: appointment.serviceId } });
+      const service = await this.servicesRepository.findOne({
+        where: { id: appointment.serviceId },
+      });
       const startAt = dto.startAt ? new Date(dto.startAt) : appointment.startAt;
       const endAt = addMinutes(startAt, service?.durationMinutes ?? 30);
 
@@ -282,7 +309,11 @@ export class AppointmentsService {
         });
       });
 
-      await this.availabilityService.invalidateDoctorDay(appointment.doctorId, appointment.branchId, appointment.startAt);
+      await this.availabilityService.invalidateDoctorDay(
+        appointment.doctorId,
+        appointment.branchId,
+        appointment.startAt,
+      );
       await this.availabilityService.invalidateDoctorDay(doctorId, appointment.branchId, startAt);
     } else {
       await this.appointmentsRepository.update(id, {
@@ -292,7 +323,11 @@ export class AppointmentsService {
       });
       if (dto.status) {
         // A status change (e.g. CANCELLED) can free up or occupy the slot even without a reschedule.
-        await this.availabilityService.invalidateDoctorDay(appointment.doctorId, appointment.branchId, appointment.startAt);
+        await this.availabilityService.invalidateDoctorDay(
+          appointment.doctorId,
+          appointment.branchId,
+          appointment.startAt,
+        );
       }
     }
 
@@ -372,22 +407,38 @@ export class AppointmentsService {
       throw new ConflictException('This time slot was just booked - please pick another one');
     }
 
-    const day = await this.availabilityService.getDoctorDayAvailability(doctorId, branchId, startAt);
+    const day = await this.availabilityService.getDoctorDayAvailability(
+      doctorId,
+      branchId,
+      startAt,
+    );
     const startHHmm = `${startAt.getHours().toString().padStart(2, '0')}:${startAt
       .getMinutes()
       .toString()
       .padStart(2, '0')}`;
     const matchingSlot = day.slots.find((slot) => slot.start === startHHmm);
 
-    if (!matchingSlot || (matchingSlot.status !== SlotStatus.FREE && matchingSlot.status !== SlotStatus.BOOKED)) {
-      throw new BadRequestException('This time is outside the doctor\'s working hours or on a break');
+    if (
+      !matchingSlot ||
+      (matchingSlot.status !== SlotStatus.FREE && matchingSlot.status !== SlotStatus.BOOKED)
+    ) {
+      throw new BadRequestException(
+        "This time is outside the doctor's working hours or on a break",
+      );
     }
-    if (matchingSlot.status === SlotStatus.BOOKED && matchingSlot.appointmentId !== excludeAppointmentId) {
+    if (
+      matchingSlot.status === SlotStatus.BOOKED &&
+      matchingSlot.appointmentId !== excludeAppointmentId
+    ) {
       throw new ConflictException('This time slot was just booked - please pick another one');
     }
   }
 
-  private async resolveOwner(phone: string, fullName: string | undefined, email: string | undefined) {
+  private async resolveOwner(
+    phone: string,
+    fullName: string | undefined,
+    email: string | undefined,
+  ) {
     let owner = await this.usersRepository.findOne({ where: { phone } });
     if (!owner) {
       owner = await this.usersRepository.save(
@@ -428,7 +479,10 @@ export class AppointmentsService {
     );
   }
 
-  private async notifyOwnerOfUpdate(appointment: Appointment, actor: AuthenticatedUser): Promise<void> {
+  private async notifyOwnerOfUpdate(
+    appointment: Appointment,
+    actor: AuthenticatedUser,
+  ): Promise<void> {
     if (actor.role === Role.PET_OWNER) return; // owner updating their own booking doesn't need a self-notification
 
     const label = appointment.priorityColor ? ` Mức độ ưu tiên: ${appointment.priorityColor}.` : '';

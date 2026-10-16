@@ -46,7 +46,7 @@ export class InventoryTransactions1792000001000 implements MigrationInterface {
       CREATE INDEX IF NOT EXISTS "idx_inventory_transactions_branch_created"
       ON "inventory_transactions" ("branch_id", "created_at" DESC)
     `);
-    
+
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_inventory_transactions_reference"
       ON "inventory_transactions" ("reference_type", "reference_id")

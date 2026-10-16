@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { isUUID } from 'class-validator';
@@ -101,7 +106,7 @@ export class PetsService {
   async findOneForActor(id: string, actor: AuthenticatedUser): Promise<Pet> {
     const pet = await this.loadPetOrThrow(id);
     if (actor.role === Role.PET_OWNER && pet.ownerId !== actor.userId) {
-      throw new ForbiddenException('You can only view your own pet\'s profile');
+      throw new ForbiddenException("You can only view your own pet's profile");
     }
     return pet;
   }
@@ -130,9 +135,11 @@ export class PetsService {
     if (search) {
       qb.andWhere(
         new Brackets((sub) => {
-          sub.where('pet.name ILIKE :search', { search: `%${search}%` }).orWhere('owner.phone ILIKE :search', {
-            search: `%${search}%`,
-          });
+          sub
+            .where('pet.name ILIKE :search', { search: `%${search}%` })
+            .orWhere('owner.phone ILIKE :search', {
+              search: `%${search}%`,
+            });
           // Only add the exact-id branch when `search` is actually a UUID - a raw
           // non-UUID string in a `uuid = :param` comparison throws a Postgres error.
           if (isUUID(search)) {
@@ -143,7 +150,8 @@ export class PetsService {
     }
 
     // sortBy is caller-controlled input - never interpolate it unchecked into raw SQL.
-    const sortBy = query.sortBy && PET_SORTABLE_COLUMNS.has(query.sortBy) ? query.sortBy : 'createdAt';
+    const sortBy =
+      query.sortBy && PET_SORTABLE_COLUMNS.has(query.sortBy) ? query.sortBy : 'createdAt';
     qb.orderBy(`pet.${sortBy}`, query.sortOrder ?? 'DESC')
       .skip((query.page - 1) * query.limit)
       .take(query.limit);
@@ -168,7 +176,10 @@ export class PetsService {
   }
 
   private async loadPetOrThrow(id: string): Promise<Pet> {
-    const pet = await this.petsRepository.findOne({ where: { id }, relations: PET_DETAIL_RELATIONS });
+    const pet = await this.petsRepository.findOne({
+      where: { id },
+      relations: PET_DETAIL_RELATIONS,
+    });
     if (!pet) {
       throw new NotFoundException('Pet not found');
     }

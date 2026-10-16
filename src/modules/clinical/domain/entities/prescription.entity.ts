@@ -6,7 +6,6 @@ import { MedicalRecord } from './medical-record.entity';
 import { PrescriptionItem } from './prescription-item.entity';
 
 @Entity({ name: 'prescriptions' })
-
 @Index('idx_prescriptions_status_created', ['status', 'createdAt'])
 export class Prescription extends BaseEntity {
   @ManyToOne(() => MedicalRecord, (record) => record.prescriptions, {

@@ -23,7 +23,7 @@ export class Categories1791000000000 implements MigrationInterface {
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_categories_code"
       ON "categories" ("code") WHERE "deleted_at" IS NULL
     `);
-    
+
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_categories_item_type_parent"
       ON "categories" ("item_type", "parent_id")

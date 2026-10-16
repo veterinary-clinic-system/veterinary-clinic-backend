@@ -40,7 +40,6 @@ export class PermissionsGuard implements CanActivate {
     const missing = required.filter((permission) => !granted.has(permission));
 
     if (missing.length > 0) {
-
       throw new ForbiddenException('Bạn không có quyền thực hiện thao tác này');
     }
 

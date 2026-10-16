@@ -17,13 +17,13 @@ export class CreatePurchaseOrderItemDto {
   itemId: string;
 
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
+  @IsInt({ message: 'Số lượng phải là số nguyên' })
+  @Min(1, { message: 'Số lượng phải từ 1 trở lên' })
   quantity: number;
 
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
+  @IsInt({ message: 'Giá nhập phải là số nguyên' })
+  @Min(0, { message: 'Giá nhập không được âm' })
   unitCost: number;
 }
 

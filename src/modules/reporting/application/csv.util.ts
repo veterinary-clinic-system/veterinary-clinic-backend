@@ -1,4 +1,3 @@
-
 const BOM = '﻿';
 const CRLF = '\r\n';
 

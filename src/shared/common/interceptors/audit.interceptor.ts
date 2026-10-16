@@ -52,7 +52,6 @@ export class AuditInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap({
         next: (result) => {
-          
           const finalId = entityId ?? this.idFromResult(result);
           const action = options.resolveAction?.(request.body) ?? options.action;
           void this.write(options, action, request, actor, origin, finalId, before, result);
@@ -83,8 +82,7 @@ export class AuditInterceptor implements NestInterceptor {
         userAgent: origin.userAgent,
       });
     } catch (error) {
-      
-      this.logger.error(`Khong dung duoc noi dung nhat ky kiem toan: ${(error as Error).message}`);
+      this.logger.error(`Không dựng được nội dung nhật ký kiểm toán: ${(error as Error).message}`);
     }
   }
 
@@ -125,7 +123,7 @@ export class AuditInterceptor implements NestInterceptor {
       return sanitizeAuditPayload(row) as Record<string, unknown>;
     } catch (error) {
       this.logger.warn(
-        `Khong chup duoc trang thai cua ${options.entity}#${entityId}: ${(error as Error).message}`,
+        `Không chụp được trạng thái của ${options.entity}#${entityId}: ${(error as Error).message}`,
       );
       return null;
     }
@@ -144,7 +142,7 @@ export class AuditInterceptor implements NestInterceptor {
     if (typeof record.id === 'string') {
       return record.id;
     }
-    
+
     for (const value of Object.values(record)) {
       if (
         value &&

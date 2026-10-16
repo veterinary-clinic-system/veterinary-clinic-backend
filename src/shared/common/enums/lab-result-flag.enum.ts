@@ -1,4 +1,3 @@
-
 export enum LabResultFlag {
   NORMAL = 'NORMAL',
   LOW = 'LOW',

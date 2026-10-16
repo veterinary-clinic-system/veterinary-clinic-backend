@@ -14,7 +14,9 @@ export class CloudinaryAssetUrls1801000000000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     if (!CLOUDINARY_CLOUD_NAME) {
-      throw new Error('CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME is required before migrating image URLs');
+      throw new Error(
+        'CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME is required before migrating image URLs',
+      );
     }
 
     await this.replace(queryRunner, 'users', 'avatar_url', DEFAULT_USER_IMAGE, [
@@ -34,10 +36,10 @@ export class CloudinaryAssetUrls1801000000000 implements MigrationInterface {
     ]);
 
     for (let index = 1; index <= 6; index += 1) {
-      await queryRunner.query(
-        `UPDATE "doctors" SET "avatar_url" = $1 WHERE "avatar_url" = $2`,
-        [cloudinaryWebImage(`doctors/doctor-${index}.svg`), `/doctors/doctor-${index}.svg`],
-      );
+      await queryRunner.query(`UPDATE "doctors" SET "avatar_url" = $1 WHERE "avatar_url" = $2`, [
+        cloudinaryWebImage(`doctors/doctor-${index}.svg`),
+        `/doctors/doctor-${index}.svg`,
+      ]);
     }
   }
 

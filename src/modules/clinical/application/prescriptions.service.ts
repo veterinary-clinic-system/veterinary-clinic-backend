@@ -34,9 +34,9 @@ export interface PrescriptionItemStock {
   prescriptionItemId: string;
   medicationId: string;
   medicationName: string;
-  
+
   requested: number;
-  
+
   availableQuantity: number;
   insufficientStock: boolean;
 }
@@ -45,7 +45,7 @@ export interface PrescriptionView {
   prescription: Prescription;
   branchId: string;
   stockCheck: PrescriptionItemStock[];
-  
+
   hasInsufficientStock: boolean;
 }
 
@@ -134,7 +134,7 @@ export class PrescriptionsService {
     const prescription = await this.loadOrThrow(id);
     if (!EDITABLE_PRESCRIPTION_STATUSES.has(prescription.status)) {
       throw new ConflictException(
-        `Don thuoc dang o trang thai ${prescription.status}, khong sua duoc nua`,
+        `Đơn thuốc đang ở trạng thái ${prescription.status}, không sửa được nữa`,
       );
     }
     if (dto.items) {
@@ -180,18 +180,18 @@ export class PrescriptionsService {
         throw new NotFoundException('Prescription not found');
       }
       if (prescription.status === PrescriptionStatus.DISPENSED) {
-        throw new ConflictException('Don thuoc nay da duoc cap phat roi');
+        throw new ConflictException('Đơn thuốc này đã được cấp phát rồi');
       }
       if (!isValidPrescriptionStatusTransition(prescription.status, PrescriptionStatus.DISPENSED)) {
         throw new ConflictException(
-          `Khong the cap phat don dang o trang thai ${prescription.status}`,
+          `Không thể cấp phát đơn đang ở trạng thái ${prescription.status}`,
         );
       }
 
       const branchId = await this.branchIdOf(em, prescription.medicalRecordId);
       const items = prescription.items ?? [];
       if (items.length === 0) {
-        throw new ConflictException('Don thuoc khong co dong nao de cap phat');
+        throw new ConflictException('Đơn thuốc không có dòng nào để cấp phát');
       }
 
       const shortages: string[] = [];
@@ -208,7 +208,7 @@ export class PrescriptionsService {
         }
       }
       if (shortages.length > 0) {
-        throw new ConflictException(`Khong du ton kho de cap phat - ${shortages.join('; ')}`);
+        throw new ConflictException(`Không đủ tồn kho để cấp phát - ${shortages.join('; ')}`);
       }
 
       for (const item of items) {
@@ -245,7 +245,7 @@ export class PrescriptionsService {
     const prescription = await this.loadOrThrow(id);
     if (!isValidPrescriptionStatusTransition(prescription.status, next)) {
       throw new ConflictException(
-        `Khong the chuyen don thuoc tu ${prescription.status} sang ${next}`,
+        `Không thể chuyển đơn thuốc từ ${prescription.status} sang ${next}`,
       );
     }
     await this.prescriptionsRepository.update({ id }, { status: next });
@@ -317,7 +317,7 @@ export class PrescriptionsService {
 
   private toItemColumns(item: PrescriptionItemDto) {
     if (item.quantity <= 0) {
-      throw new BadRequestException('So luong thuoc phai la so nguyen duong');
+      throw new BadRequestException('Số lượng thuốc phải là số nguyên dương');
     }
     return {
       medicationId: item.medicationId,

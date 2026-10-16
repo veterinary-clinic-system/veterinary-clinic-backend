@@ -1,14 +1,12 @@
-
 export enum QueueStatus {
-  
   WAITING = 'WAITING',
-  
+
   ASSIGNED = 'ASSIGNED',
-  
+
   IN_ROOM = 'IN_ROOM',
-  
+
   DONE = 'DONE',
-  
+
   CANCELLED = 'CANCELLED',
 }
 
@@ -24,9 +22,8 @@ export const TERMINAL_QUEUE_STATUSES: ReadonlySet<QueueStatus> = new Set([
 ]);
 
 export enum QueueSource {
-  
   APPOINTMENT = 'APPOINTMENT',
-  
+
   WALK_IN = 'WALK_IN',
 }
 

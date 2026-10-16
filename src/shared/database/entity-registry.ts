@@ -60,3 +60,7 @@ export * from '@/modules/sales/domain/entities/cart-item.entity';
 export * from '@/modules/notification/domain/entities/notification.entity';
 export * from '@/modules/notification/domain/entities/outbox-event.entity';
 export * from '@/modules/notification/domain/entities/staff-notification.entity';
+
+export * from '@/modules/messaging/domain/entities/conversation.entity';
+export * from '@/modules/messaging/domain/entities/call-session.entity';
+export * from '@/modules/messaging/domain/entities/message.entity';

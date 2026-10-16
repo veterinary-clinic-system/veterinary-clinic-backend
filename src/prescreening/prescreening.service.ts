@@ -28,10 +28,7 @@ export class PrescreeningService {
    * ("Doctor/Receptionist retain full authority... never treat the AI output as final").
    */
   async runForAppointment(appointment: Appointment, pet: Pet): Promise<PreScreeningResult> {
-    const symptomText = [
-      appointment.commonSymptoms.join(', '),
-      appointment.otherSymptoms ?? '',
-    ]
+    const symptomText = [appointment.commonSymptoms.join(', '), appointment.otherSymptoms ?? '']
       .filter(Boolean)
       .join('. ');
 

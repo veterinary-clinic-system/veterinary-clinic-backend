@@ -33,10 +33,18 @@ export class AuthService {
   ) {}
 
   async registerPetOwner(dto: RegisterPetOwnerDto): Promise<TokenPair> {
-    let user = await this.usersRepository.findOne({ where: { phone: dto.phone } });
+    // passwordHash là cột select:false — phải addSelect, nếu không nó luôn undefined và
+    // ai cũng ghi đè được mật khẩu của tài khoản đã đăng ký (chiếm tài khoản).
+    let user = await this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.phone = :phone', { phone: dto.phone })
+      .getOne();
 
-    if (user?.passwordHash) {
-      throw new ConflictException('This phone number is already registered');
+    // Chỉ cho "nhận" hồ sơ khách vãng lai chưa có mật khẩu; không bao giờ cho đăng ký
+    // đè lên tài khoản nhân viên (sẽ thừa hưởng quyền nhân viên).
+    if (user && (user.passwordHash || user.role !== Role.PET_OWNER)) {
+      throw new ConflictException('Số điện thoại này đã được đăng ký');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
@@ -80,7 +88,7 @@ export class AuthService {
       action: AuditAction.LOGIN,
       entityName: 'User',
       entityId: user.id,
-      
+
       changes: { phone: user.phone, role: user.role },
       ipAddress: context.ipAddress ?? null,
       userAgent: context.userAgent ?? null,
@@ -142,9 +150,7 @@ export class AuthService {
         ipAddress: context.ipAddress ?? null,
         userAgent: context.userAgent ?? null,
       });
-    } catch {
-      
-    }
+    } catch {}
   }
 
   private async issueTokenPair(user: User): Promise<TokenPair> {

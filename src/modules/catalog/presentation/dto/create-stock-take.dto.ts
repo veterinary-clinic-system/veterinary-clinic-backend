@@ -36,8 +36,8 @@ export class CountStockTakeItemDto {
   stockTakeItemId: string;
 
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
+  @IsInt({ message: 'Số lượng đếm được phải là số nguyên' })
+  @Min(0, { message: 'Số lượng đếm được không được âm' })
   countedQuantity: number;
 
   @IsOptional()
@@ -55,7 +55,6 @@ export class SubmitStockTakeCountsDto {
 }
 
 export class ConfirmStockTakeDto {
-  
   @IsOptional()
   @IsString()
   @MaxLength(500)

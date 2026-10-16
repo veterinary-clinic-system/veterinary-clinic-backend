@@ -21,7 +21,6 @@ describe('formatValidationErrors', () => {
   });
 
   it('trường bỏ trống báo "thiếu giá trị" chứ không báo giới hạn độ dài', () => {
-
     const messages = messagesOf([
       error('note', {
         maxLength: 'note must be shorter than or equal to 500 characters',
@@ -46,7 +45,6 @@ describe('formatValidationErrors', () => {
   });
 
   it('không phụ thuộc vào thứ tự khai báo decorator', () => {
-    
     const a = messagesOf([error('x', { isNotEmpty: 'thiếu', maxLength: 'quá dài' })]);
     const b = messagesOf([error('x', { maxLength: 'quá dài', isNotEmpty: 'thiếu' })]);
 

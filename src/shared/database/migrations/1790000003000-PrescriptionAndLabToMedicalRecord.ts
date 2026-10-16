@@ -4,7 +4,6 @@ export class PrescriptionAndLabToMedicalRecord1790000003000 implements Migration
   name = 'PrescriptionAndLabToMedicalRecord1790000003000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    
     await queryRunner.query(`
       INSERT INTO "medical_records"
         ("appointment_id", "pet_id", "doctor_id", "visit_reason", "notes",
@@ -33,7 +32,6 @@ export class PrescriptionAndLabToMedicalRecord1790000003000 implements Migration
     `);
 
     for (const table of ['prescriptions', 'lab_test_orders']) {
-      
       await queryRunner.query(
         `ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "medical_record_id" uuid`,
       );

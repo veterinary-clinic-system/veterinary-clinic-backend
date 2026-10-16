@@ -123,7 +123,6 @@ export class VaccinesService {
     );
 
     await this.dataSource.transaction(async (manager) => {
-      
       const itemUpdates: Partial<
         Pick<Item, 'itemName' | 'describe' | 'unitPrice' | 'categoryId' | 'active'>
       > = {};
@@ -166,7 +165,6 @@ export class VaccinesService {
       }
 
       if (dto.speciesIds !== undefined) {
-
         const species = await this.resolveSpecies(manager, dto.speciesIds);
         const entity = await manager.findOneOrFail(Vaccine, {
           where: { id },
@@ -182,9 +180,7 @@ export class VaccinesService {
 
   private assertScheduleCoherent(doseCount: number, intervalDays: number | null): void {
     if (doseCount > 1 && !intervalDays) {
-      throw new BadRequestException(
-        'Phac do nhieu hon mot mui phai khai `intervalDays` (khoang cach giua cac mui)',
-      );
+      throw new BadRequestException('Phác đồ nhiều hơn một mũi phải khai khoảng cách giữa các mũi');
     }
   }
 

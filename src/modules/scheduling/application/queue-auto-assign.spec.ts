@@ -2,7 +2,6 @@ import { QueueService } from './queue.service';
 import { DayAvailability, SlotInfo, SlotStatus } from './availability.service';
 
 describe('QueueService.findEarliestFreeDoctorSlot', () => {
-  
   const NOW = new Date(2026, 7, 4, 8, 0, 0);
   const DATE_STR = '2026-08-04';
 
@@ -40,7 +39,7 @@ describe('QueueService.findEarliestFreeDoctorSlot', () => {
         return Promise.resolve({
           date: DATE_STR,
           dayOfWeek: NOW.getDay(),
-          
+
           isBranchOpen: slots !== null,
           slots: slots ?? [],
         } satisfies DayAvailability);
@@ -77,7 +76,6 @@ describe('QueueService.findEarliestFreeDoctorSlot', () => {
 
   it('chon bac si co khung trong SOM NHAT, khong phai bac si dau danh sach', async () => {
     const service = makeService({
-      
       'doctor-a': grid(9, [SlotStatus.BOOKED, SlotStatus.BOOKED, SlotStatus.FREE]),
       'doctor-b': grid(9, [SlotStatus.FREE, SlotStatus.FREE, SlotStatus.FREE]),
     });
@@ -102,7 +100,6 @@ describe('QueueService.findEarliestFreeDoctorSlot', () => {
 
   it('ton trong thoi luong dich vu khi so sanh giua cac bac si', async () => {
     const service = makeService({
-      
       'doctor-a': grid(9, [SlotStatus.FREE, SlotStatus.BOOKED, SlotStatus.FREE]),
       'doctor-b': grid(9, [SlotStatus.BOOKED, SlotStatus.FREE, SlotStatus.FREE]),
     });
@@ -135,7 +132,6 @@ describe('QueueService.findEarliestFreeDoctorSlot', () => {
   });
 
   it('bo qua khung gio da troi qua gio hien tai', async () => {
-    
     const service = makeService({
       'doctor-a': grid(7, [SlotStatus.FREE, SlotStatus.FREE, SlotStatus.FREE]),
     });

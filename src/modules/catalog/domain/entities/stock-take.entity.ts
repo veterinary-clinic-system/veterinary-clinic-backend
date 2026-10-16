@@ -8,7 +8,6 @@ import { StockTakeItem } from './stock-take-item.entity';
 @Entity({ name: 'stock_takes' })
 @Index('idx_stock_takes_branch_status', ['branchId', 'status'])
 export class StockTake extends BaseEntity {
-  
   @Column({ name: 'stock_take_code', length: 32 })
   stockTakeCode: string;
 

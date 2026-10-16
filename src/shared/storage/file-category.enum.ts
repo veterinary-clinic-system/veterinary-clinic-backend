@@ -8,6 +8,7 @@ export enum FileCategory {
   SYMPTOM_VIDEO = 'symptom-videos',
   EXAM_ATTACHMENT = 'exam-attachments',
   LAB_RESULT = 'lab-results',
+  CHAT_IMAGE = 'chat-images',
 }
 
 export const IMAGE_CATEGORIES: FileCategory[] = [
@@ -17,4 +18,5 @@ export const IMAGE_CATEGORIES: FileCategory[] = [
   FileCategory.EMPLOYEE_AVATAR,
   FileCategory.CATALOG_IMAGE,
   FileCategory.SYMPTOM_PHOTO,
+  FileCategory.CHAT_IMAGE,
 ];

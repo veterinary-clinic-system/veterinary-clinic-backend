@@ -1,12 +1,10 @@
-
 export enum PrescriptionStatus {
-  
   PRESCRIBED = 'PRESCRIBED',
-  
+
   DISPENSING = 'DISPENSING',
-  
+
   DISPENSED = 'DISPENSED',
-  
+
   CANCELLED = 'CANCELLED',
 }
 

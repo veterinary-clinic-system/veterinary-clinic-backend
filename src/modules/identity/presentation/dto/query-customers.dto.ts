@@ -10,7 +10,6 @@ function toOptionalBoolean({ obj, key }: { obj: Record<string, unknown>; key: st
 }
 
 export class QueryCustomersDto extends PaginationQueryDto {
-  
   @IsOptional()
   @IsString()
   search?: string;

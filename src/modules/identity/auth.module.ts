@@ -22,7 +22,7 @@ import { AuditLogModule } from './audit-log.module';
         signOptions: { expiresIn: config.get<string>('jwt.accessExpiresIn') },
       }),
     }),
-    
+
     AuditLogModule,
   ],
   controllers: [AuthController],

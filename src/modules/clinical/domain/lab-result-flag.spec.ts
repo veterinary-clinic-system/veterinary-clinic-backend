@@ -18,7 +18,6 @@ describe('lab-result-flag.util', () => {
     });
 
     it('nam dung tren bien van la NORMAL', () => {
-
       expect(computeLabResultFlag(6, wbc)).toBe(LabResultFlag.NORMAL);
       expect(computeLabResultFlag(17, wbc)).toBe(LabResultFlag.NORMAL);
     });
@@ -39,7 +38,6 @@ describe('lab-result-flag.util', () => {
     });
 
     it('khong bao gio tu sinh ra CRITICAL', () => {
-      
       const flags = [-100, 0, 6, 17, 25, 10_000].map((value) => computeLabResultFlag(value, wbc));
       expect(flags).not.toContain(LabResultFlag.CRITICAL);
     });

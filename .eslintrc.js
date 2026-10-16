@@ -11,6 +11,7 @@ const MODULES = [
   'notification',
   'reporting',
   'assistant',
+  'messaging',
 ];
 
 const crossModuleZones = MODULES.flatMap((target) =>
@@ -22,7 +23,7 @@ const crossModuleZones = MODULES.flatMap((target) =>
       './application/index.ts',
 
       `./${target}.module.ts`,
-      
+
       './auth.module.ts',
       './users.module.ts',
       './customers.module.ts',
@@ -30,9 +31,9 @@ const crossModuleZones = MODULES.flatMap((target) =>
       './employees.module.ts',
     ],
     message:
-      `Module "${source}" khong duoc voi vao ben trong module "${target}". ` +
-      `Chi duoc import tu "${target}/domain/entities", barrel "${target}/application", ` +
-      `hoac module goc "${target}.module.ts".`,
+      `Module "${source}" không được với vào bên trong module "${target}". ` +
+      `Chỉ được import từ "${target}/domain/entities", barrel "${target}/application", ` +
+      `hoặc module gốc "${target}.module.ts".`,
   })),
 );
 
@@ -94,7 +95,6 @@ module.exports = {
           ...crossModuleZones,
           ...layerZones,
           {
-
             target: './src/shared',
             from: './src/modules',
             except: ['../shared/database/entity-registry.ts'],
@@ -108,7 +108,6 @@ module.exports = {
   },
   overrides: [
     {
-
       files: ['src/shared/database/entity-registry.ts'],
       rules: { 'import/no-restricted-paths': 'off' },
     },

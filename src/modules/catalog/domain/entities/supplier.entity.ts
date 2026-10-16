@@ -3,7 +3,6 @@ import { BaseEntity } from '@/shared/database/base.entity';
 
 @Entity({ name: 'suppliers' })
 export class Supplier extends BaseEntity {
-  
   @Column({ name: 'supplier_code', length: 32 })
   supplierCode: string;
 

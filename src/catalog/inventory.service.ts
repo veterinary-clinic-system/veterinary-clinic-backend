@@ -14,7 +14,8 @@ const UNIQUE_VIOLATION = '23505';
 @Injectable()
 export class InventoryService {
   constructor(
-    @InjectRepository(InventoryItem) private readonly inventoryRepository: Repository<InventoryItem>,
+    @InjectRepository(InventoryItem)
+    private readonly inventoryRepository: Repository<InventoryItem>,
     @InjectRepository(Item) private readonly itemsRepository: Repository<Item>,
     @InjectRepository(Branch) private readonly branchesRepository: Repository<Branch>,
   ) {}

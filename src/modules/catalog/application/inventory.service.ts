@@ -45,7 +45,7 @@ export interface ReceiveStockParams {
   costPrice?: number;
   supplierId?: string | null;
   goodsReceiptId?: string | null;
-  
+
   type?: InventoryTransactionType;
   referenceType?: InventoryReferenceType;
   referenceId?: string | null;
@@ -57,7 +57,7 @@ export interface IssueStockParams {
   itemId: string;
   branchId: string;
   quantity: number;
-  
+
   type: InventoryTransactionType;
   referenceType?: InventoryReferenceType;
   referenceId?: string | null;
@@ -68,11 +68,11 @@ export interface IssueStockParams {
 export interface AdjustStockParams {
   itemId: string;
   branchId: string;
-  
+
   quantityChange: number;
-  
+
   batchId?: string | null;
-  
+
   note: string;
   referenceType?: InventoryReferenceType;
   referenceId?: string | null;
@@ -132,7 +132,6 @@ export class InventoryService {
       });
     }
     if (query.lowStock) {
-
       qb.leftJoin('products', 'product', 'product.item_id = item.id AND product.deleted_at IS NULL')
         .leftJoin(
           'medications',
@@ -228,7 +227,7 @@ export class InventoryService {
           itemId: dto.itemId,
           branchId: dto.branchId,
           quantityChange: dto.inventoryQuantity,
-          note: 'Khai bao ton ban dau',
+          note: 'Khai báo tồn ban đầu',
           performedByUserId,
         });
       }
@@ -271,7 +270,7 @@ export class InventoryService {
         itemId: inventoryItem.itemId,
         branchId: inventoryItem.branchId,
         quantityChange: change,
-        note: dto.note ?? 'Dieu chinh tu man hinh kho',
+        note: dto.note ?? 'Điều chỉnh từ màn hình kho',
         performedByUserId,
       });
     });
@@ -280,10 +279,10 @@ export class InventoryService {
   private async receiveIn(em: EntityManager, params: ReceiveStockParams): Promise<InventoryBatch> {
     const type = params.type ?? InventoryTransactionType.PURCHASE;
     if (params.quantity <= 0 || !Number.isInteger(params.quantity)) {
-      throw new BadRequestException('So luong nhap phai la so nguyen duong');
+      throw new BadRequestException('Số lượng nhập phải là số nguyên dương');
     }
     if (!isValidSign(type, params.quantity)) {
-      throw new BadRequestException(`Loai giao dich ${type} khong dung de nhap kho`);
+      throw new BadRequestException(`Loại giao dịch ${type} không dùng để nhập kho`);
     }
 
     await this.lock(em, params.itemId, params.branchId);
@@ -297,8 +296,8 @@ export class InventoryService {
     if (batch) {
       if (batch.expiryDate !== expiryDate) {
         throw new ConflictException(
-          `Ma lo "${params.batchNo}" da ton tai voi han dung khac (${batch.expiryDate ?? 'khong han'}). ` +
-            'Kiem tra lai ma lo tren vo hop.',
+          `Mã lô "${params.batchNo}" đã tồn tại với hạn dùng khác (${batch.expiryDate ?? 'không hạn'}). ` +
+            'Kiểm tra lại mã lô trên vỏ hộp.',
         );
       }
       batch.costPrice = this.weightedCost(
@@ -340,10 +339,10 @@ export class InventoryService {
 
   private async issueIn(em: EntityManager, params: IssueStockParams): Promise<BatchAllocation[]> {
     if (params.quantity <= 0 || !Number.isInteger(params.quantity)) {
-      throw new BadRequestException('So luong xuat phai la so nguyen duong');
+      throw new BadRequestException('Số lượng xuất phải là số nguyên dương');
     }
     if (!isValidSign(params.type, -params.quantity)) {
-      throw new BadRequestException(`Loai giao dich ${params.type} khong dung de xuat kho`);
+      throw new BadRequestException(`Loại giao dịch ${params.type} không dùng để xuất kho`);
     }
 
     await this.lock(em, params.itemId, params.branchId);
@@ -351,8 +350,7 @@ export class InventoryService {
       where: { itemId: params.itemId, branchId: params.branchId },
     });
     if (!inventoryItem) {
-
-      throw new ConflictException('Khong du ton kho: kha dung 0');
+      throw new ConflictException('Không đủ tồn kho: khả dụng 0');
     }
 
     const batches = await this.loadBatches(em, inventoryItem.id);
@@ -395,7 +393,7 @@ export class InventoryService {
 
   private async adjustIn(em: EntityManager, params: AdjustStockParams): Promise<InventoryItem> {
     if (!Number.isInteger(params.quantityChange) || params.quantityChange === 0) {
-      throw new BadRequestException('Chenh lech kiem ke phai la so nguyen khac 0');
+      throw new BadRequestException('Chênh lệch kiểm kê phải là số nguyên khác 0');
     }
 
     await this.lock(em, params.itemId, params.branchId);
@@ -449,7 +447,7 @@ export class InventoryService {
         where: { id: params.batchId, inventoryItemId: inventoryItem.id },
       });
       if (!batch) {
-        throw new BadRequestException('Lo hang khong thuoc dong ton kho nay');
+        throw new BadRequestException('Lô hàng không thuộc dòng tồn kho này');
       }
       return batch;
     }
@@ -485,18 +483,18 @@ export class InventoryService {
         where: { id: params.batchId, inventoryItemId: inventoryItem.id },
       });
       if (!batch) {
-        throw new BadRequestException('Lo hang khong thuoc dong ton kho nay');
+        throw new BadRequestException('Lô hàng không thuộc dòng tồn kho này');
       }
       if (batch.quantity < shortage) {
         throw new ConflictException(
-          `Lo ${batch.batchNo} chi con ${batch.quantity}, khong the giam ${shortage}`,
+          `Lô ${batch.batchNo} chỉ còn ${batch.quantity}, không thể giảm ${shortage}`,
         );
       }
       return [{ batchId: batch.id, quantityChange: params.quantityChange }];
     }
 
     const batches = await this.loadBatches(em, inventoryItem.id);
-    
+
     const allocations = (() => {
       try {
         return allocateFefo(batches, shortage, '1970-01-01');

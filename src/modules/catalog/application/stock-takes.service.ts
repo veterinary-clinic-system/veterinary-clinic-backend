@@ -49,10 +49,10 @@ export class StockTakesService {
           : { branchId: dto.branchId },
       });
       if (inventoryItems.length === 0) {
-        throw new BadRequestException('Chi nhanh chua co mat hang nao de kiem ke');
+        throw new BadRequestException('Chi nhánh chưa có mặt hàng nào để kiểm kê');
       }
       if (dto.inventoryItemIds?.length && inventoryItems.length !== dto.inventoryItemIds.length) {
-        throw new BadRequestException('Mot hoac nhieu dong ton kho khong thuoc chi nhanh nay');
+        throw new BadRequestException('Một hoặc nhiều dòng tồn kho không thuộc chi nhánh này');
       }
 
       const stockTake = await em.save(
@@ -123,7 +123,7 @@ export class StockTakesService {
     const lines = new Map((stockTake.items ?? []).map((line) => [line.id, line]));
     for (const count of dto.items) {
       if (!lines.has(count.stockTakeItemId)) {
-        throw new BadRequestException('Dong kiem ke khong thuoc phieu nay');
+        throw new BadRequestException('Dòng kiểm kê không thuộc phiếu này');
       }
     }
 
@@ -150,7 +150,7 @@ export class StockTakesService {
 
     const counted = (stockTake.items ?? []).filter((line) => line.countedQuantity !== null);
     if (counted.length === 0) {
-      throw new ConflictException('Chua dem dong nao - khong co gi de xac nhan');
+      throw new ConflictException('Chưa đếm dòng nào - không có gì để xác nhận');
     }
 
     await this.dataSource.transaction(async (em) => {
@@ -207,7 +207,7 @@ export class StockTakesService {
   private assertDraft(stockTake: StockTake): void {
     if (stockTake.status !== StockTakeStatus.DRAFT) {
       throw new ConflictException(
-        `Phieu ${stockTake.stockTakeCode} da ${stockTake.status}, khong sua duoc nua`,
+        `Phiếu ${stockTake.stockTakeCode} đã ${stockTake.status}, không sửa được nữa`,
       );
     }
   }

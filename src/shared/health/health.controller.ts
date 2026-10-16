@@ -58,7 +58,7 @@ export class HealthController {
       await probe();
       return { [key]: { status: 'up' } };
     } catch (error) {
-      this.logger.warn(`Health check "${key}" that bai: ${(error as Error).message}`);
+      this.logger.warn(`Health check "${key}" thất bại: ${(error as Error).message}`);
       return { [key]: { status: 'down' } };
     }
   }
@@ -66,13 +66,13 @@ export class HealthController {
   private async pingRedis(): Promise<void> {
     const reply = await this.withTimeout(this.redis.ping(), 'redis');
     if (reply !== 'PONG') {
-      throw new Error(`Redis tra loi bat thuong: ${reply}`);
+      throw new Error(`Redis trả lời bất thường: ${reply}`);
     }
   }
 
   private async pingHttp(url: string | null): Promise<void> {
     if (!url) {
-      throw new Error('Chua cau hinh dia chi');
+      throw new Error('Chưa cấu hình địa chỉ');
     }
 
     const response = await fetch(url, {
@@ -90,7 +90,7 @@ export class HealthController {
     const apiSecret = this.configService.get<string>('files.cloudinary.apiSecret');
 
     if (!cloudinaryUrl && (!cloudName || !apiKey || !apiSecret)) {
-      return Promise.reject(new Error('Chua cau hinh Cloudinary'));
+      return Promise.reject(new Error('Chưa cấu hình Cloudinary'));
     }
     return Promise.resolve();
   }

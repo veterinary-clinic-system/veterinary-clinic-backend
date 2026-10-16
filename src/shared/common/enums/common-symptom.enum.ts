@@ -1,4 +1,3 @@
-
 export enum CommonSymptom {
   SKIN_ALLERGY = 'SKIN_ALLERGY',
   EAR_INFECTION = 'EAR_INFECTION',

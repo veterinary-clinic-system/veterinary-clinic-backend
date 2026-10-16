@@ -1,18 +1,17 @@
-
 export enum AuditAction {
   CREATE = 'CREATE',
   UPDATE = 'UPDATE',
   DELETE = 'DELETE',
   LOGIN = 'LOGIN',
   LOGOUT = 'LOGOUT',
-  
+
   APPROVE = 'APPROVE',
-  
+
   CANCEL = 'CANCEL',
-  
+
   PAYMENT = 'PAYMENT',
-  
+
   DISPENSE = 'DISPENSE',
-  
+
   STOCK_ADJUSTMENT = 'STOCK_ADJUSTMENT',
 }

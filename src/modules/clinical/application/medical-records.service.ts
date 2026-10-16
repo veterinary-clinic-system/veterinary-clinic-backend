@@ -6,13 +6,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Not, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import { Diagnosis } from '@/modules/clinical/domain/entities/diagnosis.entity';
 import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
 import { Treatment } from '@/modules/clinical/domain/entities/treatment.entity';
 import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
 import { Pet } from '@/modules/pets/domain/entities/pet.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
+import { QueueEntry } from '@/modules/scheduling/domain/entities/queue-entry.entity';
+import { ACTIVE_QUEUE_STATUSES, QueueStatus } from '@/shared/common/enums/queue-status.enum';
+import { RealtimeGateway } from '@/shared/realtime/realtime.gateway';
 import {
   AppointmentStatus,
   TERMINAL_APPOINTMENT_STATUSES,
@@ -69,6 +72,7 @@ export class MedicalRecordsService {
     @InjectRepository(Pet) private readonly petsRepository: Repository<Pet>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly prescreeningService: PrescreeningService,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   async openForAppointment(
@@ -168,6 +172,7 @@ export class MedicalRecordsService {
   }
 
   async complete(id: string): Promise<MedicalRecord> {
+    let queueClosed = false;
     await this.dataSource.transaction(async (manager) => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [id]);
 
@@ -197,7 +202,19 @@ export class MedicalRecordsService {
           status: AppointmentStatus.COMPLETED,
         });
       }
+
+      // Khám xong thì lượt chờ của lịch hẹn này cũng kết thúc, nếu không thú cưng còn treo trên hàng chờ.
+      const closedQueue = await manager.update(
+        QueueEntry,
+        { appointmentId: record.appointmentId, status: In(ACTIVE_QUEUE_STATUSES) },
+        { status: QueueStatus.DONE, finishedAt: new Date() },
+      );
+      queueClosed = (closedQueue.affected ?? 0) > 0;
     });
+
+    if (queueClosed) {
+      this.realtimeGateway.emitQueueChanged();
+    }
 
     const completed = await this.findOne(id);
     const confirmedDiseaseNames = (completed.diagnoses ?? [])

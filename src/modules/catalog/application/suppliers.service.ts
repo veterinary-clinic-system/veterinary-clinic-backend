@@ -16,7 +16,6 @@ export class SuppliersService {
   ) {}
 
   async create(dto: CreateSupplierDto): Promise<Supplier> {
-
     const supplier = this.suppliersRepository.create({
       name: dto.name,
       phone: dto.phone ?? null,

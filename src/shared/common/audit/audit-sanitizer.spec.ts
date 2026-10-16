@@ -14,7 +14,7 @@ describe('audit-sanitizer', () => {
 
       expect(sanitized.passwordHash).toBe(REDACTED);
       expect(JSON.stringify(sanitized)).not.toContain('$2b$12$');
-      
+
       expect(sanitized.phone).toBe('0900000001');
       expect(sanitized.fullName).toBe('Nguyen Van A');
     });
@@ -59,7 +59,6 @@ describe('audit-sanitizer', () => {
     });
 
     it('bang khac biet cung khong lam ro mat khau', () => {
-
       const before = sanitizeAuditPayload({ id: 'u-1', passwordHash: 'hash-cu' }) as Record<
         string,
         unknown

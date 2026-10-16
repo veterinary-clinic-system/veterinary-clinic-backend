@@ -1,8 +1,7 @@
-
 export enum NotificationChannel {
   SMS = 'SMS',
   ZALO = 'ZALO',
-  
+
   EMAIL = 'EMAIL',
 }
 

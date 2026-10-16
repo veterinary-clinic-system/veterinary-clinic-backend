@@ -1,14 +1,12 @@
-
-
 export interface DashboardKpi {
   key: string;
   label: string;
   value: number;
-  
+
   format: 'currency' | 'count';
-  
+
   deltaRatio: number | null;
-  
+
   link?: string;
 }
 
@@ -25,7 +23,6 @@ export interface DashboardSeries {
 }
 
 export interface DashboardResponse {
-  
   generatedAt: string;
   branchId: string | null;
   kpis: DashboardKpi[];

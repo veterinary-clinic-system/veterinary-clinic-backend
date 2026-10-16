@@ -33,8 +33,10 @@ export class CloudinaryStorageAdapter implements StorageProvider, OnModuleInit {
       );
     }
 
-    this.folder = (this.configService.get<string>('files.cloudinary.folder') ?? 'vetcare')
-      .replace(/^\/+|\/+$/g, '');
+    this.folder = (this.configService.get<string>('files.cloudinary.folder') ?? 'vetcare').replace(
+      /^\/+|\/+$/g,
+      '',
+    );
   }
 
   async save(category: FileCategory, file: Express.Multer.File): Promise<StoredFile> {

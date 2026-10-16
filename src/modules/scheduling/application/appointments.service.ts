@@ -188,8 +188,8 @@ export class AppointmentsService {
             appointmentId: saved.id,
             recipientPhone: owner.phone,
             message:
-              `Nhac lich: ${pet.name} co lich hen luc ` +
-              `${startAt.toLocaleString('vi-VN')}. Vui long den dung gio.`,
+              `Nhắc lịch: ${pet.name} có lịch hẹn lúc ` +
+              `${startAt.toLocaleString('vi-VN')}. Vui lòng đến đúng giờ.`,
           },
         });
 
@@ -279,7 +279,17 @@ export class AppointmentsService {
     const appointment = await this.appointmentsRepository.findOne({
       where: { id },
 
-      relations: ['pet', 'pet.owner', 'doctor', 'branch', 'service', 'service.item', 'cancelledBy'],
+      relations: [
+        'pet',
+        'pet.owner',
+        'pet.breed',
+        'pet.breed.species',
+        'doctor',
+        'branch',
+        'service',
+        'service.item',
+        'cancelledBy',
+      ],
     });
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
@@ -476,7 +486,7 @@ export class AppointmentsService {
 
     if (dto.status && !isValidAppointmentStatusTransition(appointment.status, dto.status)) {
       throw new ConflictException(
-        `Khong the chuyen lich hen tu trang thai "${appointment.status}" sang "${dto.status}"`,
+        `Không thể chuyển lịch hẹn từ trạng thái "${appointment.status}" sang "${dto.status}"`,
       );
     }
     if (
@@ -484,7 +494,7 @@ export class AppointmentsService {
       TERMINAL_APPOINTMENT_STATUSES.has(appointment.status)
     ) {
       throw new ConflictException(
-        `Khong the doi lich cho mot lich hen da o trang thai ket thuc ("${appointment.status}")`,
+        `Không thể đổi lịch cho một lịch hẹn đã ở trạng thái kết thúc ("${appointment.status}")`,
       );
     }
 
@@ -604,7 +614,7 @@ export class AppointmentsService {
 
     if (!isValidAppointmentStatusTransition(appointment.status, status)) {
       throw new ConflictException(
-        `Khong the chuyen lich hen tu trang thai "${appointment.status}" sang "${status}"`,
+        `Không thể chuyển lịch hẹn từ trạng thái "${appointment.status}" sang "${status}"`,
       );
     }
 

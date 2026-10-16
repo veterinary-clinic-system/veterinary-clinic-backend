@@ -9,7 +9,5 @@ export class AddVaccineItemType1796000000000 implements MigrationInterface {
     );
   }
 
-  public async down(): Promise<void> {
-    
-  }
+  public async down(): Promise<void> {}
 }

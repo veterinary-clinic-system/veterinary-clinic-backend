@@ -6,7 +6,9 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Min,
 } from 'class-validator';
+import { IsNotFutureDate } from '@/shared/common/validation/is-not-future-date.validator';
 import { Gender } from '@/shared/common/enums/gender.enum';
 
 export class CreatePetInlineDto {
@@ -26,9 +28,11 @@ export class CreatePetInlineDto {
 
   @IsOptional()
   @IsNumber({}, { message: 'Cân nặng phải là số' })
+  @Min(0, { message: 'Cân nặng không được âm' })
   weight?: number;
 
   @IsOptional()
   @IsDateString({}, { message: 'Ngày sinh không hợp lệ' })
+  @IsNotFutureDate({ message: 'Ngày sinh không được sau hôm nay' })
   birthDate?: string;
 }

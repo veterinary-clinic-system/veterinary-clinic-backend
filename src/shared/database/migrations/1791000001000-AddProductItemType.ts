@@ -9,7 +9,5 @@ export class AddProductItemType1791000001000 implements MigrationInterface {
     );
   }
 
-  public async down(): Promise<void> {
-    
-  }
+  public async down(): Promise<void> {}
 }

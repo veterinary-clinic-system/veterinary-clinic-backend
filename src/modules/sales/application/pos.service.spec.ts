@@ -16,7 +16,7 @@ describe('PosService.checkout', () => {
     itemId: string;
     itemName: string;
     quantity: number;
-    
+
     cartPrice: number;
     catalogPrice: number;
     available: number;
@@ -145,7 +145,7 @@ describe('PosService.checkout', () => {
     const invoice = harness.savedInvoices[0];
     expect(invoice.source).toBe(InvoiceSource.POS);
     expect(invoice.appointmentId).toBeNull();
-    
+
     expect(invoice.subtotal).toBe(800);
     expect(invoice.totalAmount).toBe(800);
     expect(invoice.items?.map((line) => line.price)).toEqual([350, 100]);

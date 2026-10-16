@@ -10,7 +10,5 @@ export class VaccinationInventoryReference1796000003000 implements MigrationInte
     `);
   }
 
-  public async down(): Promise<void> {
-    
-  }
+  public async down(): Promise<void> {}
 }

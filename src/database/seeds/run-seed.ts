@@ -193,11 +193,36 @@ async function seed() {
   const medicationRepo = dataSource.getRepository(Medication);
 
   const serviceSeeds = [
-    { name: 'Khám tổng quát', describe: 'Khám sức khỏe định kỳ, tư vấn chung', price: 150_000, minutes: 30 },
-    { name: 'Khám da liễu', describe: 'Khám và tư vấn các bệnh về da, dị ứng', price: 200_000, minutes: 30 },
-    { name: 'Tiêm phòng dại', describe: 'Tiêm vắc-xin phòng bệnh dại', price: 120_000, minutes: 30 },
-    { name: 'Phẫu thuật nhỏ', describe: 'Tiểu phẫu, khâu vết thương, triệt sản nhỏ', price: 800_000, minutes: 60 },
-    { name: 'Siêu âm chẩn đoán hình ảnh', describe: 'Siêu âm ổ bụng, chẩn đoán hình ảnh', price: 300_000, minutes: 30 },
+    {
+      name: 'Khám tổng quát',
+      describe: 'Khám sức khỏe định kỳ, tư vấn chung',
+      price: 150_000,
+      minutes: 30,
+    },
+    {
+      name: 'Khám da liễu',
+      describe: 'Khám và tư vấn các bệnh về da, dị ứng',
+      price: 200_000,
+      minutes: 30,
+    },
+    {
+      name: 'Tiêm phòng dại',
+      describe: 'Tiêm vắc-xin phòng bệnh dại',
+      price: 120_000,
+      minutes: 30,
+    },
+    {
+      name: 'Phẫu thuật nhỏ',
+      describe: 'Tiểu phẫu, khâu vết thương, triệt sản nhỏ',
+      price: 800_000,
+      minutes: 60,
+    },
+    {
+      name: 'Siêu âm chẩn đoán hình ảnh',
+      describe: 'Siêu âm ổ bụng, chẩn đoán hình ảnh',
+      price: 300_000,
+      minutes: 30,
+    },
   ];
 
   const services: Service[] = [];
@@ -251,7 +276,10 @@ async function seed() {
   const diseases = await diseaseRepo.save([
     { diseaseName: 'Dị ứng da', commonSymptoms: [CommonSymptom.SKIN_ALLERGY] },
     { diseaseName: 'Viêm tai', commonSymptoms: [CommonSymptom.EAR_INFECTION] },
-    { diseaseName: 'Viêm dạ dày ruột', commonSymptoms: [CommonSymptom.VOMITING, CommonSymptom.DIARRHEA] },
+    {
+      diseaseName: 'Viêm dạ dày ruột',
+      commonSymptoms: [CommonSymptom.VOMITING, CommonSymptom.DIARRHEA],
+    },
     { diseaseName: 'Nhiễm trùng đường tiết niệu', commonSymptoms: [CommonSymptom.HEMATURIA] },
     { diseaseName: 'Khám định kỳ', commonSymptoms: [] },
   ]);
@@ -471,7 +499,9 @@ async function seed() {
 
   console.log('Seed complete:');
   console.log(`  Branches: ${branch1.branchName}, ${branch2.branchName}`);
-  console.log(`  Admin login: phone 0900000001 / password ${process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345'}`);
+  console.log(
+    `  Admin login: phone 0900000001 / password ${process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345'}`,
+  );
   console.log('  Receptionist login: phone 0900000002 / password Staff@12345');
   console.log('  Doctor login: phone 0900000010 / password Staff@12345');
   console.log('  Pet owner login: phone 0911111111 / password Owner@12345');

@@ -3,10 +3,13 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnApplicationBootstrap,
 } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { Between, DataSource, EntityManager, In, Repository } from 'typeorm';
+import { Between, DataSource, EntityManager, In, LessThan, Repository } from 'typeorm';
 import { addMinutes, format } from 'date-fns';
 import { Service } from '@/modules/catalog/domain/entities/service.entity';
 import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
@@ -56,8 +59,12 @@ const PRIORITY_RANK_SQL = `CASE queue.priority_color
     ELSE 5
   END`;
 
+const STALE_CANCEL_REASON = 'Tự đóng: lượt chờ không kết thúc trong ngày';
+
 @Injectable()
-export class QueueService {
+export class QueueService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(QueueService.name);
+
   constructor(
     @InjectRepository(QueueEntry) private readonly queueRepository: Repository<QueueEntry>,
     @InjectRepository(Appointment) private readonly appointmentsRepository: Repository<Appointment>,
@@ -95,16 +102,8 @@ export class QueueService {
       );
     }
 
-    const petInQueue = await this.queueRepository.findOne({
-      where: { petId: appointment.petId, status: In(ACTIVE_QUEUE_STATUSES) },
-    });
-    if (petInQueue) {
-      throw new ConflictException(
-        `${appointment.pet.name} đang có một lượt chờ chưa kết thúc (số thứ tự ${petInQueue.ticketNumber}).`,
-      );
-    }
-
     const queueDate = format(new Date(), 'yyyy-MM-dd');
+    await this.assertPetHasNoOpenEntry(appointment.petId, appointment.pet.name, queueDate);
 
     const entry = await this.dataSource.transaction(async (manager) => {
       const created = manager.create(QueueEntry, {
@@ -141,8 +140,16 @@ export class QueueService {
       appointment.branchId,
       appointment.startAt,
     );
-    this.realtimeGateway.emitQueueChanged({ branchId: entry.branchId, queueDate: entry.queueDate, ticketNumber: entry.ticketNumber });
-    this.realtimeGateway.emitAppointmentChanged({ appointmentId: appointment.id, branchId: appointment.branchId, doctorId: appointment.doctorId });
+    this.realtimeGateway.emitQueueChanged({
+      branchId: entry.branchId,
+      queueDate: entry.queueDate,
+      ticketNumber: entry.ticketNumber,
+    });
+    this.realtimeGateway.emitAppointmentChanged({
+      appointmentId: appointment.id,
+      branchId: appointment.branchId,
+      doctorId: appointment.doctorId,
+    });
 
     return this.findOne(entry.id);
   }
@@ -163,16 +170,8 @@ export class QueueService {
     const owner = await this.partyResolver.resolveOwner(dto.phone, dto.ownerFullName);
     const pet = await this.partyResolver.resolvePet(dto, owner);
 
-    const activeEntry = await this.queueRepository.findOne({
-      where: { petId: pet.id, status: In(ACTIVE_QUEUE_STATUSES) },
-    });
-    if (activeEntry) {
-      throw new ConflictException(
-        `${pet.name} đang có một lượt chờ chưa kết thúc (số thứ tự ${activeEntry.ticketNumber}).`,
-      );
-    }
-
     const queueDate = format(new Date(), 'yyyy-MM-dd');
+    await this.assertPetHasNoOpenEntry(pet.id, pet.name, queueDate);
 
     const entry = await this.dataSource.transaction(async (manager) => {
       const created = manager.create(QueueEntry, {
@@ -227,8 +226,15 @@ export class QueueService {
       const preempted = await this.preemptForEmergency(entry, branchId, durationMinutes, actor);
       if (preempted) return preempted;
     }
-    this.realtimeGateway.emitQueueChanged({ branchId: entry.branchId, queueDate: entry.queueDate, ticketNumber: entry.ticketNumber });
-    this.realtimeGateway.emitAppointmentChanged({ branchId: entry.branchId, doctorId: entry.doctorId ?? undefined });
+    this.realtimeGateway.emitQueueChanged({
+      branchId: entry.branchId,
+      queueDate: entry.queueDate,
+      ticketNumber: entry.ticketNumber,
+    });
+    this.realtimeGateway.emitAppointmentChanged({
+      branchId: entry.branchId,
+      doctorId: entry.doctorId ?? undefined,
+    });
 
     return this.findOne(entryId);
   }
@@ -371,8 +377,16 @@ export class QueueService {
     if (entry.doctorId && dto.status) {
       await this.availabilityService.invalidateDoctorDay(entry.doctorId, entry.branchId, now);
     }
-    this.realtimeGateway.emitQueueChanged({ branchId: entry.branchId, queueDate: entry.queueDate, ticketNumber: entry.ticketNumber });
-    this.realtimeGateway.emitAppointmentChanged({ appointmentId: entry.appointmentId ?? undefined, branchId: entry.branchId, doctorId: entry.doctorId ?? undefined });
+    this.realtimeGateway.emitQueueChanged({
+      branchId: entry.branchId,
+      queueDate: entry.queueDate,
+      ticketNumber: entry.ticketNumber,
+    });
+    this.realtimeGateway.emitAppointmentChanged({
+      appointmentId: entry.appointmentId ?? undefined,
+      branchId: entry.branchId,
+      doctorId: entry.doctorId ?? undefined,
+    });
 
     return this.findOne(id);
   }
@@ -411,6 +425,60 @@ export class QueueService {
       throw new NotFoundException('Không tìm thấy lượt chờ');
     }
     return entry;
+  }
+
+  /**
+   * Hàng chờ tính theo ngày: lượt còn mở của ngày khác (bị kẹt vì không ai đóng)
+   * không được chặn tiếp nhận hôm nay.
+   */
+  private async assertPetHasNoOpenEntry(
+    petId: string,
+    petName: string,
+    queueDate: string,
+  ): Promise<void> {
+    const open = await this.queueRepository.findOne({
+      where: { petId, queueDate, status: In(ACTIVE_QUEUE_STATUSES) },
+    });
+    if (open) {
+      throw new ConflictException(
+        `${petName} đang có một lượt chờ chưa kết thúc (số thứ tự ${open.ticketNumber}).`,
+      );
+    }
+  }
+
+  /**
+   * Đóng các lượt của những ngày trước còn mở: đã vào phòng khám thì coi như xong (DONE),
+   * chưa được gọi thì huỷ. Chạy đầu mỗi ngày và một lần khi khởi động để bù những đêm máy chủ tắt.
+   */
+  @Cron('5 0 * * *')
+  async closeStaleEntries(): Promise<number> {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const now = new Date();
+
+    const done = await this.queueRepository.update(
+      { queueDate: LessThan(today), status: QueueStatus.IN_ROOM },
+      { status: QueueStatus.DONE, finishedAt: now },
+    );
+    const cancelled = await this.queueRepository.update(
+      {
+        queueDate: LessThan(today),
+        status: In([QueueStatus.WAITING, QueueStatus.ASSIGNED]),
+      },
+      { status: QueueStatus.CANCELLED, finishedAt: now, cancelReason: STALE_CANCEL_REASON },
+    );
+
+    const closed = (done.affected ?? 0) + (cancelled.affected ?? 0);
+    if (closed > 0) {
+      this.logger.log(`Đã tự đóng ${closed} lượt chờ tồn từ các ngày trước`);
+      this.realtimeGateway.emitQueueChanged();
+    }
+    return closed;
+  }
+
+  async onApplicationBootstrap(): Promise<void> {
+    await this.closeStaleEntries().catch((error: unknown) =>
+      this.logger.warn(`Không đóng được lượt chờ tồn: ${String(error)}`),
+    );
   }
 
   private async nextTicketNumber(

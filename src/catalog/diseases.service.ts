@@ -20,7 +20,9 @@ const UNIQUE_VIOLATION = '23505';
  */
 @Injectable()
 export class DiseasesService {
-  constructor(@InjectRepository(Disease) private readonly diseasesRepository: Repository<Disease>) {}
+  constructor(
+    @InjectRepository(Disease) private readonly diseasesRepository: Repository<Disease>,
+  ) {}
 
   async findAll(query: QueryDiseasesDto): Promise<PaginatedResultDto<Disease>> {
     const qb = this.diseasesRepository.createQueryBuilder('disease');
@@ -29,7 +31,8 @@ export class DiseasesService {
       qb.andWhere('disease.diseaseName ILIKE :search', { search: `%${query.search}%` });
     }
 
-    const sortBy = query.sortBy && SORTABLE_COLUMNS.has(query.sortBy) ? query.sortBy : 'diseaseName';
+    const sortBy =
+      query.sortBy && SORTABLE_COLUMNS.has(query.sortBy) ? query.sortBy : 'diseaseName';
     qb.orderBy(`disease.${sortBy}`, query.sortOrder ?? 'ASC')
       .skip((query.page - 1) * query.limit)
       .take(query.limit);
@@ -47,7 +50,9 @@ export class DiseasesService {
   }
 
   async create(dto: CreateDiseaseDto): Promise<Disease> {
-    const existing = await this.diseasesRepository.findOne({ where: { diseaseName: dto.diseaseName } });
+    const existing = await this.diseasesRepository.findOne({
+      where: { diseaseName: dto.diseaseName },
+    });
     if (existing) {
       throw new ConflictException('A disease with this name already exists');
     }

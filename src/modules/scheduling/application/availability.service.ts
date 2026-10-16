@@ -26,7 +26,7 @@ export enum SlotStatus {
   BOOKED = 'BOOKED',
   BREAK = 'BREAK',
   OFF_SHIFT = 'OFF_SHIFT',
-    PAST = 'PAST',
+  PAST = 'PAST',
 }
 
 export interface SlotInfo extends TimeRange {
@@ -44,16 +44,16 @@ export interface DayAvailability {
 }
 
 export interface MonthDaySummary {
-    date: string;
+  date: string;
   dayOfWeek: number;
   isBranchOpen: boolean;
-    appointmentCount: number;
-    closedCount: number;
-    topPriorityColor: PriorityColor | null;
+  appointmentCount: number;
+  closedCount: number;
+  topPriorityColor: PriorityColor | null;
 }
 
 export interface MonthOverview {
-    month: string;
+  month: string;
   days: MonthDaySummary[];
 }
 
@@ -95,11 +95,7 @@ export function mergeDoctorDays(days: DayAvailability[]): DayAvailability | null
   };
 }
 
-export function slotsCovering(
-  slots: SlotInfo[],
-  startAt: Date,
-  endAt: Date,
-): SlotInfo[] | null {
+export function slotsCovering(slots: SlotInfo[], startAt: Date, endAt: Date): SlotInfo[] | null {
   const covered = slots
     .filter(
       (slot) =>
@@ -164,7 +160,7 @@ export class AvailabilityService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
-    async getDoctorDayAvailability(
+  async getDoctorDayAvailability(
     doctorId: string,
     branchId: string,
     date: Date,
@@ -184,7 +180,7 @@ export class AvailabilityService {
     return result;
   }
 
-    async invalidateDoctorDay(doctorId: string, branchId: string, date: Date): Promise<void> {
+  async invalidateDoctorDay(doctorId: string, branchId: string, date: Date): Promise<void> {
     const dateStr = format(date, 'yyyy-MM-dd');
     await this.redis.del(this.cacheKey(doctorId, branchId, dateStr)).catch(() => undefined);
   }
@@ -193,7 +189,7 @@ export class AvailabilityService {
     return `availability:${branchId}:${doctorId}:${dateStr}`;
   }
 
-    private reviveDates(day: DayAvailability): DayAvailability {
+  private reviveDates(day: DayAvailability): DayAvailability {
     return {
       ...day,
       slots: day.slots.map((slot) => ({
@@ -291,7 +287,7 @@ export class AvailabilityService {
     return days;
   }
 
-    async getMonthOverview(
+  async getMonthOverview(
     branchId: string,
     doctorId: string | undefined,
     monthOf: Date,
@@ -347,7 +343,7 @@ export class AvailabilityService {
     return { month: format(monthStart, 'yyyy-MM'), days };
   }
 
-    private rangeContains(outer: TimeRange, inner: TimeRange): boolean {
+  private rangeContains(outer: TimeRange, inner: TimeRange): boolean {
     return outer.start <= inner.start && inner.end <= outer.end;
   }
 }

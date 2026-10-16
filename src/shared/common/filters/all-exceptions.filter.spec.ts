@@ -93,7 +93,6 @@ describe('AllExceptionsFilter', () => {
   });
 
   it('KHÔNG để lộ nội dung của lỗi ngoài dự kiến', () => {
-    
     const leaky = new Error(
       'insert into "users" ("password_hash") values ($1) - duplicate key value violates unique constraint',
     );

@@ -35,7 +35,7 @@ export class CreateUserDto {
   password: string;
 
   @IsIn([Role.ADMIN, Role.MANAGER, Role.DOCTOR, Role.RECEPTIONIST, Role.PHARMACIST, Role.STAFF], {
-    message: 'Vai tro nhan vien khong hop le',
+    message: 'Vai trò nhân viên không hợp lệ',
   })
   role: Role;
 

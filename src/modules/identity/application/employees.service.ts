@@ -79,7 +79,7 @@ export class EmployeesService {
             passwordHash: await bcrypt.hash(dto.account.password, BCRYPT_ROUNDS),
             role: dto.account.role,
             branchId: dto.account.role === Role.ADMIN ? null : (dto.branchId ?? null),
-            
+
             active: !NON_WORKING_EMPLOYEE_STATUSES.includes(status),
           }),
         );

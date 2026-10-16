@@ -39,7 +39,7 @@ export class Employees1787000002000 implements MigrationInterface {
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_employees_employee_code"
       ON "employees" ("employee_code") WHERE "deleted_at" IS NULL
     `);
-    
+
     await queryRunner.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_employees_user_id"
       ON "employees" ("user_id") WHERE "deleted_at" IS NULL AND "user_id" IS NOT NULL

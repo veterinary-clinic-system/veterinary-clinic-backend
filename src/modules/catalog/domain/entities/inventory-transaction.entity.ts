@@ -9,7 +9,6 @@ import { InventoryBatch } from './inventory-batch.entity';
 import { InventoryItem } from './inventory-item.entity';
 
 @Entity({ name: 'inventory_transactions' })
-
 @Index('idx_inventory_transactions_item_created', ['inventoryItemId', 'createdAt'])
 @Index('idx_inventory_transactions_branch_created', ['branchId', 'createdAt'])
 export class InventoryTransaction {

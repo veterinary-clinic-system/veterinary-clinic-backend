@@ -3,7 +3,6 @@ import 'dotenv/config';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import * as entities from './entity-registry';
 
-
 export const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',
   host: process.env.DB_HOST ?? 'localhost',

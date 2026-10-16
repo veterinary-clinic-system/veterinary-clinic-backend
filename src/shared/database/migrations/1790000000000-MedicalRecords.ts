@@ -31,7 +31,7 @@ export class MedicalRecords1790000000000 implements MigrationInterface {
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_medical_records_appointment"
       ON "medical_records" ("appointment_id") WHERE "deleted_at" IS NULL
     `);
-    
+
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_medical_records_pet_created"
       ON "medical_records" ("pet_id", "created_at" DESC)
@@ -77,7 +77,7 @@ export class MedicalRecords1790000000000 implements MigrationInterface {
           FOREIGN KEY ("medical_record_id") REFERENCES "medical_records"("id") ON DELETE CASCADE;
       EXCEPTION WHEN duplicate_object THEN NULL; END $$
     `);
-    
+
     await queryRunner.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS "uq_examinations_medical_record"
       ON "examinations" ("medical_record_id")

@@ -1,7 +1,6 @@
 import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 
 export interface RevenueByPeriod {
-  
   period: string;
   totalRevenue: number;
   invoiceCount: number;
@@ -35,18 +34,17 @@ export interface AiAccuracyReport {
   totalEvaluated: number;
   accepted: number;
   overridden: number;
-  
+
   acceptanceRate: number;
   breakdownByColor: AiAccuracyByColor[];
 }
 
 export interface RevenueSummaryReport {
-  
   totalRevenue: number;
   totalPaid: number;
-  
+
   totalRefunded: number;
-  
+
   totalUnpaid: number;
   invoiceCount: number;
   unpaidInvoiceCount: number;
@@ -60,7 +58,7 @@ export interface InventoryReport {
   outOfStock: number;
   expiringSoon: number;
   expired: number;
-  
+
   expiringSoonDays: number;
 }
 
@@ -84,7 +82,7 @@ export interface ExamSummaryReport {
   completed: number;
   noShow: number;
   cancelled: number;
-  
+
   noShowRate: number;
   topVeterinarians: TopVeterinarian[];
 }

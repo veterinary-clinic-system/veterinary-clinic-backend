@@ -1,11 +1,10 @@
-
 export enum ItemType {
   SERVICE = 'SERVICE',
   MEDICATION = 'MEDICATION',
   LAB_TEST = 'LAB_TEST',
-  
+
   PRODUCT = 'PRODUCT',
-  
+
   VACCINE = 'VACCINE',
   OTHER = 'OTHER',
 }

@@ -152,6 +152,28 @@ class EnvironmentVariables {
   @IsString()
   @Matches(/^https?:\/\/\S+$/, { message: 'SEPAY_QR_ENDPOINT must be an HTTP(S) URL' })
   SEPAY_QR_ENDPOINT: string;
+
+  @IsOptional()
+  @IsString()
+  WEBRTC_STUN_URLS: string;
+
+  // Chuỗi rỗng (chép nguyên webrtc.env.example) nghĩa là chưa dùng TURN.
+  @ValidateIf((environment: EnvironmentVariables) => !!environment.WEBRTC_TURN_URLS)
+  @IsString()
+  @Matches(/^(turns?:\S+)(,\s*turns?:\S+)*$/, {
+    message: 'WEBRTC_TURN_URLS must be a comma-separated list of turn:/turns: URLs',
+  })
+  WEBRTC_TURN_URLS: string;
+
+  @ValidateIf((environment: EnvironmentVariables) => !!environment.WEBRTC_TURN_URLS)
+  @IsString()
+  @Matches(/\S/)
+  WEBRTC_TURN_USERNAME: string;
+
+  @ValidateIf((environment: EnvironmentVariables) => !!environment.WEBRTC_TURN_URLS)
+  @IsString()
+  @Matches(/\S/)
+  WEBRTC_TURN_CREDENTIAL: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

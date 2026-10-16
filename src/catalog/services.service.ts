@@ -100,7 +100,9 @@ export class ServicesService {
         await manager.update(Item, service.itemId, itemUpdates);
       }
 
-      const serviceUpdates: Partial<Pick<Service, 'durationMinutes' | 'requiresSpecialization' | 'active'>> = {};
+      const serviceUpdates: Partial<
+        Pick<Service, 'durationMinutes' | 'requiresSpecialization' | 'active'>
+      > = {};
       if (dto.durationMinutes !== undefined) serviceUpdates.durationMinutes = dto.durationMinutes;
       if (dto.requiresSpecialization !== undefined) {
         serviceUpdates.requiresSpecialization = dto.requiresSpecialization;

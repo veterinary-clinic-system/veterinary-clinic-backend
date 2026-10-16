@@ -1,7 +1,6 @@
 import { Role } from './role.enum';
 
 export enum Permission {
-  
   CUSTOMER_VIEW = 'CUSTOMER_VIEW',
   CUSTOMER_CREATE = 'CUSTOMER_CREATE',
   CUSTOMER_UPDATE = 'CUSTOMER_UPDATE',
@@ -26,15 +25,15 @@ export enum Permission {
 
   PRESCRIPTION_VIEW = 'PRESCRIPTION_VIEW',
   PRESCRIPTION_CREATE = 'PRESCRIPTION_CREATE',
-  
+
   PRESCRIPTION_DISPENSE = 'PRESCRIPTION_DISPENSE',
 
   VACCINATION_VIEW = 'VACCINATION_VIEW',
-  
+
   VACCINATION_CREATE = 'VACCINATION_CREATE',
 
   LABORATORY_VIEW = 'LABORATORY_VIEW',
-  
+
   LABORATORY_RESULT_ENTER = 'LABORATORY_RESULT_ENTER',
 
   CATALOG_VIEW = 'CATALOG_VIEW',
@@ -111,7 +110,6 @@ export const PERMISSION_GROUPS: Record<string, Permission[]> = {
 const ALL_PERMISSIONS = Object.values(Permission);
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
-  
   [Role.ADMIN]: ALL_PERMISSIONS,
 
   [Role.MANAGER]: [
@@ -161,7 +159,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
 
     Permission.PRESCRIPTION_VIEW,
     Permission.PRESCRIPTION_CREATE,
-    
+
     Permission.VACCINATION_VIEW,
     Permission.VACCINATION_CREATE,
     Permission.LABORATORY_VIEW,
@@ -201,7 +199,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     Permission.CUSTOMER_VIEW,
     Permission.PET_VIEW,
     Permission.MEDICAL_RECORD_VIEW,
-    
+
     Permission.PRESCRIPTION_VIEW,
     Permission.PRESCRIPTION_DISPENSE,
 

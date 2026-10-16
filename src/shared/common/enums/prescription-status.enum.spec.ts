@@ -21,14 +21,12 @@ describe('isValidPrescriptionStatusTransition', () => {
       [PrescriptionStatus.CANCELLED]: true,
     },
     [PrescriptionStatus.DISPENSING]: {
-      
       [PrescriptionStatus.PRESCRIBED]: false,
       [PrescriptionStatus.DISPENSING]: true,
       [PrescriptionStatus.DISPENSED]: true,
       [PrescriptionStatus.CANCELLED]: true,
     },
     [PrescriptionStatus.DISPENSED]: {
-      
       [PrescriptionStatus.PRESCRIBED]: false,
       [PrescriptionStatus.DISPENSING]: false,
       [PrescriptionStatus.DISPENSED]: true,

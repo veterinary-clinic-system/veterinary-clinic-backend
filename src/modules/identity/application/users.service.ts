@@ -78,7 +78,8 @@ export class UsersService {
       const user = manager.create(User, {
         phone: dto.phone,
         fullName: dto.fullName,
-        avatarUrl: dto.avatarUrl ?? (dto.role === Role.DOCTOR ? DEFAULT_DOCTOR_IMAGE : DEFAULT_STAFF_IMAGE),
+        avatarUrl:
+          dto.avatarUrl ?? (dto.role === Role.DOCTOR ? DEFAULT_DOCTOR_IMAGE : DEFAULT_STAFF_IMAGE),
         email: dto.email ?? null,
         passwordHash,
         role: dto.role,

@@ -1,4 +1,3 @@
-
 export const AUDIT_RECORDER = Symbol('AUDIT_RECORDER');
 
 export interface AuditRecordParams {
@@ -12,6 +11,5 @@ export interface AuditRecordParams {
 }
 
 export interface AuditRecorder {
-  
   record(params: AuditRecordParams): void;
 }

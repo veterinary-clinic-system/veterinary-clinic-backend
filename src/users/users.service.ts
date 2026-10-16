@@ -120,7 +120,8 @@ export class UsersService {
       qb.andWhere('user.branchId = :branchId', { branchId: query.branchId });
     }
 
-    const sortBy = query.sortBy && USER_SORTABLE_COLUMNS.has(query.sortBy) ? query.sortBy : 'createdAt';
+    const sortBy =
+      query.sortBy && USER_SORTABLE_COLUMNS.has(query.sortBy) ? query.sortBy : 'createdAt';
     qb.orderBy(`user.${sortBy}`, query.sortOrder ?? 'DESC')
       .skip((query.page - 1) * query.limit)
       .take(query.limit);
@@ -223,7 +224,8 @@ export class UsersService {
       });
     }
 
-    const sortBy = query.sortBy && USER_SORTABLE_COLUMNS.has(query.sortBy) ? query.sortBy : 'createdAt';
+    const sortBy =
+      query.sortBy && USER_SORTABLE_COLUMNS.has(query.sortBy) ? query.sortBy : 'createdAt';
     qb.orderBy(`user.${sortBy}`, query.sortOrder ?? 'DESC')
       .skip((query.page - 1) * query.limit)
       .take(query.limit);

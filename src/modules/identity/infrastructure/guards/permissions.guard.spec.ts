@@ -8,7 +8,6 @@ import { PERMISSIONS_KEY } from '@/shared/common/decorators/require-permissions.
 import type { PermissionsService } from '@/modules/identity/application/permissions.service';
 
 describe('PermissionsGuard', () => {
-  
   function makeContext(user?: { role: Role }): ExecutionContext {
     return {
       getHandler: () => function handler() {},
@@ -40,7 +39,7 @@ describe('PermissionsGuard', () => {
     );
 
     await expect(guard.canActivate(makeContext())).resolves.toBe(true);
-    
+
     expect(service.getPermissionsForRole).not.toHaveBeenCalled();
   });
 
@@ -85,7 +84,6 @@ describe('PermissionsGuard', () => {
     );
 
     await expect(guard.canActivate(makeContext({ role: Role.STAFF }))).rejects.toThrow(
-
       /Bạn không có quyền thực hiện thao tác này/,
     );
   });
@@ -93,7 +91,7 @@ describe('PermissionsGuard', () => {
   it('tu choi vai tro khong co dong nao trong ma tran (PET_OWNER)', async () => {
     const guard = new PermissionsGuard(
       makeReflector({ [PERMISSIONS_KEY]: [Permission.CUSTOMER_VIEW] }),
-      makeService([]), 
+      makeService([]),
     );
 
     await expect(guard.canActivate(makeContext({ role: Role.PET_OWNER }))).rejects.toThrow(

@@ -15,7 +15,6 @@ describe('vaccination-schedule.util', () => {
 
   describe('computeNextDueDate', () => {
     it('con trong phac do thi hen theo intervalDays', () => {
-      
       const next = computeNextDueDate(
         schedule({ doseCount: 3, intervalDays: 21, boosterIntervalDays: 365 }),
         1,
@@ -25,7 +24,6 @@ describe('vaccination-schedule.util', () => {
     });
 
     it('mui cuoi cua phac do thi hen theo boosterIntervalDays, khong phai intervalDays', () => {
-
       const next = computeNextDueDate(
         schedule({ doseCount: 3, intervalDays: 21, boosterIntervalDays: 365 }),
         3,
@@ -82,7 +80,6 @@ describe('vaccination-schedule.util', () => {
     });
 
     it('dung hom nay van la DUE_SOON, khong phai OVERDUE', () => {
-      
       expect(classifyDueDate(TODAY, TODAY)).toBe('DUE_SOON');
     });
 
@@ -98,7 +95,6 @@ describe('vaccination-schedule.util', () => {
 
   describe('toDateOnly', () => {
     it('dung lich DIA PHUONG chu khong phai UTC', () => {
-
       expect(toDateOnly(new Date('2026-08-07T00:30:00'))).toBe('2026-08-07');
     });
   });

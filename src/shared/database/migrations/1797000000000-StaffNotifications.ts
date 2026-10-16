@@ -4,7 +4,6 @@ export class StaffNotifications1797000000000 implements MigrationInterface {
   name = 'StaffNotifications1797000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    
     await queryRunner.query(`
       ALTER TYPE "notifications_channel_enum" ADD VALUE IF NOT EXISTS 'EMAIL'
     `);
@@ -45,6 +44,5 @@ export class StaffNotifications1797000000000 implements MigrationInterface {
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_staff_notif_recipient_unread"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "staff_notifications"`);
     await queryRunner.query(`DROP TYPE IF EXISTS "staff_notifications_type_enum"`);
-
   }
 }

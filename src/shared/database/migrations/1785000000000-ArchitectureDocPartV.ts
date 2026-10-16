@@ -4,7 +4,6 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
   name = 'ArchitectureDocPartV1785000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS btree_gist`);
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS unaccent`);
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
@@ -111,7 +110,7 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
       CREATE INDEX IF NOT EXISTS "idx_prescreening_raw_ai_gin"
       ON "pre_screening_results" USING GIN ("raw_ai_response" jsonb_path_ops)
     `);
-    
+
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_prescreening_model_version"
       ON "pre_screening_results" ("model_version", "created_at")
@@ -134,7 +133,7 @@ export class ArchitectureDocPartV1785000000000 implements MigrationInterface {
       CREATE INDEX IF NOT EXISTS "idx_users_full_name_trgm"
       ON "users" USING GIN (f_unaccent("full_name") gin_trgm_ops)
     `);
-    
+
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_users_phone_trgm"
       ON "users" USING GIN ("phone" gin_trgm_ops)

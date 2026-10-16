@@ -1,14 +1,12 @@
-
 export enum PurchaseOrderStatus {
-  
   DRAFT = 'DRAFT',
-  
+
   ORDERED = 'ORDERED',
-  
+
   PARTIALLY_RECEIVED = 'PARTIALLY_RECEIVED',
-  
+
   RECEIVED = 'RECEIVED',
-  
+
   CANCELLED = 'CANCELLED',
 }
 

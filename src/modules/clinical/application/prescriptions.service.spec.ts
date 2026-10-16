@@ -41,7 +41,7 @@ describe('PrescriptionsService.dispense', () => {
 
   function makeService(options: {
     lines: Line[];
-    
+
     available: Record<string, number>;
     status?: PrescriptionStatus;
   }) {
@@ -102,7 +102,7 @@ describe('PrescriptionsService.dispense', () => {
   it('mot dong thieu ton -> ca don 409 va KHONG dong nao bi tru', async () => {
     const { service, issue } = makeService({
       lines: TWO_LINES,
-      
+
       available: { 'item-a': 100, 'item-b': 1 },
     });
 

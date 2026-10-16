@@ -10,6 +10,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { IsNotFutureDate } from '@/shared/common/validation/is-not-future-date.validator';
 import { Gender } from '@/shared/common/enums/gender.enum';
 
 export class CreatePetDto {
@@ -36,6 +37,7 @@ export class CreatePetDto {
 
   @IsOptional()
   @IsDateString({}, { message: 'Ngày sinh không hợp lệ' })
+  @IsNotFutureDate({ message: 'Ngày sinh không được sau hôm nay' })
   birthDate?: string;
 
   @IsOptional()

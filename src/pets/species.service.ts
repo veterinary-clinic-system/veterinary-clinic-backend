@@ -22,11 +22,15 @@ export class SpeciesService {
   }
 
   async create(dto: CreateSpeciesDto): Promise<Species> {
-    const existing = await this.speciesRepository.findOne({ where: { speciesName: dto.speciesName } });
+    const existing = await this.speciesRepository.findOne({
+      where: { speciesName: dto.speciesName },
+    });
     if (existing) {
       throw new ConflictException('This species already exists');
     }
-    return this.speciesRepository.save(this.speciesRepository.create({ speciesName: dto.speciesName }));
+    return this.speciesRepository.save(
+      this.speciesRepository.create({ speciesName: dto.speciesName }),
+    );
   }
 
   async findBreeds(speciesId: string): Promise<Breed[]> {
@@ -37,12 +41,16 @@ export class SpeciesService {
   async createBreed(speciesId: string, dto: CreateBreedDto): Promise<Breed> {
     await this.findSpeciesOrThrow(speciesId);
 
-    const existing = await this.breedsRepository.findOne({ where: { speciesId, breedName: dto.breedName } });
+    const existing = await this.breedsRepository.findOne({
+      where: { speciesId, breedName: dto.breedName },
+    });
     if (existing) {
       throw new ConflictException('This breed already exists for this species');
     }
 
-    return this.breedsRepository.save(this.breedsRepository.create({ speciesId, breedName: dto.breedName }));
+    return this.breedsRepository.save(
+      this.breedsRepository.create({ speciesId, breedName: dto.breedName }),
+    );
   }
 
   private async findSpeciesOrThrow(id: string): Promise<Species> {

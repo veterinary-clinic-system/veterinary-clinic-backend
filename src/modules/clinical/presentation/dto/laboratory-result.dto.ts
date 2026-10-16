@@ -11,7 +11,6 @@ import {
 import { LabResultFlag } from '@/shared/common/enums/lab-result-flag.enum';
 
 export class LaboratoryResultDto {
-  
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)

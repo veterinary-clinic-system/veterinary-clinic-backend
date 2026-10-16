@@ -107,7 +107,6 @@ export class ProductsService {
     }
 
     await this.dataSource.transaction(async (manager) => {
-
       const itemUpdates: Partial<
         Pick<Item, 'itemName' | 'imageUrl' | 'describe' | 'unitPrice' | 'categoryId' | 'active'>
       > = {};

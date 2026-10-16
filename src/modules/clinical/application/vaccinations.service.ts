@@ -34,7 +34,7 @@ const DETAIL_RELATIONS = ['vaccine', 'vaccine.item', 'doctor', 'doctor.user'];
 
 export interface VaccinationRecordView {
   vaccination: Vaccination;
-  
+
   dueStatus: VaccinationDueStatus;
 }
 
@@ -52,7 +52,7 @@ export interface VaccinationDueRow {
   doseNumber: number;
   vaccinatedAt: string;
   nextDueDate: string;
-  
+
   daysUntilDue: number;
   branchId: string;
 }
@@ -81,7 +81,7 @@ export class VaccinationsService {
         throw new NotFoundException('Vaccine not found');
       }
       if (!vaccine.active) {
-        throw new ConflictException('Vaccine nay da ngung su dung, khong ghi nhan mui tiem duoc');
+        throw new ConflictException('Vaccine này đã ngừng sử dụng, không ghi nhận mũi tiêm được');
       }
 
       const medicalRecord = await this.resolveMedicalRecord(em, dto, pet.id);
@@ -236,13 +236,13 @@ export class VaccinationsService {
           .map((batch) => `${batch.batchNo} (HSD ${batch.expiryDate})`)
           .join(', ');
         throw new ConflictException(
-          `Vaccine "${vaccine.diseasePrevented}" o chi nhanh nay chi con lo DA HET HAN: ` +
-            `${detail}. Khong duoc tiem (BR-11) - huy lo het han va nhap lo moi truoc.`,
+          `Vaccine "${vaccine.diseasePrevented}" ở chi nhánh này chỉ còn lô ĐÃ HẾT HẠN: ` +
+            `${detail}. Không được tiêm (BR-11) - huỷ lô hết hạn và nhập lô mới trước.`,
         );
       }
     }
     throw new ConflictException(
-      `Chi nhanh nay khong con vaccine "${vaccine.diseasePrevented}" trong kho`,
+      `Chi nhánh này không còn vaccine "${vaccine.diseasePrevented}" trong kho`,
     );
   }
 
@@ -269,7 +269,7 @@ export class VaccinationsService {
     }
 
     if (medicalRecord.petId !== petId) {
-      throw new BadRequestException('Ho so benh an nay khong thuoc ve thu cung da chon');
+      throw new BadRequestException('Hồ sơ bệnh án này không thuộc về thú cưng đã chọn');
     }
     return medicalRecord;
   }
@@ -292,7 +292,7 @@ export class VaccinationsService {
       return dto.branchId;
     }
     throw new BadRequestException(
-      'Tiem don le (khong gan ho so benh an) phai chi ro `branchId` de biet tru kho o dau',
+      'Tiêm đơn lẻ (không gắn hồ sơ bệnh án) phải chọn chi nhánh để biết trừ kho ở đâu',
     );
   }
 
@@ -309,8 +309,8 @@ export class VaccinationsService {
       return medicalRecord.doctorId;
     }
     throw new ForbiddenException(
-      'Tai khoan hien tai khong phai ho so bac si va mui tiem cung khong gan ho so benh an nao ' +
-        'de lay bac si phu trach - khong xac dinh duoc nguoi tiem.',
+      'Tài khoản hiện tại không phải hồ sơ bác sĩ và mũi tiêm cũng không gắn hồ sơ bệnh án nào ' +
+        'để lấy bác sĩ phụ trách - không xác định được người tiêm.',
     );
   }
 }

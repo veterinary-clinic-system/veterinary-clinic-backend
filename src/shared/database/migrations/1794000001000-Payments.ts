@@ -4,7 +4,6 @@ export class Payments1794000001000 implements MigrationInterface {
   name = 'Payments1794000001000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-
     await queryRunner.query(`
       ALTER TYPE "invoices_payment_method_enum" ADD VALUE IF NOT EXISTS 'BANK_TRANSFER'
     `);
@@ -105,6 +104,5 @@ export class Payments1794000001000 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "payments"`);
     await queryRunner.query(`DROP TYPE IF EXISTS "payments_status_enum"`);
     await queryRunner.query(`DROP TYPE IF EXISTS "payments_method_enum"`);
-
   }
 }

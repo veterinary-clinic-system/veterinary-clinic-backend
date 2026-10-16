@@ -7,6 +7,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { IsNotFutureDate } from '@/shared/common/validation/is-not-future-date.validator';
 
 export class UpdateCustomerDto {
   @IsOptional()
@@ -26,6 +27,7 @@ export class UpdateCustomerDto {
 
   @IsOptional()
   @IsDateString({}, { message: 'Ngày sinh không hợp lệ' })
+  @IsNotFutureDate({ message: 'Ngày sinh không được sau hôm nay' })
   dateOfBirth?: string;
 
   @IsOptional()

@@ -32,8 +32,7 @@ import { QueryWeekDto } from './dto/query-week.dto';
 import { QueryDayDto, QueryMonthDto } from './dto/query-calendar.dto';
 import { Audit } from '@/shared/common/decorators/audit.decorator';
 import { AuditAction } from '@/shared/common/enums/audit-action.enum';
-import { BillingService } from '@/modules/billing/application/billing.service';
-import { SepayService } from '@/modules/billing/application/sepay.service';
+import { BillingService, SepayService } from '@/modules/billing/application';
 import { CreateBookingCheckoutDto } from './dto/create-booking-checkout.dto';
 
 @ApiTags('appointments')

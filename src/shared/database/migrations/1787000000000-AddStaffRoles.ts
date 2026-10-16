@@ -11,7 +11,5 @@ export class AddStaffRoles1787000000000 implements MigrationInterface {
     }
   }
 
-  public async down(): Promise<void> {
-    
-  }
+  public async down(): Promise<void> {}
 }

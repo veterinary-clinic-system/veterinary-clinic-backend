@@ -10,7 +10,6 @@ import { Supplier } from './supplier.entity';
 @Entity({ name: 'goods_receipts' })
 @Index('idx_goods_receipts_branch_received', ['branchId', 'receivedDate'])
 export class GoodsReceipt extends BaseEntity {
-  
   @Column({ name: 'receipt_code', length: 32 })
   receiptCode: string;
 
