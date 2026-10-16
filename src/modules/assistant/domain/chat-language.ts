@@ -453,6 +453,27 @@ export function extractOwnerName(raw: string, awaitingOwnerName = false): string
       if (name && name.split(' ').length >= minWords) return name;
     }
   }
+
+  // "Trần Thị Smoke 0987000111" / "0987000111 - Trần Thị Smoke": họ tên VIẾT HOA (2-5 chữ)
+  // đứng sát số điện thoại là họ tên người liên hệ, kể cả không có chữ "tên".
+  const nextToPhone =
+    raw.match(
+      new RegExp(
+        String.raw`(\p{Lu}[\p{L}'-]*(?:\s+\p{Lu}[\p{L}'-]*){1,4})\s*[,:\-–]?\s*${PHONE_PATTERN.source}`,
+        'u',
+      ),
+    ) ??
+    raw.match(
+      new RegExp(
+        String.raw`${PHONE_PATTERN.source}\s*[,:\-–]?\s*(\p{Lu}[\p{L}'-]*(?:\s+\p{Lu}[\p{L}'-]*){1,4})`,
+        'u',
+      ),
+    );
+  if (nextToPhone) {
+    const name = cleanNameCandidate(nextToPhone[1], 5);
+    if (name && name.split(' ').length >= 2) return name;
+  }
+
   return awaitingOwnerName ? bareAnswer(text, 5, 2) : undefined;
 }
 

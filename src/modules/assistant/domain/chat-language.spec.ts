@@ -257,6 +257,14 @@ describe('chat-language', () => {
       expect(parseDate('đặt lịch Thứ 6', NOW)).toBe('2026-10-16');
     });
 
+    it('họ tên viết hoa đứng sát SĐT, không có chữ "tên"', () => {
+      expect(extractOwnerName('bé Bơ mèo đực quận 7 sáng mai 9h, Trần Thị Smoke 0987000111')).toBe(
+        'Trần Thị Smoke',
+      );
+      expect(extractOwnerName('0987000111 - Nguyễn Văn An')).toBe('Nguyễn Văn An');
+      expect(extractOwnerName('đặt lịch Quận 7, 0987000111')).toBeUndefined();
+    });
+
     it('ngày không có trên lịch', () => {
       expect(hasInvalidDateText('ngày 31/2 lúc 9h')).toBe(true);
       expect(hasInvalidDateText('20/10')).toBe(false);

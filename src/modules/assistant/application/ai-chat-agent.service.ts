@@ -527,7 +527,10 @@ export class AiChatAgentService {
         draft.time = time;
         draft.period = period;
       } else if (period) {
-        draft.time = undefined;
+        // "Sáng Thứ 2" sau khi đã nói "9h": giữ 9h vì vẫn thuộc buổi sáng; chỉ bỏ giờ cũ khi
+        // khách đổi sang buổi khác ("à thôi, buổi chiều").
+        const keepsTime = draft.time && draft.time < NOON === (period === 'morning');
+        if (!keepsTime) draft.time = undefined;
         draft.period = period;
       }
       if (date || time || period) draft.offeredSlots = undefined;
@@ -657,9 +660,24 @@ export class AiChatAgentService {
       );
     }
 
+    // Ngày chi nhánh nghỉ (cuối tuần, không có giờ mở cửa): báo ngay, không đợi khách khai
+    // hết SĐT/họ tên rồi mới nói "không còn bác sĩ trống".
+    if (draft.date && draft.branchId && !(await this.isBranchOpen(draft.branchId, draft.date))) {
+      const branchName =
+        ctx.branches.find((b) => b.id === draft.branchId)?.branchName ?? 'Chi nhánh';
+      notes.push(
+        `**${branchName}** không làm việc vào **${formatWeekday(draft.date)}**, bạn chọn ngày khác giúp em nhé.`,
+      );
+      draft.date = undefined;
+      draft.offeredSlots = undefined;
+    }
+
     const missing = this.missingFields(draft, ctx);
     if (missing.length > 0) {
-      return this.askForMissing(draft, ctx, missing, notes);
+      const dateSuggestions = missing.includes('date')
+        ? await this.dateSuggestions(draft.branchId ?? ctx.branches[0]?.id, now)
+        : [];
+      return this.askForMissing(draft, ctx, missing, notes, dateSuggestions);
     }
 
     const branch = ctx.branches.find((b) => b.id === draft.branchId)!;
@@ -722,6 +740,7 @@ export class AiChatAgentService {
     ctx: ChatContext,
     missing: string[],
     notes: string[],
+    dateSuggestions: string[],
   ): BookingOutcome {
     draft.awaiting = missing;
     const known = this.describeKnown(draft, ctx);
@@ -746,7 +765,7 @@ export class AiChatAgentService {
     if (missing.includes('petChoice')) quickReplies = ctx.pets.map((p) => p.name);
     else if (missing.includes('branch')) quickReplies = ctx.branches.map((b) => b.branchName);
     else if (missing.includes('gender') && missing.length <= 2) quickReplies = ['Đực', 'Cái'];
-    else if (missing.includes('date')) quickReplies = ['Sáng mai', 'Chiều mai', 'Thứ 2 tuần sau'];
+    else if (missing.includes('date')) quickReplies = dateSuggestions;
     else if (missing.includes('time')) quickReplies = ['Buổi sáng', 'Buổi chiều'];
 
     const intro =
@@ -841,6 +860,32 @@ export class AiChatAgentService {
     return [...starts.values()].sort((a, b) => a.getTime() - b.getTime());
   }
 
+  private async isBranchOpen(branchId: string, date: string): Promise<boolean> {
+    const doctor = await this.doctorsRepository.findOne({ where: { branchId, active: true } });
+    if (!doctor) return false;
+    const day = await this.availabilityService.getDoctorDayAvailability(
+      doctor.id,
+      branchId,
+      new Date(`${date}T00:00:00`),
+    );
+    return day.isBranchOpen;
+  }
+
+  /**
+   * Nút gợi ý ngày: 2 ngày mở cửa gần nhất của chi nhánh ("Sáng Thứ 2 19/10"...). Gợi ý cố
+   * định "Sáng mai" từng trỏ vào thứ 7/CN - đúng ngày phòng khám nghỉ.
+   */
+  private async dateSuggestions(branchId: string | undefined, now: Date): Promise<string[]> {
+    if (!branchId) return [];
+    const open: Date[] = [];
+    for (let offset = 1; offset <= 10 && open.length < 2; offset++) {
+      const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+      if (await this.isBranchOpen(branchId, format(day, 'yyyy-MM-dd'))) open.push(day);
+    }
+    const label = (d: Date) => `${WEEKDAY_LABELS[d.getDay()]} ${format(d, 'dd/MM')}`;
+    return open.flatMap((d) => [`Sáng ${label(d)}`, `Chiều ${label(d)}`]).slice(0, 3);
+  }
+
   private async offerAlternatives(
     draft: BookingDraft,
     branch: Branch,
@@ -873,15 +918,17 @@ export class AiChatAgentService {
           format(next, 'yyyy-MM-dd'),
           now,
         );
-        const preferred = free.filter((s) =>
-          draft.period === 'afternoon'
-            ? format(s, 'HH:mm') >= NOON
-            : draft.period === 'morning'
-              ? format(s, 'HH:mm') < NOON
-              : true,
+        // Ngày kế tiếp: ưu tiên giờ gần giờ khách muốn nhất (9h thì đề xuất 9h, không phải 7h).
+        const wantedMinutes = target.getHours() * 60 + target.getMinutes();
+        const byCloseness = [...free].sort(
+          (a, b) =>
+            Math.abs(a.getHours() * 60 + a.getMinutes() - wantedMinutes) -
+            Math.abs(b.getHours() * 60 + b.getMinutes() - wantedMinutes),
         );
         options.push(
-          ...(preferred.length > 0 ? preferred : free).slice(0, MAX_ALTERNATIVES - options.length),
+          ...byCloseness
+            .slice(0, MAX_ALTERNATIVES - options.length)
+            .sort((a, b) => a.getTime() - b.getTime()),
         );
       }
     }
@@ -909,7 +956,10 @@ export class AiChatAgentService {
     const labels = options.map((o) => formatSlot(o));
     return {
       reply:
-        `Dạ ${asked} tại **${branch.branchName}** không còn bác sĩ trống (đã kín lịch hoặc ngoài giờ làm việc). ` +
+        `Dạ ${asked} tại **${branch.branchName}** ` +
+        (sameDay.length === 0
+          ? 'đã kín lịch cả ngày. '
+          : 'không còn bác sĩ trống (đã kín lịch hoặc ngoài giờ làm việc). ') +
         `Các giờ trống gần nhất:\n` +
         labels.map((label, i) => `${i + 1}. ${label}`).join('\n') +
         '\n\nBạn chọn giờ nào (gõ số thứ tự hoặc giờ khác) em đặt ngay ạ.',
@@ -1158,6 +1208,10 @@ export class AiChatAgentService {
 function formatDay(isoDate: string): string {
   const [y, m, d] = isoDate.split('-');
   return `${d}/${m}/${y}`;
+}
+
+function formatWeekday(isoDate: string): string {
+  return `${WEEKDAY_LABELS[new Date(`${isoDate}T00:00:00`).getDay()]} ${formatDay(isoDate)}`;
 }
 
 const WEEKDAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];

@@ -126,7 +126,10 @@ describe('AiChatAgentService', () => {
       { find: jest.fn().mockResolvedValue(breeds) } as never,
       usersRepository as never,
       petsRepository as never,
-      { find: jest.fn().mockResolvedValue([{ id: 'doctor-1' }]) } as never,
+      {
+        find: jest.fn().mockResolvedValue([{ id: 'doctor-1' }]),
+        findOne: jest.fn().mockResolvedValue({ id: 'doctor-1' }),
+      } as never,
     );
   });
 
@@ -206,11 +209,45 @@ describe('AiChatAgentService', () => {
     expect(new Date(dto.startAt)).toEqual(new Date(2026, 9, 16, 9, 30));
   });
 
-  it('chọn ngày cuối tuần (phòng khám nghỉ): đề xuất ngày mở cửa kế tiếp', async () => {
-    const offered = await say(
-      'đặt lịch bé Milu mèo đực quận 1 thứ 7 lúc 9h, tôi tên Lan 0912345678',
-    );
-    expect(offered.quickReplies[0]).toBe('07:00 Thứ 2 19/10/2026');
+  it('chọn ngày chi nhánh nghỉ: báo ngay và gợi ý ngày mở cửa thật (không phải "Sáng mai")', async () => {
+    const reply = await say('đặt lịch bé Milu mèo đực quận 1 thứ 7 lúc 9h');
+    expect(appointmentsService.createBookingWithReport).not.toHaveBeenCalled();
+    expect(reply.reply).toContain('không làm việc vào **Thứ 7 17/10/2026**');
+    expect(reply.missingFields).toEqual(['date', 'phone', 'ownerName']);
+    expect(reply.draft.time).toBe('09:00');
+    expect(reply.quickReplies).toEqual([
+      'Sáng Thứ 6 16/10',
+      'Chiều Thứ 6 16/10',
+      'Sáng Thứ 2 19/10',
+    ]);
+
+    // Bấm gợi ý -> đặt đúng ngày đó (giữ giờ 9h đã nói).
+    const done = await say('Sáng Thứ 2 19/10, tôi tên Lan 0912345678', reply);
+    expect(new Date(done.booking!.startAt)).toEqual(new Date(2026, 9, 19, 9, 0));
+  });
+
+  it('kín lịch cả ngày: đề xuất ngày sau, giờ gần giờ khách muốn nhất', async () => {
+    busy = [
+      '07:00',
+      '07:30',
+      '08:00',
+      '08:30',
+      '09:00',
+      '09:30',
+      '10:00',
+      '10:30',
+      '13:30',
+      '14:00',
+      '14:30',
+      '15:00',
+    ].map((t) => `2026-10-16 ${t}`);
+    const offered = await say('đặt lịch bé Milu mèo đực quận 1 mai 9h, tôi tên Lan 0912345678');
+    expect(offered.reply).toContain('đã kín lịch cả ngày');
+    expect(offered.quickReplies).toEqual([
+      '08:30 Thứ 2 19/10/2026',
+      '09:00 Thứ 2 19/10/2026',
+      '09:30 Thứ 2 19/10/2026',
+    ]);
   });
 
   it('không nhận lịch trong hôm nay, và hướng dẫn tới ngay nếu bé đang nguy cấp', async () => {
