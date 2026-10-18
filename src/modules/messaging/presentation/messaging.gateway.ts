@@ -68,6 +68,9 @@ export class MessagingGateway implements OnGatewayInit, OnGatewayConnection, OnG
       return;
     }
     await client.join(userRoom(user.userId));
+    // Mở app từ thông báo cuộc gọi đến: lời mời đã phát lúc app còn đóng, gửi lại cho kết nối này.
+    const pending = this.calls.pendingInvitationFor(user.userId);
+    if (pending) client.emit('call:incoming', pending);
   }
 
   async handleDisconnect(client: Socket) {

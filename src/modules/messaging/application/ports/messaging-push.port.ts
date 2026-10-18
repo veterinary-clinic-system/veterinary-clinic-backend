@@ -6,6 +6,17 @@
 export abstract class MessagingPushPort {
   abstract sendToUser(
     userId: string,
-    content: { title: string; body: string; url?: string },
+    content: {
+      title: string;
+      body: string;
+      url?: string;
+      /** Kênh thông báo Android - cuộc gọi đến dùng kênh 'calls' (chuông, ưu tiên cao nhất). */
+      channelId?: string;
+      /** Dữ liệu kèm cho app (vd. `{ kind: 'call' }` để app ẩn khi đang mở). */
+      data?: Record<string, string>;
+    },
   ): Promise<unknown>;
+
+  /** Người này có máy nhận push không (để đổ chuông qua push khi họ không mở app). */
+  abstract hasDevices(userId: string): Promise<boolean>;
 }

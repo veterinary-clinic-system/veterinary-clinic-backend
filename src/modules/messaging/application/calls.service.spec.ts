@@ -63,6 +63,10 @@ function setup() {
     isUserOnline: jest.fn().mockReturnValue(true),
   };
   const config = { get: jest.fn().mockReturnValue([{ urls: ['stun:stun.l.google.com:19302'] }]) };
+  const push = {
+    sendToUser: jest.fn().mockResolvedValue(undefined),
+    hasDevices: jest.fn().mockResolvedValue(false),
+  };
 
   const service = new CallsService(
     calls as never,
@@ -70,8 +74,9 @@ function setup() {
     messaging as never,
     events,
     config as never,
+    push,
   );
-  return { service, calls, messaging, events, sessions };
+  return { service, calls, messaging, events, sessions, push };
 }
 
 function emitted(events: { emitToUsers: jest.Mock }, name: string) {
@@ -205,6 +210,31 @@ describe('CallsService', () => {
     expect(result).toMatchObject({ status: CallStatus.MISSED, reason: 'OFFLINE' });
     expect(emitted(events, 'call:incoming')).toHaveLength(0);
     expect(service.findActiveCallOf('owner-user')).toBeUndefined();
+  });
+
+  it('người nhận đóng app nhưng có máy nhận push -> đổ chuông qua push, gửi lại khi nối socket', async () => {
+    const { service, events, push } = setup();
+    events.isUserOnline.mockReturnValue(false);
+    push.hasDevices.mockResolvedValue(true);
+    const result = await service.invite(DOCTOR, 'sock-doctor', {
+      conversationId: 'conv-1',
+      media: CallMedia.VIDEO,
+    });
+    expect(result).toMatchObject({ status: CallStatus.RINGING });
+    expect(push.sendToUser).toHaveBeenCalledWith(
+      OWNER.userId,
+      expect.objectContaining({
+        channelId: 'calls',
+        data: { kind: 'call', callId: result.callId },
+      }),
+    );
+    expect(service.pendingInvitationFor(OWNER.userId)).toMatchObject({
+      callId: result.callId,
+      media: CallMedia.VIDEO,
+    });
+
+    await service.accept(OWNER.userId, 'sock-owner', result.callId);
+    expect(service.pendingInvitationFor(OWNER.userId)).toBeUndefined();
   });
 
   it('không gọi chồng: người gọi đang có cuộc gọi khác thì bị chặn', async () => {

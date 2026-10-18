@@ -10,6 +10,9 @@ export interface PushContent {
   title: string;
   body: string;
   url?: string;
+  /** Kênh thông báo Android trong app ('default' nếu bỏ trống). */
+  channelId?: string;
+  data?: Record<string, string>;
 }
 
 /**
@@ -60,6 +63,10 @@ export class PushNotificationsService {
   /** Đăng xuất: máy này thôi nhận push của tài khoản. Token của người khác không bị đụng. */
   async unregisterDevice(userId: string, token: string): Promise<void> {
     await this.devices.delete({ userId, token });
+  }
+
+  async hasDevices(userId: string): Promise<boolean> {
+    return (await this.devices.count({ where: { userId } })) > 0;
   }
 
   async hasDevicesForPhone(phone: string): Promise<boolean> {

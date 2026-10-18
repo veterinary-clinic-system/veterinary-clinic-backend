@@ -50,8 +50,8 @@ export class ExpoPushSender extends PushSenderPort {
           body: m.body,
           sound: 'default',
           priority: 'high',
-          channelId: 'default',
-          data: m.url ? { url: m.url } : {},
+          channelId: m.channelId ?? 'default',
+          data: { ...(m.data ?? {}), ...(m.url ? { url: m.url } : {}) },
         })),
       ),
     });

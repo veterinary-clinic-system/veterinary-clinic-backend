@@ -4,6 +4,8 @@ export interface PushMessage {
   body: string;
   /** Màn hình app mở khi bấm vào thông báo. */
   url?: string;
+  channelId?: string;
+  data?: Record<string, string>;
 }
 
 /** Kết quả theo đúng thứ tự `messages`. `deviceGone` = token không còn hợp lệ, nên xoá. */
