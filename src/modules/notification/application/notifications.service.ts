@@ -15,6 +15,7 @@ import {
   NOTIFICATION_DISPATCHER,
   NotificationDispatcher,
 } from '@/modules/notification/application/ports/notification.port';
+import { PushNotificationsService } from './push-notifications.service';
 
 export interface ScheduleReminderParams {
   appointment: Appointment;
@@ -105,7 +106,19 @@ export class NotificationsService {
     @Inject(NOTIFICATION_DISPATCHER)
     private readonly providerRegistry: NotificationDispatcher,
     private readonly configService: ConfigService,
+    private readonly push: PushNotificationsService,
   ) {}
+
+  /** Zalo (+ Gmail) như cũ, cộng PUSH khi chủ nuôi đã đăng nhập app trên ít nhất một máy. */
+  private async channelsFor(
+    recipientPhone: string,
+    recipientEmail?: string | null,
+  ): Promise<NotificationChannel[]> {
+    const channels = customerChannels(recipientEmail);
+    return (await this.push.hasDevicesForPhone(recipientPhone))
+      ? [...channels, NotificationChannel.PUSH]
+      : channels;
+  }
 
   async scheduleAppointmentReminder({
     appointment,
@@ -125,8 +138,9 @@ export class NotificationsService {
       : `Nhắc lịch: bé ${petName} có lịch hẹn tại phòng khám thú y lúc ` +
         `${formatAppointmentTime(appointment.startAt)}. Vui lòng đến đúng giờ.`;
 
+    const channels = await this.channelsFor(recipientPhone, recipientEmail);
     return this.notificationsRepository.save(
-      customerChannels(recipientEmail).map((channel) =>
+      channels.map((channel) =>
         this.notificationsRepository.create({
           appointmentId: appointment.id,
           type: NotificationType.APPOINTMENT_REMINDER,
@@ -175,8 +189,9 @@ export class NotificationsService {
     recipientEmail,
     message,
   }: NotifyNowParams): Promise<DeliveryReport> {
+    const channels = await this.channelsFor(recipientPhone, recipientEmail);
     const notifications = await this.notificationsRepository.save(
-      customerChannels(recipientEmail).map((channel) =>
+      channels.map((channel) =>
         this.notificationsRepository.create({
           appointmentId: appointment.id,
           type,
@@ -248,7 +263,7 @@ export class NotificationsService {
       'hoặc liên hệ phòng khám.';
 
     const deliveries: ChannelDelivery[] = [];
-    for (const channel of customerChannels(params.recipientEmail)) {
+    for (const channel of await this.channelsFor(params.recipientPhone, params.recipientEmail)) {
       const recipient =
         channel === NotificationChannel.EMAIL
           ? (params.recipientEmail ?? '')
@@ -310,6 +325,7 @@ export class NotificationsService {
         recipientEmail: notification.recipientEmail,
         message: notification.message,
         subject: SUBJECT_BY_TYPE[notification.type],
+        url: `/appointments/${notification.appointmentId}`,
       });
     } catch (error) {
       result = { success: false, error: (error as Error).message };

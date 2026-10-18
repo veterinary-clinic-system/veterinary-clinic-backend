@@ -116,6 +116,7 @@ function setup(options: { eligible?: boolean } = {}) {
     doctors as never,
     dataSource as never,
     events,
+    { sendToUser: jest.fn(() => Promise.resolve()) } as never,
   );
   return { service, conversations, messages, messageQuery, dataSource, events, insertBuilder };
 }

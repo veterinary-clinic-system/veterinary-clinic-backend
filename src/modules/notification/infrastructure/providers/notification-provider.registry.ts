@@ -4,6 +4,7 @@ import { NotificationChannel } from '@/shared/common/enums/notification.enum';
 import { NotificationProvider } from '@/modules/notification/application/ports/notification.port';
 import { EmailNotificationProvider } from './email-notification.provider';
 import { LogNotificationProvider } from './log-notification.provider';
+import { PushNotificationProvider } from './push-notification.provider';
 import { SmsNotificationProvider } from './sms-notification.provider';
 import { ZaloNotificationProvider } from './zalo-notification.provider';
 
@@ -25,6 +26,7 @@ export class NotificationProviderRegistry {
     private readonly smsProvider: SmsNotificationProvider,
     private readonly zaloProvider: ZaloNotificationProvider,
     private readonly emailProvider: EmailNotificationProvider,
+    private readonly pushProvider: PushNotificationProvider,
   ) {}
 
   isSimulated(): boolean {
@@ -42,6 +44,8 @@ export class NotificationProviderRegistry {
         return this.zaloProvider;
       case NotificationChannel.EMAIL:
         return this.emailProvider;
+      case NotificationChannel.PUSH:
+        return this.pushProvider;
       case NotificationChannel.SMS:
       default:
         return this.smsProvider;

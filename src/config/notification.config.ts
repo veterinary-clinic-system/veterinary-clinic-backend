@@ -12,5 +12,7 @@ export default registerAs('notification', () => ({
     oaAccessToken: process.env.ZALO_OA_ACCESS_TOKEN,
     oaId: process.env.ZALO_OA_ID,
   },
+  /** Không bắt buộc: chỉ cần khi bật "Enhanced Security for Push" trên Expo. */
+  expoAccessToken: process.env.EXPO_ACCESS_TOKEN,
   reminderLeadHours: parseInt(process.env.APPOINTMENT_REMINDER_LEAD_HOURS ?? '24', 10),
 }));

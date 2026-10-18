@@ -9,19 +9,24 @@ import { CallSession } from '@/modules/messaging/domain/entities/call-session.en
 import {
   CallsService,
   MessagingEventsPort,
+  MessagingPushPort,
   MessagingService,
 } from '@/modules/messaging/application';
+import { NotificationModule } from '@/modules/notification/notification.module';
+import { PushNotificationsService } from '@/modules/notification/application';
 import { MessagingController } from '@/modules/messaging/presentation/messaging.controller';
 import { MessagingGateway } from '@/modules/messaging/presentation/messaging.gateway';
 import { MessagingSocketHub } from '@/modules/messaging/presentation/messaging-socket.hub';
 
 /**
  * Nhắn tin + gọi thoại/video giữa chủ thú cưng và bác sĩ. Chỉ đọc lịch hẹn/thú cưng để
- * kiểm tra quyền (bằng SQL), không phụ thuộc service của module khác.
+ * kiểm tra quyền (bằng SQL). Phụ thuộc duy nhất ra ngoài là push (module notification),
+ * đi qua cổng MessagingPushPort.
  */
 @Module({
   imports: [
     TypeOrmModule.forFeature([Conversation, Message, CallSession, Doctor, User]),
+    NotificationModule,
     // Chỉ dùng để xác minh access token lúc bắt tay socket; secret truyền khi verify.
     JwtModule.register({}),
   ],
@@ -31,6 +36,7 @@ import { MessagingSocketHub } from '@/modules/messaging/presentation/messaging-s
     CallsService,
     MessagingSocketHub,
     { provide: MessagingEventsPort, useExisting: MessagingSocketHub },
+    { provide: MessagingPushPort, useExisting: PushNotificationsService },
     MessagingGateway,
   ],
   exports: [MessagingService],

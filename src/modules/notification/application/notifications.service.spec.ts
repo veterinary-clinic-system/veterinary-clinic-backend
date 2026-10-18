@@ -25,7 +25,13 @@ describe('NotificationsService', () => {
     delete: jest.fn(),
   };
   const config = { get: jest.fn(() => 24) };
-  const service = new NotificationsService(repository as never, registry as never, config as never);
+  const push = { hasDevicesForPhone: jest.fn(() => Promise.resolve(false)) };
+  const service = new NotificationsService(
+    repository as never,
+    registry as never,
+    config as never,
+    push as never,
+  );
   const appointment = { id: 'abcdef12-aaaa', startAt: new Date(2026, 9, 16, 9, 0) } as Appointment;
 
   beforeEach(() => {
@@ -39,6 +45,24 @@ describe('NotificationsService', () => {
       NotificationChannel.ZALO,
       NotificationChannel.EMAIL,
     ]);
+  });
+
+  it('thêm kênh PUSH khi chủ nuôi có máy đã đăng ký, kèm đường dẫn mở lịch hẹn', async () => {
+    push.hasDevicesForPhone.mockResolvedValueOnce(true);
+    await service.confirmAppointment({
+      appointment,
+      recipientPhone: '0912345678',
+      recipientEmail: null,
+      petName: 'Milu',
+      branchName: 'Quận 7',
+    });
+
+    expect(repository.create.mock.calls.map(([n]) => n.channel)).toEqual([
+      NotificationChannel.ZALO,
+      NotificationChannel.PUSH,
+    ]);
+    const pushed = provider.send.mock.calls.find(([m]) => m.channel === NotificationChannel.PUSH);
+    expect(pushed?.[0].url).toBe('/appointments/abcdef12-aaaa');
   });
 
   it('xác nhận lịch: mỗi kênh một dòng, báo cáo đúng trạng thái từng kênh', async () => {

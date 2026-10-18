@@ -60,6 +60,8 @@ export * from '@/modules/sales/domain/entities/cart-item.entity';
 export * from '@/modules/notification/domain/entities/notification.entity';
 export * from '@/modules/notification/domain/entities/outbox-event.entity';
 export * from '@/modules/notification/domain/entities/staff-notification.entity';
+// Chỉ xuất lớp entity: `export *` sẽ kéo cả enum DevicePlatform vào danh sách entities.
+export { DeviceToken } from '@/modules/notification/domain/entities/device-token.entity';
 
 export * from '@/modules/messaging/domain/entities/conversation.entity';
 export * from '@/modules/messaging/domain/entities/call-session.entity';

@@ -10,6 +10,9 @@ export interface NotificationMessage {
 
   /** Chỉ để ghi log/đối soát - nhà cung cấp thật đã ngầm định kênh của chính nó. */
   channel?: NotificationChannel;
+
+  /** Màn hình app mở khi chủ nuôi bấm vào push (vd. `/appointments/<id>`); kênh khác bỏ qua. */
+  url?: string;
 }
 
 export interface NotificationSendResult {
