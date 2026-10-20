@@ -128,7 +128,7 @@ describe('AiChatAgentService', () => {
       petsRepository as never,
       {
         find: jest.fn().mockResolvedValue([{ id: 'doctor-1' }]),
-        findOne: jest.fn().mockResolvedValue({ id: 'doctor-1' }),
+        findOne: jest.fn().mockResolvedValue({ id: 'doctor-1', fullName: 'BS. Lê Văn An' }),
       } as never,
     );
   });
@@ -181,6 +181,9 @@ describe('AiChatAgentService', () => {
     });
     expect(new Date(dto.startAt)).toEqual(new Date(2026, 9, 16, 9, 0));
     expect(done.booking?.code).toBe('ABCDEF12');
+    expect(done.booking?.doctorName).toBe('BS. Lê Văn An');
+    expect(done.reply).toContain('Bác sĩ khám: **BS. Lê Văn An**');
+    expect(done.reply).not.toContain('đã có hồ sơ tại phòng khám mang tên');
     expect(done.reply).toContain('Zalo (0912345678)');
     expect(done.reply).toContain('Gmail (an.nguyen@gmail.com)');
     // Đặt xong: bỏ thông tin lịch hẹn, giữ liên hệ cho lần sau.
@@ -189,6 +192,15 @@ describe('AiChatAgentService', () => {
       ownerFullName: 'Nguyễn Văn An',
       email: 'an.nguyen@gmail.com',
     });
+  });
+
+  it('SĐT đã có hồ sơ tên khác: giữ tên hồ sơ và nói rõ cho khách', async () => {
+    usersRepository.findOne.mockResolvedValue({ id: 'u-minh', fullName: 'Minh' });
+    const done = await say(
+      'đặt lịch cho bé Milu mèo đực ở Quận 1 lúc 9h ngày mai, tôi tên Tống Quốc Khanh sđt 0384043556',
+    );
+    expect(appointmentsService.createBookingWithReport).toHaveBeenCalledTimes(1);
+    expect(done.reply).toContain('đã có hồ sơ tại phòng khám mang tên **Minh**');
   });
 
   it('giờ đã kín: đề xuất giờ trống gần nhất, khách chọn số thứ tự thì đặt đúng giờ đó', async () => {

@@ -124,6 +124,15 @@ describe('chat-language', () => {
       expect(extractPetName('Milu, mèo cái, Nguyễn Văn An, 0912345678', true)).toBe('Milu');
       expect(extractPetName('Milu ạ')).toBeUndefined();
     });
+
+    it('nhận "tên Pun" khi vừa hỏi tên bé, nhường họ tên dài cho chủ', () => {
+      expect(extractPetName('tên Pun', true)).toBe('Pun');
+      expect(extractPetName('tên pun', true)).toBe('Pun');
+      expect(extractPetName('ten la Mimi', true)).toBe('Mimi');
+      expect(extractPetName('tên Pun, mèo đực', true)).toBe('Pun');
+      expect(extractPetName('tên Nguyễn Văn An', true)).toBeUndefined();
+      expect(extractPetName('tên Pun')).toBeUndefined();
+    });
   });
 
   describe('extractOwnerName', () => {
