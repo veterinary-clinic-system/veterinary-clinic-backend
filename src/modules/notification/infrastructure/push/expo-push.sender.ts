@@ -44,15 +44,20 @@ export class ExpoPushSender extends PushSenderPort {
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body: JSON.stringify(
-        messages.map((m) => ({
-          to: m.to,
-          title: m.title,
-          body: m.body,
-          sound: 'default',
-          priority: 'high',
-          channelId: m.channelId ?? 'default',
-          data: { ...(m.data ?? {}), ...(m.url ? { url: m.url } : {}) },
-        })),
+        messages.map((m) => {
+          const data = { ...(m.data ?? {}), ...(m.url ? { url: m.url } : {}) };
+          // Không có title/body: FCM giao dạng data message, app tự dựng thông báo.
+          if (m.dataOnly) return { to: m.to, priority: 'high', data };
+          return {
+            to: m.to,
+            title: m.title,
+            body: m.body,
+            sound: 'default',
+            priority: 'high',
+            channelId: m.channelId ?? 'default',
+            data,
+          };
+        }),
       ),
     });
 

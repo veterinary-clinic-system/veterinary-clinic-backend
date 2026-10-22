@@ -62,7 +62,11 @@ function setup() {
     emitToSocket: jest.fn(),
     isUserOnline: jest.fn().mockReturnValue(true),
   };
-  const config = { get: jest.fn().mockReturnValue([{ urls: ['stun:stun.l.google.com:19302'] }]) };
+  const config = {
+    get: jest.fn((key: string) =>
+      key === 'jwt.accessSecret' ? 'test-secret' : [{ urls: ['stun:stun.l.google.com:19302'] }],
+    ),
+  };
   const push = {
     sendToUser: jest.fn().mockResolvedValue(undefined),
     hasDevices: jest.fn().mockResolvedValue(false),
@@ -225,7 +229,14 @@ describe('CallsService', () => {
       OWNER.userId,
       expect.objectContaining({
         channelId: 'calls',
-        data: { kind: 'call', callId: result.callId },
+        dataOnly: true,
+        data: expect.objectContaining({
+          kind: 'call',
+          callId: result.callId,
+          conversationId: 'conv-1',
+          media: CallMedia.VIDEO,
+          declineToken: expect.stringMatching(/^[0-9a-f]{64}$/),
+        }),
       }),
     );
     expect(service.pendingInvitationFor(OWNER.userId)).toMatchObject({
@@ -235,6 +246,33 @@ describe('CallsService', () => {
 
     await service.accept(OWNER.userId, 'sock-owner', result.callId);
     expect(service.pendingInvitationFor(OWNER.userId)).toBeUndefined();
+  });
+
+  it('từ chối trên thông báo bằng declineToken; kết thúc thì báo app tắt chuông', async () => {
+    const { service, events, push, sessions } = setup();
+    events.isUserOnline.mockReturnValue(false);
+    push.hasDevices.mockResolvedValue(true);
+    const { callId } = await service.invite(DOCTOR, 'sock-doctor', {
+      conversationId: 'conv-1',
+      media: CallMedia.AUDIO,
+    });
+    const token = (push.sendToUser.mock.calls[0][1] as { data: { declineToken: string } }).data
+      .declineToken;
+
+    await expect(service.rejectWithToken(callId, 'f'.repeat(64))).rejects.toThrow();
+    expect(sessions.get(callId)?.status).toBe(CallStatus.RINGING);
+
+    await service.rejectWithToken(callId, token);
+    expect(sessions.get(callId)).toMatchObject({
+      status: CallStatus.REJECTED,
+      endReason: 'REJECTED',
+    });
+    expect(push.sendToUser).toHaveBeenLastCalledWith(
+      OWNER.userId,
+      expect.objectContaining({ dataOnly: true, data: { kind: 'call-ended', callId } }),
+    );
+    // Bấm muộn sau khi cuộc gọi đã kết thúc: không lỗi.
+    await expect(service.rejectWithToken(callId, token)).resolves.toBeUndefined();
   });
 
   it('không gọi chồng: người gọi đang có cuộc gọi khác thì bị chặn', async () => {

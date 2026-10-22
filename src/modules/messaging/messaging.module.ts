@@ -1,3 +1,4 @@
+import { CallActionsController } from '@/modules/messaging/presentation/call-actions.controller';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -30,7 +31,7 @@ import { MessagingSocketHub } from '@/modules/messaging/presentation/messaging-s
     // Chỉ dùng để xác minh access token lúc bắt tay socket; secret truyền khi verify.
     JwtModule.register({}),
   ],
-  controllers: [MessagingController],
+  controllers: [MessagingController, CallActionsController],
   providers: [
     MessagingService,
     CallsService,

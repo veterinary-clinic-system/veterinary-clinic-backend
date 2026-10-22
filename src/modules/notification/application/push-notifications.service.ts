@@ -16,6 +16,8 @@ export interface PushContent {
   /** Kênh thông báo Android trong app ('default' nếu bỏ trống). */
   channelId?: string;
   data?: Record<string, string>;
+  /** Xem PushMessage.dataOnly. */
+  dataOnly?: boolean;
 }
 
 /**
@@ -95,8 +97,10 @@ export class PushNotificationsService {
 
     if (this.isSimulated()) {
       this.logger.log(
-        `--> [PUSH] ${devices.length} máy | ${content.title} | ${content.body}` +
-          (content.url ? ` | ${content.url}` : ''),
+        `--> [PUSH${content.dataOnly ? ' data' : ''}] ${devices.length} máy | ${content.title} | ` +
+          `${content.body}` +
+          (content.url ? ` | ${content.url}` : '') +
+          (content.dataOnly && content.data ? ` | ${JSON.stringify(content.data)}` : ''),
       );
       return { success: true, providerMessageId: `log-${Date.now()}` };
     }

@@ -14,6 +14,8 @@ export abstract class MessagingPushPort {
       channelId?: string;
       /** Dữ liệu kèm cho app (vd. `{ kind: 'call' }` để app ẩn khi đang mở). */
       data?: Record<string, string>;
+      /** Chỉ dữ liệu: app tự dựng thông báo (chuông cuộc gọi toàn màn hình). */
+      dataOnly?: boolean;
     },
   ): Promise<unknown>;
 
