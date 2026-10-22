@@ -26,11 +26,13 @@ describe('NotificationsService', () => {
   };
   const config = { get: jest.fn(() => 24) };
   const push = { hasDevicesForPhone: jest.fn(() => Promise.resolve(false)) };
+  const inbox = { record: jest.fn(() => Promise.resolve()) };
   const service = new NotificationsService(
     repository as never,
     registry as never,
     config as never,
     push as never,
+    inbox as never,
   );
   const appointment = { id: 'abcdef12-aaaa', startAt: new Date(2026, 9, 16, 9, 0) } as Appointment;
 
@@ -156,5 +158,47 @@ describe('NotificationsService', () => {
       NotificationChannel.EMAIL,
     ]);
     expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it('hộp thông báo: mọi kênh của cùng một thông báo dùng chung một dedupe key', async () => {
+    await service.confirmAppointment({
+      appointment,
+      recipientPhone: '0912345678',
+      recipientEmail: 'an@gmail.com',
+      petName: 'Milu',
+      branchName: 'Quận 7',
+    });
+
+    expect(inbox.record).toHaveBeenCalledTimes(2);
+    const keys = new Set(
+      inbox.record.mock.calls.map(([p]: never[]) => (p as { dedupeKey: string }).dedupeKey),
+    );
+    expect(keys.size).toBe(1);
+    expect(inbox.record.mock.calls[0]).toEqual([
+      expect.objectContaining({
+        recipientPhone: '0912345678',
+        type: 'APPOINTMENT_CONFIRMED',
+        title: 'Xác nhận lịch hẹn khám',
+        link: '/appointments/abcdef12-aaaa',
+      }),
+    ]);
+  });
+
+  it('tin tài khoản (mã khôi phục) gửi qua Zalo + Gmail, không qua push', async () => {
+    push.hasDevicesForPhone.mockResolvedValue(true);
+    const report = await service.sendAccountMessage({
+      recipientPhone: '0912345678',
+      recipientEmail: 'an@gmail.com',
+      subject: 'Mã khôi phục',
+      message: 'Mã của bạn là 123456',
+    });
+    push.hasDevicesForPhone.mockResolvedValue(false);
+
+    expect(report.deliveries.map((d) => d.channel)).toEqual([
+      NotificationChannel.ZALO,
+      NotificationChannel.EMAIL,
+    ]);
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(inbox.record).not.toHaveBeenCalled();
   });
 });

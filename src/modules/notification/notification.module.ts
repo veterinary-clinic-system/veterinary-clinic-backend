@@ -4,6 +4,10 @@ import { Notification } from '@/modules/notification/domain/entities/notificatio
 import { OutboxEvent } from '@/modules/notification/domain/entities/outbox-event.entity';
 import { StaffNotification } from '@/modules/notification/domain/entities/staff-notification.entity';
 import { DeviceToken } from '@/modules/notification/domain/entities/device-token.entity';
+import { OwnerNotification } from '@/modules/notification/domain/entities/owner-notification.entity';
+import { User } from '@/modules/identity/domain/entities/user.entity';
+import { OwnerNotificationsService } from '@/modules/notification/application/owner-notifications.service';
+import { OwnerNotificationsController } from '@/modules/notification/presentation/owner-notifications.controller';
 import { NotificationsService } from '@/modules/notification/application/notifications.service';
 import { OutboxService } from '@/modules/notification/application/outbox.service';
 import { StaffNotificationsService } from '@/modules/notification/application/staff-notifications.service';
@@ -22,8 +26,22 @@ import { PushNotificationProvider } from '@/modules/notification/infrastructure/
 import { ExpoPushSender } from '@/modules/notification/infrastructure/push/expo-push.sender';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Notification, OutboxEvent, StaffNotification, DeviceToken])],
-  controllers: [NotificationsController, StaffNotificationsController, DevicesController],
+  imports: [
+    TypeOrmModule.forFeature([
+      Notification,
+      OutboxEvent,
+      StaffNotification,
+      DeviceToken,
+      OwnerNotification,
+      User,
+    ]),
+  ],
+  controllers: [
+    NotificationsController,
+    StaffNotificationsController,
+    DevicesController,
+    OwnerNotificationsController,
+  ],
   providers: [
     NotificationsService,
     OutboxService,
@@ -34,11 +52,18 @@ import { ExpoPushSender } from '@/modules/notification/infrastructure/push/expo-
     ZaloNotificationProvider,
     EmailNotificationProvider,
     PushNotificationsService,
+    OwnerNotificationsService,
     PushNotificationProvider,
     { provide: PushSenderPort, useClass: ExpoPushSender },
 
     { provide: NOTIFICATION_DISPATCHER, useExisting: NotificationProviderRegistry },
   ],
-  exports: [NotificationsService, OutboxService, StaffNotificationsService, PushNotificationsService],
+  exports: [
+    NotificationsService,
+    OutboxService,
+    StaffNotificationsService,
+    PushNotificationsService,
+    OwnerNotificationsService,
+  ],
 })
 export class NotificationModule {}

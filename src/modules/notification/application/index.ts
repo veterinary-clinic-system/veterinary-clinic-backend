@@ -6,3 +6,4 @@ export { StaffNotificationsService } from './staff-notifications.service';
 export type { NotifyStaffParams } from './staff-notifications.service';
 export { PushNotificationsService } from './push-notifications.service';
 export type { PushContent } from './push-notifications.service';
+export { OwnerNotificationsService } from './owner-notifications.service';

@@ -16,6 +16,8 @@ import {
   NotificationDispatcher,
 } from '@/modules/notification/application/ports/notification.port';
 import { PushNotificationsService } from './push-notifications.service';
+import { OwnerNotificationsService } from './owner-notifications.service';
+import { OwnerNotificationType } from '@/modules/notification/domain/entities/owner-notification.entity';
 
 export interface ScheduleReminderParams {
   appointment: Appointment;
@@ -107,6 +109,7 @@ export class NotificationsService {
     private readonly providerRegistry: NotificationDispatcher,
     private readonly configService: ConfigService,
     private readonly push: PushNotificationsService,
+    private readonly ownerInbox: OwnerNotificationsService,
   ) {}
 
   /** Zalo (+ Gmail) như cũ, cộng PUSH khi chủ nuôi đã đăng nhập app trên ít nhất một máy. */
@@ -292,6 +295,53 @@ export class NotificationsService {
       }
     }
 
+    await this.ownerInbox.record({
+      recipientPhone: params.recipientPhone,
+      type: OwnerNotificationType.VACCINATION_DUE,
+      title: subject,
+      body: message,
+      dedupeKey: `vacc:${params.recipientPhone}:${params.vaccineName}:${params.nextDueDate}`,
+    });
+
+    return { simulated: this.providerRegistry.isSimulated(), deliveries };
+  }
+
+  /**
+   * Tin về tài khoản (mã khôi phục mật khẩu...) gửi thẳng qua Zalo (+ Gmail nếu có), không
+   * qua push: người quên mật khẩu chưa đăng nhập app. Không lưu vào `notifications` vì bảng
+   * đó gắn với lịch hẹn, và không vào hộp thông báo (mã chỉ dùng một lần).
+   */
+  async sendAccountMessage(params: {
+    recipientPhone: string;
+    recipientEmail?: string | null;
+    subject: string;
+    message: string;
+  }): Promise<DeliveryReport> {
+    const deliveries: ChannelDelivery[] = [];
+    for (const channel of customerChannels(params.recipientEmail)) {
+      const recipient =
+        channel === NotificationChannel.EMAIL
+          ? (params.recipientEmail ?? '')
+          : params.recipientPhone;
+      let result;
+      try {
+        result = await this.providerRegistry.resolve(channel).send({
+          channel,
+          recipientPhone: params.recipientPhone,
+          recipientEmail: params.recipientEmail,
+          message: params.message,
+          subject: params.subject,
+        });
+      } catch (error) {
+        result = { success: false, error: (error as Error).message };
+      }
+      deliveries.push({
+        channel,
+        recipient,
+        status: result.success ? NotificationStatus.SENT : NotificationStatus.FAILED,
+        error: result.error ?? null,
+      });
+    }
     return { simulated: this.providerRegistry.isSimulated(), deliveries };
   }
 
@@ -344,6 +394,18 @@ export class NotificationsService {
           `${remaining > 0 ? ', sẽ thử lại' : ', hết lượt thử'}): ${result.error}`,
       );
     }
+
+    // Hộp thông báo của app: một dòng cho mỗi thông báo, dù gửi qua bao nhiêu kênh.
+    await this.ownerInbox.record({
+      recipientPhone: notification.recipientPhone,
+      type: notification.type as unknown as OwnerNotificationType,
+      title: SUBJECT_BY_TYPE[notification.type],
+      body: notification.message,
+      link: `/appointments/${notification.appointmentId}`,
+      dedupeKey:
+        `appt:${notification.appointmentId}:${notification.type}:` +
+        `${notification.scheduledFor.getTime()}`,
+    });
 
     return this.notificationsRepository.save(notification);
   }

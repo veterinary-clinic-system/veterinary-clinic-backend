@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { DevicePlatform, DeviceToken } from '@/modules/notification/domain/entities/device-token.entity';
+import {
+  DevicePlatform,
+  DeviceToken,
+} from '@/modules/notification/domain/entities/device-token.entity';
 import { NotificationSendResult } from './ports/notification.port';
 import { PushSenderPort } from './ports/push-sender.port';
 

@@ -1,22 +1,38 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { Doctor } from '@/modules/identity/domain/entities/doctor.entity';
 import { User } from '@/modules/identity/domain/entities/user.entity';
+import { RefreshToken } from '@/modules/identity/domain/entities/refresh-token.entity';
+import { PasswordResetCode } from '@/modules/identity/domain/entities/password-reset-code.entity';
+import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
+import { DeviceToken } from '@/modules/notification/domain/entities/device-token.entity';
+import { OwnerNotification } from '@/modules/notification/domain/entities/owner-notification.entity';
+import { AppointmentStatus } from '@/shared/common/enums/appointment-status.enum';
+import { AUDIT_RECORDER, AuditRecorder } from '@/shared/common/audit/audit-recorder.port';
+import { AuditAction } from '@/shared/common/enums/audit-action.enum';
+import { UpdateMyProfileDto } from '@/modules/identity/presentation/dto/update-my-profile.dto';
 import { Branch } from '@/modules/organization/domain/entities/branch.entity';
 import { DoctorBreak } from '@/modules/scheduling/domain/entities/doctor-break.entity';
 import { DoctorShift } from '@/modules/scheduling/domain/entities/doctor-shift.entity';
 import { BRANCH_SCOPED_ROLES, Role } from '@/shared/common/enums/role.enum';
 import { PaginationQueryDto } from '@/shared/common/dto/pagination-query.dto';
 import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
-import { DEFAULT_DOCTOR_IMAGE, DEFAULT_STAFF_IMAGE } from '@/shared/storage/cloudinary-web-assets';
+import {
+  DEFAULT_DOCTOR_IMAGE,
+  DEFAULT_STAFF_IMAGE,
+  DEFAULT_USER_IMAGE,
+} from '@/shared/storage/cloudinary-web-assets';
 import { CreateUserDto } from '@/modules/identity/presentation/dto/create-user.dto';
 import { UpdateUserDto } from '@/modules/identity/presentation/dto/update-user.dto';
 import { UpdatePasswordDto } from '@/modules/identity/presentation/dto/update-password.dto';
@@ -47,6 +63,7 @@ export class UsersService {
     @InjectRepository(DoctorBreak) private readonly doctorBreaksRepository: Repository<DoctorBreak>,
     @InjectRepository(Branch) private readonly branchesRepository: Repository<Branch>,
     @InjectDataSource() private readonly dataSource: DataSource,
+    @Inject(AUDIT_RECORDER) private readonly auditRecorder: AuditRecorder,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -202,6 +219,107 @@ export class UsersService {
 
     user.passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
     await this.usersRepository.save(user);
+  }
+
+  /** Chủ nuôi tự sửa hồ sơ (họ tên, email, ngày sinh, địa chỉ, ảnh đại diện). */
+  async updateMyProfile(userId: string, dto: UpdateMyProfileDto): Promise<User> {
+    const user = await this.getMe(userId);
+    if (user.role !== Role.PET_OWNER) {
+      throw new ForbiddenException('Nhân viên đổi thông tin qua quản trị viên');
+    }
+
+    const email = dto.email === undefined ? undefined : dto.email?.trim() || null;
+    if (email && email !== user.email) {
+      const existing = await this.usersRepository.findOne({ where: { email } });
+      if (existing && existing.id !== userId) {
+        throw new ConflictException('Email này đã được sử dụng');
+      }
+    }
+
+    await this.usersRepository.update(userId, {
+      ...(dto.fullName !== undefined ? { fullName: dto.fullName.trim() } : {}),
+      ...(email !== undefined ? { email } : {}),
+      ...(dto.dateOfBirth !== undefined ? { dateOfBirth: dto.dateOfBirth } : {}),
+      ...(dto.address !== undefined ? { address: dto.address?.trim() || null } : {}),
+      ...(dto.avatarUrl !== undefined ? { avatarUrl: dto.avatarUrl } : {}),
+    });
+    return this.getMe(userId);
+  }
+
+  /**
+   * Chủ nuôi tự xoá tài khoản (yêu cầu của Google Play). Hồ sơ khám, hoá đơn, đơn thuốc của
+   * các bé phải giữ lại theo quy định lưu trữ hồ sơ thú y và sổ sách, nên tài khoản được
+   * ẨN DANH thay vì xoá dòng: bỏ họ tên/SĐT/email/địa chỉ/mật khẩu, khoá đăng nhập, thu hồi
+   * mọi phiên, gỡ máy nhận push và hộp thông báo. Số điện thoại được giải phóng để đăng ký
+   * lại từ đầu nếu muốn.
+   */
+  async deleteMyAccount(userId: string, password: string): Promise<void> {
+    const user = await this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.id = :id', { id: userId })
+      .getOne();
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    if (user.role !== Role.PET_OWNER) {
+      throw new ForbiddenException('Tài khoản nhân viên do quản trị viên quản lý');
+    }
+    // 400 chứ không 401: 401 làm client tưởng phiên hết hạn và đi refresh token.
+    if (!user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
+      throw new BadRequestException('Mật khẩu không đúng');
+    }
+
+    const upcoming = await this.dataSource
+      .getRepository(Appointment)
+      .createQueryBuilder('appointment')
+      .innerJoin('appointment.pet', 'pet')
+      .where('pet.ownerId = :ownerId', { ownerId: userId })
+      .andWhere('appointment.status IN (:...statuses)', {
+        statuses: [
+          AppointmentStatus.PENDING,
+          AppointmentStatus.CONFIRMED,
+          AppointmentStatus.CHECKED_IN,
+          AppointmentStatus.IN_PROGRESS,
+        ],
+      })
+      .getCount();
+    if (upcoming > 0) {
+      throw new ConflictException(
+        `Bạn còn ${upcoming} lịch hẹn chưa kết thúc - vui lòng huỷ lịch (hoặc chờ khám xong) ` +
+          'trước khi xoá tài khoản.',
+      );
+    }
+
+    const now = new Date();
+    await this.dataSource.transaction(async (manager) => {
+      await manager.update(RefreshToken, { userId, revokedAt: IsNull() }, { revokedAt: now });
+      await manager.delete(DeviceToken, { userId });
+      await manager.delete(OwnerNotification, { recipientUserId: userId });
+      await manager.delete(PasswordResetCode, { userId });
+      await manager.update(User, userId, {
+        // varchar(20), unique: "del-" + 16 ký tự hex.
+        phone: `del-${randomBytes(8).toString('hex')}`,
+        email: null,
+        fullName: 'Tài khoản đã xoá',
+        avatarUrl: DEFAULT_USER_IMAGE,
+        passwordHash: null,
+        dateOfBirth: null,
+        address: null,
+        note: `Chủ nuôi tự xoá tài khoản qua app ngày ${now.toLocaleDateString('vi-VN')}.`,
+        active: false,
+      });
+    });
+
+    this.auditRecorder.record({
+      actorUserId: userId,
+      action: AuditAction.DELETE,
+      entityName: 'User',
+      entityId: userId,
+      changes: { selfService: true, anonymized: true },
+      ipAddress: null,
+      userAgent: null,
+    });
   }
 
   async searchPetOwners(

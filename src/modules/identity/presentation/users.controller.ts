@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -26,6 +27,8 @@ import { UpdateDoctorDto } from './dto/update-doctor.dto';
 import { CreateDoctorShiftDto } from './dto/create-doctor-shift.dto';
 import { UpdateDoctorShiftDto } from './dto/update-doctor-shift.dto';
 import { CreateDoctorBreakDto } from './dto/create-doctor-break.dto';
+import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
+import { DeleteMyAccountDto } from './dto/delete-my-account.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -119,6 +122,20 @@ export class UsersController {
   async updateMyPassword(@CurrentUser() actor: AuthenticatedUser, @Body() dto: UpdatePasswordDto) {
     await this.usersService.updatePassword(actor.userId, dto);
     return { message: 'Password updated successfully' };
+  }
+
+  @Roles(Role.PET_OWNER)
+  @Patch('me')
+  updateMyProfile(@CurrentUser() actor: AuthenticatedUser, @Body() dto: UpdateMyProfileDto) {
+    return this.usersService.updateMyProfile(actor.userId, dto);
+  }
+
+  /** POST thay vì DELETE: cần thân request (mật khẩu xác nhận). */
+  @Roles(Role.PET_OWNER)
+  @Post('me/delete')
+  @HttpCode(204)
+  async deleteMyAccount(@CurrentUser() actor: AuthenticatedUser, @Body() dto: DeleteMyAccountDto) {
+    await this.usersService.deleteMyAccount(actor.userId, dto.password);
   }
 
   @Roles(Role.ADMIN, Role.RECEPTIONIST)
