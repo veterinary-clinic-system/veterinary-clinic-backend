@@ -1,0 +1,119 @@
+name: vcms-prod
+
+# Chay toan bo he thong tren mot may chu (Lightsail): Postgres, Redis, API,
+# worker, AI va cloudflared. Khong service nao mo cong ra may chu - API ra
+# Internet qua Cloudflare Tunnel (cloudflared ket noi tu trong ra).
+#
+# Ba repo phai nam canh nhau: ../worker, ../veterinary-clinic-ai.
+# Bien moi truong lay tu prod.env (xem prod.env.example):
+#   docker compose --env-file prod.env -f docker-compose.prod.yml up -d --build
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - prod.env
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      DB_HOST: postgres
+      DB_PORT: '5432'
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      AI_SERVICE_BASE_URL: http://ai:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'node -e "fetch(''http://localhost:3000/api/v1/health'').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"']
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  worker:
+    build:
+      context: ../worker
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - prod.env
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: '5432'
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+    depends_on:
+      api:
+        condition: service_healthy
+
+  ai:
+    build:
+      context: ../veterinary-clinic-ai
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: '5432'
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_DATABASE}
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL}
+      OPENROUTER_JEV_MODEL: ${OPENROUTER_JEV_MODEL:-}
+      OPENROUTER_CHAT_MODEL: ${OPENROUTER_CHAT_MODEL:-}
+      OPENROUTER_DECISIONS_URL: ${OPENROUTER_DECISIONS_URL:-}
+      JEV_SYMPTOM_THRESHOLD: ${JEV_SYMPTOM_THRESHOLD:-}
+      CORS_ALLOW_ORIGINS: ${AI_CORS_ALLOW_ORIGINS}
+    volumes:
+      - ai-state:/app/state
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: ['tunnel', '--no-autoupdate', 'run']
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
+  redis-data:
+  ai-state:
