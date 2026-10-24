@@ -27,8 +27,10 @@ jobs:
       AI_SERVICE_TOKEN: ci-token
       AI_PROVIDER: stub
       CLOUDINARY_CLOUD_NAME: ci-cloud
-      CLOUDINARY_API_KEY: ci-key
-      CLOUDINARY_API_SECRET: ci-secret
+      # Khoa that nam trong GitHub Actions secrets; PR tu fork/Dependabot khong
+      # doc duoc secrets nen roi ve gia tri gia (test khong goi Cloudinary).
+      CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY || 'ci-key' }}
+      CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET || 'ci-secret' }}
     services:
       postgres:
         image: postgres:16-alpine
