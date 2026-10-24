@@ -10,6 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { User } from '@/modules/identity/domain/entities/user.entity';
 import { CallSession } from '@/modules/messaging/domain/entities/call-session.entity';
 import { callLogText } from '@/modules/messaging/domain/message-preview';
@@ -17,9 +18,15 @@ import { CallMedia, CallStatus } from '@/shared/common/enums/messaging.enum';
 import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user.interface';
 import { MessagingService } from './messaging.service';
 import { MessagingEventsPort } from './ports/messaging-events.port';
+import { MessagingPushPort } from './ports/messaging-push.port';
 
 /** Đổ chuông bao lâu thì coi là cuộc gọi nhỡ. */
 export const CALL_RING_TIMEOUT_MS = 30_000;
+/**
+ * Người được gọi đang đóng app: chuông đi qua push, cần thêm thời gian để họ bấm thông báo,
+ * app khởi động và nối socket rồi mới nhận được lời mời.
+ */
+export const CALL_PUSH_RING_TIMEOUT_MS = 45_000;
 
 export type CallEndReason =
   | 'HANGUP'
@@ -42,6 +49,17 @@ interface ActiveCall {
   calleeSocketId: string | null;
   answeredAt: Date | null;
   ringTimer: NodeJS.Timeout | null;
+  /** Lời mời `call:incoming` - gửi lại khi người được gọi mở app và nối socket. */
+  invitation: IncomingInvitation;
+  /** Đã gửi push chuông (máy nào có app đều đổ chuông): kết thúc thì báo app tắt chuông. */
+  rangViaPush: boolean;
+}
+
+export interface IncomingInvitation {
+  callId: string;
+  conversationId: string;
+  media: CallMedia;
+  caller: { userId: string; fullName: string; avatarUrl: string | null };
 }
 
 export interface IceServerConfig {
@@ -67,6 +85,7 @@ export class CallsService implements OnModuleDestroy {
     private readonly messaging: MessagingService,
     private readonly events: MessagingEventsPort,
     private readonly config: ConfigService,
+    private readonly push: MessagingPushPort,
   ) {}
 
   onModuleDestroy() {
@@ -112,10 +131,24 @@ export class CallsService implements OnModuleDestroy {
       await this.persistEnd(session, CallStatus.REJECTED, 'BUSY');
       return { callId: session.id, status: CallStatus.REJECTED, reason: 'BUSY' };
     }
-    if (!this.events.isUserOnline(calleeUserId)) {
+    // Không mở app nhưng có máy nhận push (chủ nuôi): vẫn đổ chuông, chuông đi qua push.
+    const online = this.events.isUserOnline(calleeUserId);
+    if (!online && !(await this.push.hasDevices(calleeUserId).catch(() => false))) {
       await this.persistEnd(session, CallStatus.MISSED, 'OFFLINE');
       return { callId: session.id, status: CallStatus.MISSED, reason: 'OFFLINE' };
     }
+
+    const caller = await this.users.findOne({ where: { id: me.userId } });
+    const invitation: IncomingInvitation = {
+      callId: session.id,
+      conversationId: session.conversationId,
+      media: input.media,
+      caller: {
+        userId: me.userId,
+        fullName: caller?.fullName ?? '',
+        avatarUrl: caller?.avatarUrl ?? null,
+      },
+    };
 
     const call: ActiveCall = {
       id: session.id,
@@ -128,24 +161,46 @@ export class CallsService implements OnModuleDestroy {
       calleeSocketId: null,
       answeredAt: null,
       ringTimer: null,
+      invitation,
+      rangViaPush: false,
     };
-    call.ringTimer = setTimeout(() => {
-      void this.finish(call.id, CallStatus.MISSED, 'NO_ANSWER');
-    }, CALL_RING_TIMEOUT_MS);
+    call.ringTimer = setTimeout(
+      () => {
+        void this.finish(call.id, CallStatus.MISSED, 'NO_ANSWER');
+      },
+      online ? CALL_RING_TIMEOUT_MS : CALL_PUSH_RING_TIMEOUT_MS,
+    );
     call.ringTimer.unref?.();
     this.active.set(call.id, call);
 
-    const caller = await this.users.findOne({ where: { id: me.userId } });
-    this.events.emitToUsers([calleeUserId], 'call:incoming', {
-      callId: call.id,
-      conversationId: call.conversationId,
-      media: call.media,
-      caller: {
-        userId: me.userId,
-        fullName: caller?.fullName ?? '',
-        avatarUrl: caller?.avatarUrl ?? null,
-      },
-    });
+    this.events.emitToUsers([calleeUserId], 'call:incoming', invitation);
+    // Push luôn đi kèm: app ở nền vẫn giữ socket nên sự kiện trên tới được, nhưng người dùng
+    // không thấy gì nếu không có thông báo. App tự ẩn thông báo này khi đang mở.
+    //
+    // Push CHỈ DỮ LIỆU: app (kể cả khi đã tắt) tự dựng thông báo kiểu cuộc gọi có màn hình
+    // toàn màn hình trên màn khoá và nút Nghe/Từ chối. `declineToken` cho phép nút Từ chối
+    // gọi thẳng API mà không cần mở app (máy khoá, không có access token).
+    const mediaLabel = input.media === CallMedia.VIDEO ? 'video' : 'thoại';
+    const callerName = invitation.caller.fullName || 'Phòng khám';
+    call.rangViaPush = true;
+    void this.push
+      .sendToUser(calleeUserId, {
+        title: 'Cuộc gọi đến',
+        body: `${callerName} đang gọi ${mediaLabel} cho bạn`,
+        url: `/messages/${session.conversationId}`,
+        channelId: 'calls',
+        dataOnly: true,
+        data: {
+          kind: 'call',
+          callId: session.id,
+          conversationId: session.conversationId,
+          callerName,
+          media: input.media,
+          ringSeconds: String(Math.round(CALL_PUSH_RING_TIMEOUT_MS / 1000)),
+          declineToken: this.declineToken(session.id, calleeUserId),
+        },
+      })
+      .catch((error: Error) => this.logger.warn(`Không gửi được push cuộc gọi: ${error.message}`));
     // Các tab khác của người gọi cũng biết mình đang gọi đi (để không gọi chồng).
     this.events.emitToUsers([me.userId], 'call:outgoing', {
       callId: call.id,
@@ -192,6 +247,30 @@ export class CallsService implements OnModuleDestroy {
       throw new ConflictException('Cuộc gọi không còn đổ chuông');
     }
     await this.finish(call.id, CallStatus.REJECTED, 'REJECTED');
+  }
+
+  /**
+   * Nút "Từ chối" trên thông báo cuộc gọi của app: máy có thể đang khoá, không có access
+   * token, nên xác thực bằng `declineToken` gửi kèm push (HMAC của cuộc gọi + người được
+   * gọi). Cuộc gọi đã kết thúc/đã nhận thì bỏ qua - nút có thể được bấm muộn.
+   */
+  async rejectWithToken(callId: string, token: string): Promise<void> {
+    const call = this.active.get(callId);
+    if (!call) return;
+    const expected = Buffer.from(this.declineToken(call.id, call.calleeUserId));
+    const given = Buffer.from(token ?? '');
+    if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+      throw new ForbiddenException('Mã từ chối cuộc gọi không hợp lệ');
+    }
+    if (call.status !== CallStatus.RINGING) return;
+    await this.finish(call.id, CallStatus.REJECTED, 'REJECTED');
+  }
+
+  private declineToken(callId: string, calleeUserId: string): string {
+    const secret = this.config.get<string>('jwt.accessSecret') ?? '';
+    return createHmac('sha256', secret)
+      .update(`call-decline:${callId}:${calleeUserId}`)
+      .digest('hex');
   }
 
   async hangUp(userId: string, callId: string, reason: CallEndReason = 'HANGUP'): Promise<void> {
@@ -245,6 +324,16 @@ export class CallsService implements OnModuleDestroy {
     }
   }
 
+  /** Lời mời đang đổ chuông cho người này - gateway gửi lại khi họ vừa nối socket. */
+  pendingInvitationFor(userId: string): IncomingInvitation | undefined {
+    for (const call of this.active.values()) {
+      if (call.calleeUserId === userId && call.status === CallStatus.RINGING) {
+        return call.invitation;
+      }
+    }
+    return undefined;
+  }
+
   /** Cho test và cho gateway: cuộc gọi đang diễn ra của một người (nếu có). */
   findActiveCallOf(userId: string): ActiveCall | undefined {
     for (const call of this.active.values()) {
@@ -270,6 +359,17 @@ export class CallsService implements OnModuleDestroy {
       status,
       reason,
     });
+    // Chuông trên máy đang khoá chỉ tắt khi app nhận được tin này (socket đã đóng).
+    if (call.rangViaPush) {
+      void this.push
+        .sendToUser(call.calleeUserId, {
+          title: 'Cuộc gọi đã kết thúc',
+          body: '',
+          dataOnly: true,
+          data: { kind: 'call-ended', callId },
+        })
+        .catch(() => undefined);
+    }
 
     try {
       const session = await this.calls.findOne({ where: { id: callId } });

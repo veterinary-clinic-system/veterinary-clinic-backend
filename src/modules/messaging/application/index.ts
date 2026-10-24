@@ -9,3 +9,4 @@ export type {
 export { CallsService, CALL_RING_TIMEOUT_MS } from './calls.service';
 export type { CallEndReason, IceServerConfig } from './calls.service';
 export { MessagingEventsPort } from './ports/messaging-events.port';
+export { MessagingPushPort } from './ports/messaging-push.port';

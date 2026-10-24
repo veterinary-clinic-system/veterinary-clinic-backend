@@ -427,7 +427,19 @@ export function extractPetName(raw: string, awaitingPetName = false): string | u
     if (name) return name;
   }
 
-  return awaitingPetName ? bareAnswer(text, 2) : undefined;
+  if (!awaitingPetName) return undefined;
+
+  // Trợ lý vừa hỏi "Bé tên là gì?" thì "tên Pun" là tên bé. Chỉ nhận 1-2 chữ: từ 3 chữ trở
+  // lên ("tên Nguyễn Văn An") gần như chắc là họ tên chủ, để extractOwnerName lấy.
+  const answered = text.match(
+    namePattern(String.raw`^\s*tên(?:\s+là|\s*:)?\s+([^,;\n]+)`, text, 'iu'),
+  );
+  if (answered) {
+    const words = answered[1].trim().split(/\s+/);
+    return words.length <= 2 ? cleanNameCandidate(answered[1], 2) : undefined;
+  }
+
+  return bareAnswer(text, 2);
 }
 
 const OWNER_SELF_SOURCE = String.raw`(?<!(?:nhà|của)\s)(?:tôi|mình|em|anh|chị)\s+tên(?:\s+là|\s*:)?\s+([\p{L}][\p{L}\s'-]*)`;

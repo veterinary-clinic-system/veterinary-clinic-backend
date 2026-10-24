@@ -81,6 +81,8 @@ export interface ChatBooking {
   branchName: string;
   branchAddress: string;
   serviceName: string;
+  /** Bác sĩ hệ thống tự phân công - khách đặt qua chat không chọn bác sĩ. */
+  doctorName: string | null;
   startAt: string;
   status: string;
 }
@@ -978,6 +980,14 @@ export class AiChatAgentService {
   ): Promise<BookingOutcome> {
     const phone = ctx.owner?.phone ?? draft.phone!;
     const petId = draft.petId ?? (await this.findExistingGuestPet(phone, draft.petName));
+    // SĐT đã có hồ sơ thì lịch gắn vào hồ sơ đó và GIỮ tên cũ (khách chưa đăng nhập không
+    // được đổi tên tài khoản của người khác) - lấy trước để báo rõ cho khách.
+    const existingOwner = ctx.owner
+      ? null
+      : await this.usersRepository.findOne({
+          where: { phone },
+          select: { id: true, fullName: true },
+        });
 
     const dto: CreateBookingDto = {
       phone,
@@ -1014,6 +1024,9 @@ export class AiChatAgentService {
         branchName: branch.branchName,
         branchAddress: branch.address,
         serviceName: service.item?.itemName ?? 'Khám tổng quát',
+        doctorName:
+          (await this.doctorsRepository.findOne({ where: { id: appointment.doctorId } }))
+            ?.fullName ?? null,
         startAt: appointment.startAt.toISOString(),
         status: appointment.status,
       };
@@ -1024,6 +1037,12 @@ export class AiChatAgentService {
         !!draft.email &&
         !!notifications &&
         !notifications.deliveries.some((d) => d.channel === 'EMAIL');
+      const ownerNameKept =
+        existingOwner &&
+        draft.ownerFullName &&
+        normalizeText(existingOwner.fullName) !== normalizeText(draft.ownerFullName)
+          ? existingOwner.fullName
+          : null;
       this.clearBooking(draft);
 
       return {
@@ -1034,11 +1053,17 @@ export class AiChatAgentService {
           `- Thời gian: **${formatSlot(appointment.startAt)}**\n` +
           `- Chi nhánh: **${branch.branchName}** - ${branch.address}\n` +
           `- Dịch vụ: **${booking.serviceName}**\n` +
+          (booking.doctorName ? `- Bác sĩ khám: **${booking.doctorName}**\n` : '') +
           `- Mã lịch hẹn: **#${booking.code}**\n\n` +
           describeDeliveries(notifications) +
           (emailIgnored
             ? '_Số điện thoại này đã có hồ sơ tại phòng khám nên tin được gửi theo liên hệ trong ' +
               'hồ sơ; muốn nhận thêm qua Gmail, bạn đăng nhập để cập nhật email hoặc báo lễ tân._\n'
+            : '') +
+          (ownerNameKept
+            ? `_Số điện thoại này đã có hồ sơ tại phòng khám mang tên **${ownerNameKept}** nên ` +
+              'lịch hẹn được ghi theo hồ sơ đó. Muốn đổi tên, bạn đăng nhập để sửa hồ sơ hoặc ' +
+              'báo lễ tân._\n'
             : '') +
           '\nPhòng khám sẽ nhắc lại trước giờ hẹn. Bạn nhớ đưa bé tới đúng giờ nhé!',
         missingFields: [],

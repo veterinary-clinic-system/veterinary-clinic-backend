@@ -3,6 +3,9 @@ export enum NotificationChannel {
   ZALO = 'ZALO',
 
   EMAIL = 'EMAIL',
+
+  /** Expo push tới app chủ nuôi (P12) - chỉ khi chủ nuôi có ít nhất một máy đã đăng ký. */
+  PUSH = 'PUSH',
 }
 
 export enum NotificationStatus {

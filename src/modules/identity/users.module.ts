@@ -7,9 +7,13 @@ import { DoctorBreak } from '@/modules/scheduling/domain/entities/doctor-break.e
 import { DoctorShift } from '@/modules/scheduling/domain/entities/doctor-shift.entity';
 import { UsersController } from '@/modules/identity/presentation/users.controller';
 import { UsersService } from '@/modules/identity/application/users.service';
+import { AuditLogModule } from './audit-log.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Doctor, DoctorShift, DoctorBreak, Branch])],
+  imports: [
+    TypeOrmModule.forFeature([User, Doctor, DoctorShift, DoctorBreak, Branch]),
+    AuditLogModule,
+  ],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],

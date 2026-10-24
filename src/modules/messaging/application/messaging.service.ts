@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
@@ -13,11 +14,14 @@ import { CallSession } from '@/modules/messaging/domain/entities/call-session.en
 import { messagePreview } from '@/modules/messaging/domain/message-preview';
 import { Role } from '@/shared/common/enums/role.enum';
 import {
+  CallMedia,
+  CallStatus,
   MESSAGING_ELIGIBLE_APPOINTMENT_STATUSES,
   MessageKind,
 } from '@/shared/common/enums/messaging.enum';
 import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user.interface';
 import { MessagingEventsPort } from './ports/messaging-events.port';
+import { MessagingPushPort } from './ports/messaging-push.port';
 
 export const MESSAGE_PAGE_DEFAULT = 30;
 export const MESSAGE_PAGE_MAX = 100;
@@ -110,13 +114,33 @@ interface ContactRow {
 
 @Injectable()
 export class MessagingService {
+  private readonly logger = new Logger(MessagingService.name);
+
   constructor(
     @InjectRepository(Conversation) private readonly conversations: Repository<Conversation>,
     @InjectRepository(Message) private readonly messages: Repository<Message>,
     @InjectRepository(Doctor) private readonly doctors: Repository<Doctor>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly events: MessagingEventsPort,
+    private readonly push: MessagingPushPort,
   ) {}
+
+  /**
+   * Đẩy thông báo ra máy của người nhận. Không chờ và không làm hỏng việc gửi tin nếu push
+   * lỗi: tin đã lưu và đã phát realtime, push chỉ là lớp báo thêm khi app đang đóng.
+   */
+  private notifyRecipient(
+    recipientUserId: string,
+    senderUserId: string,
+    build: (senderName: string) => { title: string; body: string; url: string },
+  ): void {
+    void this.dataSource
+      .query('SELECT full_name FROM users WHERE id = $1', [senderUserId])
+      .then((rows: { full_name: string }[]) =>
+        this.push.sendToUser(recipientUserId, build(rows[0]?.full_name ?? 'VetCare')),
+      )
+      .catch((error: Error) => this.logger.warn(`Không gửi được push: ${error.message}`));
+  }
 
   async resolveParticipant(actor: AuthenticatedUser): Promise<Participant> {
     if (actor.role === Role.PET_OWNER) {
@@ -376,6 +400,12 @@ export class MessagingService {
 
     const view = toMessageView({ ...saved, call: null });
     this.events.emitToUsers([members.ownerUserId, members.doctorUserId], 'message:new', view);
+    const recipientUserId = me.side === 'OWNER' ? members.doctorUserId : members.ownerUserId;
+    this.notifyRecipient(recipientUserId, me.userId, (senderName) => ({
+      title: senderName,
+      body: messagePreview(kind, body),
+      url: `/messages/${conversationId}`,
+    }));
     return view;
   }
 
@@ -419,6 +449,15 @@ export class MessagingService {
     });
 
     const view = toMessageView({ ...saved, call });
+    // Người được gọi lỡ cuộc gọi (không nghe/đang tắt app): báo cuộc gọi nhỡ qua push.
+    if (call.status === CallStatus.MISSED) {
+      const media = call.media === CallMedia.VIDEO ? 'video' : 'thoại';
+      this.notifyRecipient(call.calleeUserId, call.callerUserId, (callerName) => ({
+        title: 'Cuộc gọi nhỡ',
+        body: `Cuộc gọi ${media} nhỡ từ ${callerName}`,
+        url: `/messages/${call.conversationId}`,
+      }));
+    }
     if (conversation?.doctor) {
       this.events.emitToUsers(
         [conversation.ownerId, conversation.doctor.userId],

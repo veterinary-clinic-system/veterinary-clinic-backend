@@ -9,6 +9,8 @@ import { AuthController } from '@/modules/identity/presentation/auth.controller'
 import { AuthService } from '@/modules/identity/application/auth.service';
 import { JwtStrategy } from '@/modules/identity/infrastructure/strategies/jwt.strategy';
 import { AuditLogModule } from './audit-log.module';
+import { PasswordResetService } from '@/modules/identity/application/password-reset.service';
+import { NotificationModule } from '@/modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -24,9 +26,10 @@ import { AuditLogModule } from './audit-log.module';
     }),
 
     AuditLogModule,
+    NotificationModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, PasswordResetService, JwtStrategy],
   exports: [AuthService],
 })
 export class AuthModule {}

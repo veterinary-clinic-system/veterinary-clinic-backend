@@ -6,6 +6,7 @@ export * from '@/modules/identity/domain/entities/doctor.entity';
 export * from '@/modules/identity/domain/entities/audit-log.entity';
 export * from '@/modules/identity/domain/entities/role-permission.entity';
 export * from '@/modules/identity/domain/entities/employee.entity';
+export * from '@/modules/identity/domain/entities/password-reset-code.entity';
 
 export * from '@/modules/organization/domain/entities/branch.entity';
 export * from '@/modules/organization/domain/entities/operating-hour.entity';
@@ -60,6 +61,9 @@ export * from '@/modules/sales/domain/entities/cart-item.entity';
 export * from '@/modules/notification/domain/entities/notification.entity';
 export * from '@/modules/notification/domain/entities/outbox-event.entity';
 export * from '@/modules/notification/domain/entities/staff-notification.entity';
+// Chỉ xuất lớp entity: `export *` sẽ kéo cả enum DevicePlatform vào danh sách entities.
+export { DeviceToken } from '@/modules/notification/domain/entities/device-token.entity';
+export { OwnerNotification } from '@/modules/notification/domain/entities/owner-notification.entity';
 
 export * from '@/modules/messaging/domain/entities/conversation.entity';
 export * from '@/modules/messaging/domain/entities/call-session.entity';

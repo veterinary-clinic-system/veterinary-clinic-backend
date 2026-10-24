@@ -5,6 +5,8 @@ import { AuthService } from '@/modules/identity/application/auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterPetOwnerDto } from './dto/register-pet-owner.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
+import { PasswordResetService } from '@/modules/identity/application/password-reset.service';
 import { Public } from '@/shared/common/decorators/public.decorator';
 import { ClientIp } from '@/shared/common/audit/client-ip';
 
@@ -12,7 +14,10 @@ import { ClientIp } from '@/shared/common/audit/client-ip';
 @Controller('auth')
 @UseGuards(ThrottlerGuard)
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly passwordReset: PasswordResetService,
+  ) {}
 
   @Public()
   @Post('register')
@@ -37,6 +42,23 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refresh(dto.refreshToken);
+  }
+
+  /** Gửi mã khôi phục qua Zalo/Gmail. Luôn trả cùng một kết quả dù SĐT có tài khoản hay không. */
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('password/forgot')
+  @HttpCode(HttpStatus.OK)
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.passwordReset.requestCode(dto.phone);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('password/reset')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.passwordReset.resetPassword(dto.phone, dto.code, dto.newPassword);
   }
 
   @Public()
