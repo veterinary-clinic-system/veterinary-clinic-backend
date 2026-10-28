@@ -4,6 +4,7 @@ import { DataSource, Repository } from 'typeorm';
 import { endOfDay, startOfDay } from 'date-fns';
 import { Diagnosis } from '@/modules/clinical/domain/entities/diagnosis.entity';
 import { PreScreeningResult } from '@/modules/triage/domain/entities/pre-screening-result.entity';
+import { KEYWORD_TRIAGE_MODEL_VERSION } from '@/modules/triage/application';
 import { ItemType } from '@/shared/common/enums/item-type.enum';
 import { PRIORITY_COLOR_SEVERITY, PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import { DateRangeQueryDto } from '@/modules/reporting/presentation/dto/date-range-query.dto';
@@ -217,7 +218,11 @@ export class ReportsService {
       .createQueryBuilder('preScreeningResult')
       .innerJoin('preScreeningResult.appointment', 'appointment')
       .select('preScreeningResult.aiPriorityColor', 'aiPriorityColor')
-      .addSelect('appointment.priorityColor', 'finalPriorityColor');
+      .addSelect('appointment.priorityColor', 'finalPriorityColor')
+      // Phân loại theo từ khoá lúc AI không phản hồi không phải dự đoán của mô hình.
+      .where('preScreeningResult.modelVersion <> :fallbackModel', {
+        fallbackModel: KEYWORD_TRIAGE_MODEL_VERSION,
+      });
 
     if (query.branchId) {
       qb.andWhere('appointment.branchId = :branchId', { branchId: query.branchId });

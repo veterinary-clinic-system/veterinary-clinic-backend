@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NotificationChannel } from '@/shared/common/enums/notification.enum';
 import { NotificationProvider } from '@/modules/notification/application/ports/notification.port';
@@ -19,7 +19,9 @@ import { ZaloNotificationProvider } from './zalo-notification.provider';
  * mất cho tới khi khách phàn nàn.
  */
 @Injectable()
-export class NotificationProviderRegistry {
+export class NotificationProviderRegistry implements OnModuleInit {
+  private readonly logger = new Logger(NotificationProviderRegistry.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly logProvider: LogNotificationProvider,
@@ -32,6 +34,27 @@ export class NotificationProviderRegistry {
   isSimulated(): boolean {
     const mode = this.configService.get<string>('notification.provider');
     return mode === 'log' || !mode;
+  }
+
+  /** Thiếu cấu hình Zalo thì kênh này bị bỏ qua - báo một lần ở đây để vận hành vẫn thấy. */
+  onModuleInit(): void {
+    if (!this.isConfigured(NotificationChannel.ZALO)) {
+      this.logger.warn(
+        'Zalo ZNS chưa cấu hình (ZALO_OA_ACCESS_TOKEN / ZALO_ZNS_TEMPLATE_ID) - ' +
+          'thông báo cho khách chỉ gửi qua Gmail và push.',
+      );
+    }
+  }
+
+  isConfigured(channel: NotificationChannel): boolean {
+    if (this.isSimulated()) return true;
+    if (channel === NotificationChannel.ZALO) {
+      return (
+        !!this.configService.get<string>('notification.zalo.oaAccessToken') &&
+        !!this.configService.get<string>('notification.zalo.znsTemplateId')
+      );
+    }
+    return true;
   }
 
   resolve(channel: NotificationChannel): NotificationProvider {

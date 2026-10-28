@@ -11,6 +11,7 @@ import { PetProfileService } from '@/modules/pets/application/pet-profile.servic
 import { CreatePetDto } from './dto/create-pet.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
 import { QueryPetsDto } from './dto/query-pets.dto';
+import { CreateOwnerPetDto, UpdateOwnerPetDto } from './dto/owner-pet.dto';
 import { Audit } from '@/shared/common/decorators/audit.decorator';
 import { AuditAction } from '@/shared/common/enums/audit-action.enum';
 
@@ -39,6 +40,25 @@ export class PetsController {
   @Get('mine')
   findMine(@CurrentUser() actor: AuthenticatedUser) {
     return this.petsService.findMine(actor);
+  }
+
+  @Roles(Role.PET_OWNER)
+  @Audit({ action: AuditAction.CREATE, entity: 'Pet' })
+  @Post('mine')
+  createMine(@Body() dto: CreateOwnerPetDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.petsService.create({ ...dto, ownerId: actor.userId });
+  }
+
+  @Roles(Role.PET_OWNER)
+  @Audit({ action: AuditAction.UPDATE, entity: 'Pet' })
+  @Patch('mine/:id')
+  async updateMine(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateOwnerPetDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    await this.petsService.findOneForActor(id, actor);
+    return this.petsService.update(id, dto);
   }
 
   @Roles(Role.PET_OWNER)

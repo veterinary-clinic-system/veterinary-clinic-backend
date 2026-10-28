@@ -112,15 +112,19 @@ export class NotificationsService {
     private readonly ownerInbox: OwnerNotificationsService,
   ) {}
 
-  /** Zalo (+ Gmail) như cũ, cộng PUSH khi chủ nuôi đã đăng nhập app trên ít nhất một máy. */
+  /**
+   * Zalo (+ Gmail) như cũ, cộng PUSH khi chủ nuôi đã đăng nhập app trên ít nhất một máy.
+   * Kênh thiếu cấu hình bị bỏ (xem `isConfigured`).
+   */
   private async channelsFor(
     recipientPhone: string,
     recipientEmail?: string | null,
   ): Promise<NotificationChannel[]> {
     const channels = customerChannels(recipientEmail);
-    return (await this.push.hasDevicesForPhone(recipientPhone))
+    const all = (await this.push.hasDevicesForPhone(recipientPhone))
       ? [...channels, NotificationChannel.PUSH]
       : channels;
+    return all.filter((channel) => this.providerRegistry.isConfigured(channel));
   }
 
   async scheduleAppointmentReminder({

@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { BadRequestException } from '@nestjs/common';
 import sharp from 'sharp';
 import { FileCategory, IMAGE_CATEGORIES } from './file-category.enum';
 
@@ -17,6 +18,8 @@ export async function normalizeForStorage(
   const isImage = IMAGE_CATEGORIES.includes(category) && file.mimetype.startsWith('image/');
 
   if (isImage) {
+    // MIME do trình duyệt khai, không phải nội dung thật: tệp hỏng hoặc đổi đuôi làm sharp
+    // ném lỗi - đó là lỗi của tệp gửi lên (400), không phải lỗi hệ thống (500).
     const buffer = await sharp(file.buffer)
       .rotate()
       .resize({
@@ -26,7 +29,12 @@ export async function normalizeForStorage(
         withoutEnlargement: true,
       })
       .jpeg({ quality: 85 })
-      .toBuffer();
+      .toBuffer()
+      .catch(() => {
+        throw new BadRequestException(
+          'Không đọc được ảnh - tệp bị hỏng hoặc không phải ảnh JPG/PNG/WEBP.',
+        );
+      });
 
     return { buffer, filename: `${randomUUID()}.jpg`, contentType: 'image/jpeg' };
   }

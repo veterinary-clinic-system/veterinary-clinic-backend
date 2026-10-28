@@ -15,6 +15,19 @@ const ITEM_SORT_COLUMNS = new Set(['itemName', 'unitPrice']);
 const VACCINE_SORT_COLUMNS = new Set(['diseasePrevented', 'createdAt', 'updatedAt']);
 const DETAIL_RELATIONS = ['item', 'item.category', 'supplier', 'speciesApplicable'];
 
+export interface PublicVaccine {
+  id: string;
+  name: string;
+  description: string | null;
+  unitPrice: number | null;
+  diseasePrevented: string;
+  doseCount: number;
+  intervalDays: number | null;
+  boosterIntervalDays: number | null;
+  manufacturer: string | null;
+  species: Array<{ id: string; speciesName: string }>;
+}
+
 @Injectable()
 export class VaccinesService {
   constructor(
@@ -102,6 +115,29 @@ export class VaccinesService {
 
     const [data, total] = await qb.getManyAndCount();
     return new PaginatedResultDto(data, total, query.page, query.limit);
+  }
+
+  async findPublic(speciesId?: string): Promise<PublicVaccine[]> {
+    const { data } = await this.findAll(
+      Object.assign(new QueryVaccinesDto(), { active: true, speciesId, page: 1, limit: 100 }),
+    );
+    return data
+      .filter((vaccine) => vaccine.item?.active !== false)
+      .map((vaccine) => ({
+        id: vaccine.id,
+        name: vaccine.item?.itemName ?? '',
+        description: vaccine.item?.describe ?? null,
+        unitPrice: vaccine.item?.unitPrice ?? null,
+        diseasePrevented: vaccine.diseasePrevented,
+        doseCount: vaccine.doseCount,
+        intervalDays: vaccine.intervalDays,
+        boosterIntervalDays: vaccine.boosterIntervalDays,
+        manufacturer: vaccine.manufacturer,
+        species: (vaccine.speciesApplicable ?? []).map((s) => ({
+          id: s.id,
+          speciesName: s.speciesName,
+        })),
+      }));
   }
 
   async findOne(id: string): Promise<Vaccine> {

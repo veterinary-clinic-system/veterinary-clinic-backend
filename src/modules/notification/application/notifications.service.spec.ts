@@ -18,7 +18,11 @@ describe('NotificationsService', () => {
       );
     }),
   };
-  const registry = { resolve: jest.fn(() => provider), isSimulated: jest.fn(() => false) };
+  const registry = {
+    resolve: jest.fn(() => provider),
+    isSimulated: jest.fn(() => false),
+    isConfigured: jest.fn((channel: NotificationChannel) => !!channel),
+  };
   const repository = {
     create: jest.fn((value) => ({ attemptCount: 0, ...value })),
     save: jest.fn((value) => Promise.resolve(value)),
@@ -97,6 +101,25 @@ describe('NotificationsService', () => {
         error: 'SMTP_HOST chưa được cấu hình',
       },
     ]);
+  });
+
+  it('Zalo chưa cấu hình: không tạo dòng Zalo, không báo khách "sẽ thử lại"', async () => {
+    registry.isConfigured.mockImplementation(
+      (channel: NotificationChannel) => channel !== NotificationChannel.ZALO,
+    );
+    const report = await service.confirmAppointment({
+      appointment,
+      recipientPhone: '0912345678',
+      recipientEmail: 'an@gmail.com',
+      petName: 'Milu',
+      branchName: 'Quận 7',
+    });
+    registry.isConfigured.mockImplementation(() => true);
+
+    expect(repository.create.mock.calls.map(([n]) => n.channel)).toEqual([
+      NotificationChannel.EMAIL,
+    ]);
+    expect(report.deliveries.map((d) => d.channel)).toEqual([NotificationChannel.EMAIL]);
   });
 
   it('nhắc lịch tái khám: lời nhắc đúng ngữ cảnh, lên lịch trước giờ hẹn', async () => {

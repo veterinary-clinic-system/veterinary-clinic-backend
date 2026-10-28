@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UploadApiErrorResponse, UploadApiResponse, v2 as cloudinary } from 'cloudinary';
 import { FileCategory } from '@/shared/storage/file-category.enum';
@@ -7,6 +7,7 @@ import { StorageProvider, StoredFile } from '@/shared/storage/ports/storage.port
 
 @Injectable()
 export class CloudinaryStorageAdapter implements StorageProvider, OnModuleInit {
+  private readonly logger = new Logger(CloudinaryStorageAdapter.name);
   private folder: string;
 
   constructor(private readonly configService: ConfigService) {}
@@ -41,7 +42,15 @@ export class CloudinaryStorageAdapter implements StorageProvider, OnModuleInit {
 
   async save(category: FileCategory, file: Express.Multer.File): Promise<StoredFile> {
     const { buffer } = await normalizeForStorage(category, file);
-    const result = await this.upload(buffer, `${this.folder}/${category}`);
+    const result = await this.upload(buffer, `${this.folder}/${category}`).catch((error) => {
+      const detail = (error as { message?: string; http_code?: number }) ?? {};
+      this.logger.error(
+        `Cloudinary upload failed (${category}, HTTP ${detail.http_code ?? '?'}): ${detail.message}`,
+      );
+      throw new ServiceUnavailableException(
+        'Kho lưu trữ ảnh/video tạm thời không phản hồi, vui lòng thử lại sau ít phút.',
+      );
+    });
 
     return {
       url: result.secure_url,

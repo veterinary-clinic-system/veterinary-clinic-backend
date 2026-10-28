@@ -32,4 +32,10 @@ export interface NotificationDispatcher {
 
   /** true khi NOTIFICATION_PROVIDER=log: thông báo chỉ được ghi log, không tới tay khách. */
   isSimulated(): boolean;
+
+  /**
+   * false khi kênh chắc chắn không gửi được vì THIẾU cấu hình (chưa có token Zalo/template
+   * ZNS). Tạo dòng cho kênh đó chỉ sinh 5 lượt thử vô ích và báo khách "sẽ thử lại" sai sự thật.
+   */
+  isConfigured(channel: NotificationChannel): boolean;
 }

@@ -2,10 +2,12 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from 
 import { ApiTags } from '@nestjs/swagger';
 import { RequirePermissions } from '@/shared/common/decorators/require-permissions.decorator';
 import { Permission } from '@/shared/common/enums/permission.enum';
+import { Public } from '@/shared/common/decorators/public.decorator';
 import { VaccinesService } from '@/modules/catalog/application/vaccines.service';
 import { CreateVaccineDto } from './dto/create-vaccine.dto';
 import { UpdateVaccineDto } from './dto/update-vaccine.dto';
 import { QueryVaccinesDto } from './dto/query-vaccines.dto';
+import { QueryPublicVaccinesDto } from './dto/query-public-vaccines.dto';
 
 @ApiTags('catalog')
 @Controller('catalog/vaccines')
@@ -22,6 +24,13 @@ export class VaccinesController {
   @Get()
   findAll(@Query() query: QueryVaccinesDto) {
     return this.vaccinesService.findAll(query);
+  }
+
+  /** Danh mục cho chủ nuôi/khách: chỉ vắc-xin đang dùng, không có giá vốn, nhà cung cấp, tồn kho. */
+  @Public()
+  @Get('public')
+  findPublic(@Query() query: QueryPublicVaccinesDto) {
+    return this.vaccinesService.findPublic(query.speciesId);
   }
 
   @RequirePermissions(Permission.CATALOG_VIEW)

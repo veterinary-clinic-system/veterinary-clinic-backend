@@ -11,6 +11,7 @@ import { PrescreeningController } from '@/modules/triage/presentation/prescreeni
 import { AiClientService } from '@/modules/triage/infrastructure/ai-client/ai-client.service';
 import { HttpAiPredictionAdapter } from '@/modules/triage/infrastructure/ai/http-ai-prediction.adapter';
 import { StubAiPredictionAdapter } from '@/modules/triage/infrastructure/ai/stub-ai-prediction.adapter';
+import { KeywordFallbackAiPredictionAdapter } from '@/modules/triage/infrastructure/ai/keyword-fallback-ai-prediction.adapter';
 
 @Module({
   imports: [HttpModule, TypeOrmModule.forFeature([PreScreeningResult, Disease, Appointment])],
@@ -27,7 +28,10 @@ import { StubAiPredictionAdapter } from '@/modules/triage/infrastructure/ai/stub
         config: ConfigService,
         http: HttpAiPredictionAdapter,
         stub: StubAiPredictionAdapter,
-      ) => (config.get<string>('aiService.provider') === 'stub' ? stub : http),
+      ) =>
+        config.get<string>('aiService.provider') === 'stub'
+          ? stub
+          : new KeywordFallbackAiPredictionAdapter(http),
     },
   ],
   exports: [PrescreeningService, AI_PREDICTION_PROVIDER],
