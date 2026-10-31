@@ -1,0 +1,21 @@
+# Reverse proxy cho profile `cloudfront` (docker-compose.prod.yml): CloudFront
+# goi vao cong 80 cua may chu, Caddy chuyen tiep sang api:3000 (ca WebSocket).
+# Chi nhan request co header bi mat ma CloudFront gan vao origin - ai goi thang
+# IP may chu se bi 403.
+{
+	admin off
+	auto_https off
+	# Chi CloudFront qua duoc matcher ben duoi nen tin X-Forwarded-For no gui,
+	# de backend thay IP that cua nguoi dung (TRUST_PROXY=2).
+	servers {
+		trusted_proxies static 0.0.0.0/0 ::/0
+	}
+}
+
+:80 {
+	@cloudfront header X-Origin-Verify {$CLOUDFRONT_ORIGIN_SECRET}
+	handle @cloudfront {
+		reverse_proxy api:3000
+	}
+	respond 403
+}

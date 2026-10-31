@@ -12,6 +12,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
 
+  app.set('trust proxy', config.get<number>('app.trustProxy'));
   app.use(helmet({ crossOriginResourcePolicy: false }));
   app.enableCors({ origin: config.get<string>('app.corsOrigin'), credentials: true });
 

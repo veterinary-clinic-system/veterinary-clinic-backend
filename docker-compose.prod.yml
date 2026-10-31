@@ -1,8 +1,16 @@
 name: vcms-prod
 
 # Chay toan bo he thong tren mot may chu (Lightsail): Postgres, Redis, API,
-# worker, AI va cloudflared. Khong service nao mo cong ra may chu - API ra
-# Internet qua Cloudflare Tunnel (cloudflared ket noi tu trong ra).
+# worker, AI va mot tunnel. Khong service nao mo cong ra may chu - API ra
+# Internet qua tunnel ket noi tu trong ra. Chon tunnel bang COMPOSE_PROFILES
+# trong prod.env:
+#   ngrok      - static domain mien phi cua ngrok (chua co ten mien rieng)
+#   cloudflare - Cloudflare Tunnel co ten (can ten mien tren Cloudflare)
+#   cloudfront - AWS CloudFront (dxxxx.cloudfront.net) goi vao cong 80; day la
+#                ngoai le duy nhat mo cong, chan bang header bi mat (xem
+#                deploy/cloudfront.Caddyfile)
+# Ca hai giu nguyen dia chi qua moi lan deploy, khac quick tunnel
+# (trycloudflare.com) doi URL moi lan chay lai.
 #
 # Ba repo phai nam canh nhau: ../worker, ../veterinary-clinic-ai.
 # Bien moi truong lay tu prod.env (xem prod.env.example):
@@ -106,10 +114,34 @@ services:
 
   cloudflared:
     image: cloudflare/cloudflared:latest
+    profiles: [cloudflare]
     restart: unless-stopped
     command: ['tunnel', '--no-autoupdate', 'run']
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - api
+
+  ngrok:
+    image: ngrok/ngrok:3
+    profiles: [ngrok]
+    restart: unless-stopped
+    command: ['http', '--url=${NGROK_DOMAIN}', 'api:3000']
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    depends_on:
+      - api
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: [cloudfront]
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    environment:
+      CLOUDFRONT_ORIGIN_SECRET: ${CLOUDFRONT_ORIGIN_SECRET}
+    volumes:
+      - ./deploy/cloudfront.Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
       - api
 

@@ -418,6 +418,16 @@ describe('AiChatAgentService', () => {
     expect(reply.reply).toContain('tạm gián đoạn');
   });
 
+  it('chỉ gửi ảnh mà AI không đọc được: xin mô tả triệu chứng, không báo gián đoạn', async () => {
+    aiProvider.triage.mockRejectedValue(new Error('401 API key expired'));
+    const reply = await say('', undefined, null, {
+      images: ['https://res.cloudinary.com/demo/image/upload/a.jpg'],
+    });
+    expect(reply.triage).toBeUndefined();
+    expect(reply.reply).toContain('mô tả giúp em');
+    expect(reply.reply).not.toContain('tạm gián đoạn');
+  });
+
   it('lỗi nghiệp vụ khi lưu lịch (vừa có người đặt): hỏi lại giờ, không báo thành công', async () => {
     appointmentsService.createBookingWithReport.mockRejectedValue(
       new ConflictException('Không còn bác sĩ nào trống vào khung giờ này'),

@@ -24,6 +24,7 @@ import {
   AiPetCareAnswer,
   AiPredictionProvider,
   AiTriageResult,
+  KEYWORD_TRIAGE_MODEL_VERSION,
 } from '@/modules/triage/application';
 import { Gender } from '@/shared/common/enums/gender.enum';
 import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
@@ -278,13 +279,15 @@ export class AiChatAgentService {
       draft.symptoms = [draft.symptoms, message].filter(Boolean).join('\n').slice(-2000);
       const result = await this.runTriage(draft, ctx);
       if (result) {
+        // Phân loại dự phòng theo từ khoá chỉ đọc chữ - không được nói là đã xem ảnh/video.
+        const sawMedia = result.modelVersion !== KEYWORD_TRIAGE_MODEL_VERSION;
         draft.priorityColor = result.priorityColor;
         triage = {
           priorityColor: result.priorityColor,
           reasoning: triageReasoning(result),
           suspectedDiseases: result.suspectedGroups.slice(0, 3),
-          analyzedImages: draft.photoUrls?.length ?? 0,
-          analyzedVideos: draft.videoUrls?.length ?? 0,
+          analyzedImages: sawMedia ? (draft.photoUrls?.length ?? 0) : 0,
+          analyzedVideos: sawMedia ? (draft.videoUrls?.length ?? 0) : 0,
         };
       }
       assessment = buildAssessment(triage, hasMedia);
@@ -1254,11 +1257,21 @@ function triageReasoning(result: AiTriageResult): string | null {
 }
 
 function buildAssessment(triage: ChatTriage | undefined, hasMedia: boolean): string {
+  const danger =
+    'Nếu bé có dấu hiệu nguy hiểm (khó thở, co giật, chảy máu, bỏ ăn uống hoàn toàn), bạn hãy đưa bé tới phòng khám ngay.';
+  if (!triage && hasMedia) {
+    // Chỉ có ảnh/video mà AI không đọc được: xin mô tả bằng chữ để lượt sau còn phân loại
+    // theo từ khoá được, thay vì chỉ báo lỗi.
+    return (
+      'Em đã nhận ảnh/video của bé nhưng lúc này chưa đọc được ảnh tự động. ' +
+      'Bạn mô tả giúp em bé đang có biểu hiện gì (nôn, tiêu chảy, ngứa, chảy máu, bỏ ăn...) và bao lâu rồi để em đánh giá mức độ nhé. ' +
+      danger
+    );
+  }
   if (!triage) {
     return (
-      (hasMedia ? 'Em đã nhận ảnh/video của bé. ' : '') +
       'Dạ hiện hệ thống đánh giá AI đang tạm gián đoạn nên em chưa phân tích được triệu chứng. ' +
-      'Nếu bé có dấu hiệu nguy hiểm (khó thở, co giật, chảy máu, bỏ ăn uống hoàn toàn), bạn hãy đưa bé tới phòng khám ngay.'
+      danger
     );
   }
   const parts = [`🩺 **Mức độ ưu tiên:** ${PRIORITY_TEXT[triage.priorityColor]}`];

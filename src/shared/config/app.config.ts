@@ -15,5 +15,8 @@ export default registerAs('app', () => {
     apiPrefix: process.env.API_PREFIX ?? 'api/v1',
     corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
     swaggerEnabled: resolveSwaggerEnabled(nodeEnv, process.env.ENABLE_SWAGGER),
+    // Number of reverse proxies in front of the API (Express `trust proxy`), so
+    // req.ip - and the throttler keyed on it - is the user's IP, not the proxy's.
+    trustProxy: parseInt(process.env.TRUST_PROXY ?? '0', 10),
   };
 });
