@@ -16,7 +16,11 @@ interface Sign {
 
 const RED_SIGNS: Sign[] = [
   { label: 'co giật', pattern: /\bco giat\b/ },
-  { label: 'khó thở', pattern: /\b(kho tho|tho gap|tho hoc|tho kho khan|tim tai|luoi tim)\b/ },
+  {
+    label: 'khó thở',
+    pattern:
+      /\b(kho tho|tho gap|tho doc|tho hoc|tho hon hen|tho kho khan|ha mieng tho|tim tai|luoi tim)\b/,
+  },
   { label: 'sùi bọt mép', pattern: /\bsui bot\b/ },
   { label: 'ngất / bất tỉnh', pattern: /\b(ngat xiu|bi ngat|bat tinh|hon me)\b/ },
   { label: 'chảy máu nhiều', pattern: /\b(chay mau nhieu|xuat huyet|mat mau)\b/ },
@@ -26,7 +30,11 @@ const RED_SIGNS: Sign[] = [
   },
   { label: 'tai nạn / chấn thương nặng', pattern: /\b(tai nan|xe (tong|can)|nga tu tren cao)\b/ },
   { label: 'không đi tiểu được', pattern: /\b(khong (di )?tieu duoc|bi bi tieu|bi tac tieu)\b/ },
-  { label: 'chướng bụng', pattern: /\b(chuong bung|bung (cang|truong) to|xoan da day)\b/ },
+  // GDV (xoắn dạ dày) hay được tả ngược: "bụng hơi chướng", "bụng căng".
+  {
+    label: 'chướng bụng',
+    pattern: /\b(chuong bung|chuong hoi|bung (hoi |bi |rat )?(chuong|truong|cang)|xoan da day)\b/,
+  },
   { label: 'sốt sữa / đẻ khó', pattern: /\b(sot sua|de kho)\b/ },
   { label: 'sốc nhiệt', pattern: /\b(say nang|soc nhiet)\b/ },
 ];
@@ -41,7 +49,8 @@ const ORANGE_SIGNS: Sign[] = [
   { label: 'nôn liên tục', pattern: /\b(non|oi) (lien tuc|nhieu lan|suot)\b/ },
   {
     label: 'lừ đừ, kiệt sức',
-    pattern: /\b(li bi|lu du|met la|yeu (lu|ot)|khong (dung|di) (day|len|noi)( duoc)?|bi liet)\b/,
+    pattern:
+      /\b(li bi|lu du|lo do|met la|yeu (lu|ot)|khong (dung|di) (day|len|noi)( duoc)?|bi liet)\b/,
   },
   { label: 'mất nước', pattern: /\b(mat nuoc|mat trung sau)\b/ },
   { label: 'sốt cao', pattern: /\bsot cao\b/ },
@@ -77,6 +86,7 @@ const YELLOW_SIGNS: Sign[] = [
       /\b(mat (do|sung|chay nuoc|duc)|chay ghen|nhieu ghen|viem tai|tai (hoi|do|chay dich))\b/,
   },
   { label: 'sụt cân', pattern: /\b(sut can|gay sut|gay di)\b/ },
+  { label: 'mệt mỏi', pattern: /\b(met moi|ue oai|khong muon choi)\b/ },
   { label: 'vết thương ngoài da', pattern: /\b(vet thuong|tray xuoc|bi thuong)\b/ },
   { label: 'uống / tiểu nhiều bất thường', pattern: /\b(uong nhieu nuoc|tieu nhieu)\b/ },
 ];
@@ -126,7 +136,9 @@ export function keywordTriage(symptomText: string): AiTriageResult {
     'Dịch vụ AI đang tạm không phản hồi nên đây là đánh giá nhanh theo từ khoá trong mô tả: ' +
     (signs.length > 0
       ? `ghi nhận ${signs.join(', ')}.`
-      : 'chưa thấy dấu hiệu khẩn cấp nào được nhắc tới.');
+      : // Không khớp từ nào chưa có nghĩa là bé khoẻ - đừng trấn an chủ nuôi.
+        'không nhận ra dấu hiệu nào trong danh sách từ khoá. Cách đánh giá này rất thô nên ' +
+        'không loại trừ được bệnh - nếu bé mệt, bỏ ăn hay có biểu hiện lạ, hãy cho bé đi khám.');
 
   return {
     priorityColor,

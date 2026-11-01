@@ -1284,6 +1284,11 @@ function buildAssessment(triage: ChatTriage | undefined, hasMedia: boolean): str
         .filter(Boolean)
         .join(' và ')} bạn gửi.`,
     );
+  } else if (hasMedia) {
+    // Phân loại dự phòng chỉ đọc chữ: nói thật là ảnh chưa được xem.
+    parts.push(
+      '📷 Lúc này em chưa phân tích được ảnh/video tự động - ảnh vẫn được lưu để bác sĩ xem khi khám.',
+    );
   }
   if (triage.reasoning) parts.push(`📋 **Nhận định sơ bộ:** ${triage.reasoning}`);
   if (triage.suspectedDiseases.length > 0) {

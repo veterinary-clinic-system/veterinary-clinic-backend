@@ -7,7 +7,12 @@ describe('keywordTriage', () => {
     ['Mèo thở gấp, lưỡi tím tái', PriorityColor.RED],
     ['Chó lỡ ăn phải thuốc chuột hồi sáng', PriorityColor.RED],
     ['meo duc khong di tieu duoc tu hom qua', PriorityColor.RED],
+    // Báo cáo kiểm thử 01/11/2026: hai câu này từng bị gắn GREEN.
+    ['Bé có vẻ mệt mỏi, mắt lờ đờ, bụng hơi chướng và thở dốc nhẹ', PriorityColor.RED],
+    ['Chó nhà em bụng căng, nôn khan mãi không ra', PriorityColor.RED],
     ['Bé nôn ra máu', PriorityColor.ORANGE],
+    ['Mèo lờ đờ cả ngày', PriorityColor.ORANGE],
+    ['Bé dạo này mệt mỏi', PriorityColor.YELLOW],
     ['Cún đi ngoài ra máu, lừ đừ', PriorityColor.ORANGE],
     ['Bé cún nhà em bị nôn mửa và bỏ ăn 2 ngày nay, có nguy hiểm không?', PriorityColor.ORANGE],
     ['Mèo bị ngứa và rụng lông', PriorityColor.YELLOW],
@@ -27,6 +32,14 @@ describe('keywordTriage', () => {
     const result = keywordTriage('Bác sĩ ơi, bé gái nhà em mới về, là con non 2 tháng');
     expect(result.priorityColor).toBe(PriorityColor.GREEN);
     expect(result.extractedKeywords).toEqual([]);
+  });
+
+  it('không khớp từ nào thì không trấn an là "không có dấu hiệu khẩn cấp"', () => {
+    const reasoning = keywordTriage('Bé cứ là lạ sao ấy').raw.triage_result as {
+      reasoning: string;
+    };
+    expect(reasoning.reasoning).not.toMatch(/chưa thấy dấu hiệu khẩn cấp/);
+    expect(reasoning.reasoning).toMatch(/không loại trừ được bệnh/);
   });
 
   it('ghi rõ đây là đánh giá dự phòng trong raw để báo cáo và bác sĩ phân biệt được', () => {

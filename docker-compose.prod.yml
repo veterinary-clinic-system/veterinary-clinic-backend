@@ -99,13 +99,25 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_DATABASE: ${DB_DATABASE}
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
-      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL}
-      OPENROUTER_JEV_MODEL: ${OPENROUTER_JEV_MODEL:-}
-      OPENROUTER_CHAT_MODEL: ${OPENROUTER_CHAT_MODEL:-}
-      OPENROUTER_DECISIONS_URL: ${OPENROUTER_DECISIONS_URL:-}
+      # Cong 9router (OpenAI-compatible): Gemini doc anh/video + LLM du phong khi Jev loi.
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_VISION_MODELS: ${LLM_VISION_MODELS:-}
+      LLM_FALLBACK_MODELS: ${LLM_FALLBACK_MODELS:-}
+      LLM_CHAT_MODELS: ${LLM_CHAT_MODELS:-}
+      JEV_URL: ${JEV_URL:-}
+      JEV_API_KEY: ${JEV_API_KEY:-}
+      JEV_MODEL: ${JEV_MODEL:-}
       JEV_SYMPTOM_THRESHOLD: ${JEV_SYMPTOM_THRESHOLD:-}
+      # Ten cu, service AI chi doc khi bien moi o tren de trong.
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-}
+      OPENROUTER_JEV_MODEL: ${OPENROUTER_JEV_MODEL:-}
+      OPENROUTER_DECISIONS_URL: ${OPENROUTER_DECISIONS_URL:-}
       CORS_ALLOW_ORIGINS: ${AI_CORS_ALLOW_ORIGINS}
+    # Linux khong tu co host.docker.internal - can de goi 9router chay tren may chu.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     volumes:
       - ai-state:/app/state
     depends_on:

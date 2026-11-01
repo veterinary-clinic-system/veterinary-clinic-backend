@@ -78,9 +78,13 @@ export class AiClientService {
       );
       return response.data;
     } catch (error) {
-      const axiosError = error as AxiosError;
+      const axiosError = error as AxiosError<{ detail?: unknown }>;
+      // `detail` của FastAPI mới nói ra nguyên nhân thật (khoá OpenRouter hết hạn/hết tiền,
+      // Jev từ chối ảnh...); thiếu nó thì log chỉ còn "status code 503".
+      const detail = axiosError.response?.data?.detail;
       this.logger.error(
-        `veterinary-clinic-ai call to ${path} failed: ${axiosError.response?.status ?? 'network'} ${axiosError.message}`,
+        `veterinary-clinic-ai call to ${path} failed: ${axiosError.response?.status ?? 'network'} ${axiosError.message}` +
+          (detail ? ` - ${typeof detail === 'string' ? detail : JSON.stringify(detail)}` : ''),
       );
       throw new ServiceUnavailableException('The AI pre-screening service is unavailable');
     }
