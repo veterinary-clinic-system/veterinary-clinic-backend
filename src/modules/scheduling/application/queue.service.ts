@@ -60,6 +60,17 @@ const PRIORITY_RANK_SQL = `CASE queue.priority_color
   END`;
 
 const STALE_CANCEL_REASON = 'Tự đóng: lượt chờ không kết thúc trong ngày';
+const STALE_PENDING_REASON = 'Tự huỷ: lịch hẹn chưa được xác nhận trước ngày hẹn';
+const STALE_CONFIRMED_REASON = 'Tự đánh dấu: khách không đến';
+
+/** Việt Nam không có giờ mùa hè - UTC+7 quanh năm. */
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** 00:00 hôm nay theo giờ Việt Nam, dù máy chủ (container) chạy múi giờ UTC. */
+export function startOfVietnamDay(now: Date): Date {
+  return new Date(Math.floor((now.getTime() + VN_OFFSET_MS) / DAY_MS) * DAY_MS - VN_OFFSET_MS);
+}
 
 @Injectable()
 export class QueueService implements OnApplicationBootstrap {
@@ -475,9 +486,39 @@ export class QueueService implements OnApplicationBootstrap {
     return closed;
   }
 
+  /**
+   * Lịch hẹn của những ngày trước vẫn PENDING/CONFIRMED thì không còn là "sắp tới": chưa ai
+   * xác nhận thì huỷ, đã xác nhận mà khách không check-in thì đánh dấu không đến. Chạy mỗi giờ
+   * (mốc là 00:00 giờ Việt Nam, máy chủ chạy UTC) và một lần khi khởi động.
+   */
+  @Cron('10 * * * *')
+  async closeStaleAppointments(): Promise<number> {
+    const cutoff = startOfVietnamDay(new Date());
+    const now = new Date();
+
+    const cancelled = await this.appointmentsRepository.update(
+      { startAt: LessThan(cutoff), status: AppointmentStatus.PENDING },
+      { status: AppointmentStatus.CANCELLED, cancelledAt: now, cancelReason: STALE_PENDING_REASON },
+    );
+    const noShow = await this.appointmentsRepository.update(
+      { startAt: LessThan(cutoff), status: AppointmentStatus.CONFIRMED },
+      { status: AppointmentStatus.NO_SHOW, cancelledAt: now, cancelReason: STALE_CONFIRMED_REASON },
+    );
+
+    const closed = (cancelled.affected ?? 0) + (noShow.affected ?? 0);
+    if (closed > 0) {
+      this.logger.log(`Đã tự đóng ${closed} lịch hẹn của các ngày trước`);
+      this.realtimeGateway.emitAppointmentChanged();
+    }
+    return closed;
+  }
+
   async onApplicationBootstrap(): Promise<void> {
     await this.closeStaleEntries().catch((error: unknown) =>
       this.logger.warn(`Không đóng được lượt chờ tồn: ${String(error)}`),
+    );
+    await this.closeStaleAppointments().catch((error: unknown) =>
+      this.logger.warn(`Không đóng được lịch hẹn tồn: ${String(error)}`),
     );
   }
 
