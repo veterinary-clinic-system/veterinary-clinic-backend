@@ -1,4 +1,4 @@
-import { cloudinaryWebImage } from '@/shared/storage/cloudinary-web-assets';
+import { webAssetUrl } from '@/shared/storage/cloudinary-web-assets';
 
 export interface SpeciesCatalogEntry {
   name: string;
@@ -114,5 +114,5 @@ export const SPECIES_CATALOG: SpeciesCatalogEntry[] = [
 ];
 
 export const DOCTOR_AVATAR_FILES = [1, 2, 3, 4, 5, 6].map((index) =>
-  cloudinaryWebImage(`doctors/doctor-${index}.svg`),
+  webAssetUrl(`doctors/doctor-${index}.svg`),
 );
