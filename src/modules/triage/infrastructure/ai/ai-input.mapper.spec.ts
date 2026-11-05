@@ -49,4 +49,17 @@ describe('AI input mapping', () => {
       ]),
     ).toEqual(['https://res.cloudinary.com/demo/video/upload/sample.mp4']);
   });
+
+  it('accepts videos from the configured S3/CloudFront base URL only', () => {
+    expect(
+      validAiVideoUrls(
+        [
+          'https://cdn.example.net/media/symptom-videos/a.mp4',
+          'https://cdn.example.net.evil.io/media/b.mp4',
+          'https://cdn.example.net/media/symptom-videos/c.gif',
+        ],
+        ['https://cdn.example.net/'],
+      ),
+    ).toEqual(['https://cdn.example.net/media/symptom-videos/a.mp4']);
+  });
 });

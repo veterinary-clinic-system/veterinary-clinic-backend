@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import { AiClientService } from '@/modules/triage/infrastructure/ai-client/ai-client.service';
 import { DiagnosisDetailedResponse } from '@/modules/triage/infrastructure/ai-client/ai-client.types';
@@ -40,7 +41,10 @@ describe('HttpAiPredictionAdapter', () => {
     };
     return {
       client,
-      adapter: new HttpAiPredictionAdapter(client as unknown as AiClientService),
+      adapter: new HttpAiPredictionAdapter(
+        client as unknown as AiClientService,
+        new ConfigService({}),
+      ),
     };
   }
 

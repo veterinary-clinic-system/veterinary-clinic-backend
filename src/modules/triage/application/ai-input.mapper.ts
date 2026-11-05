@@ -75,10 +75,22 @@ export function validAiImageUrls(urls: string[]): string[] {
     .slice(0, 5);
 }
 
-export function validAiVideoUrls(urls: string[]): string[] {
+/**
+ * Video chỉ được gửi khi nằm trên kho của hệ thống: Cloudinary (tệp cũ) hoặc các gốc URL
+ * trong `trustedBaseUrls` (S3 qua CloudFront). AI service tải video về nên không nhận URL lạ.
+ */
+export function validAiVideoUrls(urls: string[], trustedBaseUrls: string[] = []): string[] {
+  const bases = trustedBaseUrls
+    .map((base) => base.trim().replace(/\/+$/, ''))
+    .filter((base) => /^https:\/\/[^/]+/i.test(base))
+    .map((base) => `${base}/`.toLowerCase());
   return [...new Set(urls)]
     .map((url) => url.trim())
-    .filter((url) => /^https:\/\/res\.cloudinary\.com\//i.test(url))
+    .filter(
+      (url) =>
+        /^https:\/\/res\.cloudinary\.com\//i.test(url) ||
+        bases.some((base) => url.toLowerCase().startsWith(base)),
+    )
     .filter((url) => /\.(?:mp4|mov|webm)(?:\?|$)/i.test(url))
     .slice(0, 2);
 }

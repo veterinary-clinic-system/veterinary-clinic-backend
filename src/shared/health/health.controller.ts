@@ -46,7 +46,7 @@ export class HealthController {
   private async probeAuxiliary(): Promise<HealthIndicatorResult> {
     const results = await Promise.all([
       this.softCheck('redis', () => this.pingRedis()),
-      this.softCheck('cloudinary', () => this.checkCloudinaryConfig()),
+      this.softCheck('storage', () => this.checkStorageConfig()),
       this.softCheck('ai-service', () => this.pingHttp(this.aiHealthUrl())),
     ]);
 
@@ -81,6 +81,19 @@ export class HealthController {
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
+  }
+
+  private checkStorageConfig(): Promise<void> {
+    if (this.configService.get<string>('files.provider') === 's3') {
+      const bucket = this.configService.get<string>('files.s3.bucket');
+      const region = this.configService.get<string>('files.s3.region');
+      const publicBaseUrl = this.configService.get<string>('files.s3.publicBaseUrl');
+      if (!bucket || !region || !publicBaseUrl) {
+        return Promise.reject(new Error('Chưa cấu hình S3'));
+      }
+      return Promise.resolve();
+    }
+    return this.checkCloudinaryConfig();
   }
 
   private checkCloudinaryConfig(): Promise<void> {

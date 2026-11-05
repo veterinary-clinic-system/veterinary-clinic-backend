@@ -29,6 +29,7 @@
     "cloudinary:migrate-local-uploads": "ts-node -r tsconfig-paths/register scripts/migrate-local-uploads.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1162.0",
     "@nestjs/axios": "^3.1.1",
     "@nestjs/common": "^10.4.4",
     "@nestjs/config": "^3.3.0",

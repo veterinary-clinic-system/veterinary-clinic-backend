@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import {
   AiChatInput,
@@ -32,7 +33,10 @@ const PRIORITY_LABEL: Record<PriorityColor, string> = {
 
 @Injectable()
 export class HttpAiPredictionAdapter implements AiPredictionProvider {
-  constructor(private readonly client: AiClientService) {}
+  constructor(
+    private readonly client: AiClientService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async triage(input: AiTriageInput): Promise<AiTriageResult> {
     const response = await this.client.diagnose(this.buildTriageRequest(input));
@@ -68,7 +72,12 @@ export class HttpAiPredictionAdapter implements AiPredictionProvider {
       symptoms: input.symptomCodes,
       describe: input.symptomText,
       images: validAiImageUrls(input.photoUrls),
-      videos: validAiVideoUrls(input.videoUrls),
+      videos: validAiVideoUrls(
+        input.videoUrls,
+        [this.configService.get<string>('files.s3.publicBaseUrl')].filter(
+          (base): base is string => !!base,
+        ),
+      ),
     };
   }
 

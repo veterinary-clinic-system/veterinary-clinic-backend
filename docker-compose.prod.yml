@@ -115,6 +115,8 @@ services:
       OPENROUTER_JEV_MODEL: ${OPENROUTER_JEV_MODEL:-}
       OPENROUTER_DECISIONS_URL: ${OPENROUTER_DECISIONS_URL:-}
       CORS_ALLOW_ORIGINS: ${AI_CORS_ALLOW_ORIGINS}
+      # Goc URL anh/video S3 (qua CloudFront) ma AI duoc phep tai ve, ngoai Cloudinary.
+      MEDIA_BASE_URLS: ${S3_PUBLIC_BASE_URL:-}
     volumes:
       - ai-state:/app/state
     depends_on:

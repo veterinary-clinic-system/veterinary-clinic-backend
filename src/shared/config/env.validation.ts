@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUrl,
   Matches,
   Max,
   Min,
@@ -76,7 +77,7 @@ class EnvironmentVariables {
   @IsOptional()
   AI_PROVIDER: string;
 
-  @IsIn(['cloudinary'])
+  @IsIn(['cloudinary', 's3'])
   @IsOptional()
   @Transform(({ value }) => {
     if (typeof value !== 'string') return value;
@@ -103,6 +104,22 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CLOUDINARY_FOLDER: string;
+
+  @IsString()
+  @IsOptional()
+  S3_BUCKET: string;
+
+  @IsString()
+  @IsOptional()
+  S3_REGION: string;
+
+  @IsUrl({ require_tld: false, protocols: ['https', 'http'], require_protocol: true })
+  @IsOptional()
+  S3_PUBLIC_BASE_URL: string;
+
+  @IsString()
+  @IsOptional()
+  S3_KEY_PREFIX: string;
 
   @IsIn(['manual', 'vnpay', 'sepay'])
   @IsOptional()
