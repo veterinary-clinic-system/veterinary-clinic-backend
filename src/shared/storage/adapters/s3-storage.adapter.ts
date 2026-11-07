@@ -9,43 +9,57 @@ import { StorageProvider, StoredFile } from '@/shared/storage/ports/storage.port
  * Lưu tệp vào bucket S3 riêng tư; tệp được phục vụ qua `S3_PUBLIC_BASE_URL` (CloudFront có
  * Origin Access Control trỏ vào bucket). Khoá đối tượng luôn bắt đầu bằng `S3_KEY_PREFIX`
  * (mặc định `media`) để behavior `/media/*` của CloudFront chuyển thẳng đường dẫn sang S3.
- * Ảnh cũ trên Cloudinary vẫn giữ nguyên URL - adapter này chỉ áp dụng cho tệp tải lên mới.
+ *
+ * Thiếu cấu hình (máy dev, CI) thì API vẫn chạy: chỉ riêng việc tải tệp lên trả 503, và
+ * `/health` báo mục `storage` là down.
  */
 export class S3StorageAdapter implements StorageProvider {
   private readonly logger = new Logger(S3StorageAdapter.name);
-  private readonly client: S3Client;
-  private readonly bucket: string;
-  private readonly prefix: string;
-  private readonly publicBaseUrl: string;
+  private readonly target: {
+    client: S3Client;
+    bucket: string;
+    prefix: string;
+    publicBaseUrl: string;
+  } | null;
 
   constructor(configService: ConfigService) {
     const bucket = configService.get<string>('files.s3.bucket');
     const region = configService.get<string>('files.s3.region');
     const publicBaseUrl = configService.get<string>('files.s3.publicBaseUrl');
     if (!bucket || !region || !publicBaseUrl) {
-      throw new Error(
-        'S3 storage is not configured. Set S3_BUCKET, S3_REGION and S3_PUBLIC_BASE_URL ' +
-          '(credentials come from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).',
+      this.target = null;
+      this.logger.warn(
+        'S3 storage is not configured: uploads are disabled. Set S3_BUCKET, S3_REGION and ' +
+          'S3_PUBLIC_BASE_URL (credentials come from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).',
       );
+      return;
     }
 
-    this.bucket = bucket;
-    this.prefix = (configService.get<string>('files.s3.keyPrefix') ?? 'media').replace(
-      /^\/+|\/+$/g,
-      '',
-    );
-    this.publicBaseUrl = publicBaseUrl.replace(/\/+$/, '');
-    this.client = new S3Client({ region });
+    this.target = {
+      client: new S3Client({ region }),
+      bucket,
+      prefix: (configService.get<string>('files.s3.keyPrefix') ?? 'media').replace(
+        /^\/+|\/+$/g,
+        '',
+      ),
+      publicBaseUrl: publicBaseUrl.replace(/\/+$/, ''),
+    };
   }
 
   async save(category: FileCategory, file: Express.Multer.File): Promise<StoredFile> {
+    if (!this.target) {
+      throw new ServiceUnavailableException(
+        'Máy chủ chưa cấu hình kho lưu trữ tệp (S3), chưa thể tải ảnh/video lên.',
+      );
+    }
+    const { client, bucket, prefix, publicBaseUrl } = this.target;
     const { buffer, filename, contentType } = await normalizeForStorage(category, file);
-    const key = [this.prefix, category, filename].filter(Boolean).join('/');
+    const key = [prefix, category, filename].filter(Boolean).join('/');
 
-    await this.client
+    await client
       .send(
         new PutObjectCommand({
-          Bucket: this.bucket,
+          Bucket: bucket,
           Key: key,
           Body: buffer,
           ContentType: contentType,
@@ -65,6 +79,6 @@ export class S3StorageAdapter implements StorageProvider {
         },
       );
 
-    return { url: `${this.publicBaseUrl}/${key}`, path: key };
+    return { url: `${publicBaseUrl}/${key}`, path: key };
   }
 }

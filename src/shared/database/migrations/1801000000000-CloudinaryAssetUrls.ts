@@ -5,20 +5,18 @@ import {
   DEFAULT_PET_IMAGE,
   DEFAULT_STAFF_IMAGE,
   DEFAULT_USER_IMAGE,
-  CLOUDINARY_CLOUD_NAME,
-  cloudinaryWebImage,
-} from '@/shared/storage/cloudinary-web-assets';
+  webAssetUrl,
+} from '@/shared/storage/web-assets';
 
+/**
+ * Đổi đường dẫn ảnh tĩnh tương đối sang URL kho ảnh. Ban đầu migration này trỏ sang
+ * Cloudinary; kho ảnh nay là S3 nên nó dùng `webAssetUrl` (S3 khi có S3_PUBLIC_BASE_URL,
+ * còn lại giữ đường dẫn tương đối). Giữ nguyên tên để DB đã chạy không chạy lại.
+ */
 export class CloudinaryAssetUrls1801000000000 implements MigrationInterface {
   name = 'CloudinaryAssetUrls1801000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    if (!CLOUDINARY_CLOUD_NAME) {
-      throw new Error(
-        'CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME is required before migrating image URLs',
-      );
-    }
-
     await this.replace(queryRunner, 'users', 'avatar_url', DEFAULT_USER_IMAGE, [
       '/images/default-user.svg',
     ]);
@@ -37,7 +35,7 @@ export class CloudinaryAssetUrls1801000000000 implements MigrationInterface {
 
     for (let index = 1; index <= 6; index += 1) {
       await queryRunner.query(`UPDATE "doctors" SET "avatar_url" = $1 WHERE "avatar_url" = $2`, [
-        cloudinaryWebImage(`doctors/doctor-${index}.svg`),
+        webAssetUrl(`doctors/doctor-${index}.svg`),
         `/doctors/doctor-${index}.svg`,
       ]);
     }

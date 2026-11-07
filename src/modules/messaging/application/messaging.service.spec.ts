@@ -232,7 +232,9 @@ describe('MessagingService - luồng tin nhắn', () => {
 
   it('tin có ảnh được lưu loại IMAGE với xem trước [Hình ảnh]', async () => {
     const { service, messages, conversations } = setup();
-    await service.sendMessage(DOCTOR, 'conv-1', { imageUrl: 'https://res.cloudinary.com/x/a.jpg' });
+    await service.sendMessage(DOCTOR, 'conv-1', {
+      imageUrl: 'https://cdn.example.net/media/chat-images/a.jpg',
+    });
 
     expect(messages.save).toHaveBeenCalledWith(
       expect.objectContaining({ kind: MessageKind.IMAGE, senderUserId: 'doctor-user' }),

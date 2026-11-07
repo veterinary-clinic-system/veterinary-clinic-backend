@@ -16,7 +16,7 @@ import {
 } from '@/shared/common/enums/employee-status.enum';
 import { BRANCH_SCOPED_ROLES, Role } from '@/shared/common/enums/role.enum';
 import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
-import { DEFAULT_STAFF_IMAGE } from '@/shared/storage/cloudinary-web-assets';
+import { DEFAULT_STAFF_IMAGE } from '@/shared/storage/web-assets';
 import { CreateEmployeeDto } from '@/modules/identity/presentation/dto/create-employee.dto';
 import { UpdateEmployeeDto } from '@/modules/identity/presentation/dto/update-employee.dto';
 import { QueryEmployeesDto } from '@/modules/identity/presentation/dto/query-employees.dto';

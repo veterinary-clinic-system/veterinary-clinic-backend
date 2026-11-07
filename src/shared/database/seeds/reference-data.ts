@@ -1,4 +1,4 @@
-import { webAssetUrl } from '@/shared/storage/cloudinary-web-assets';
+import { webAssetUrl } from '@/shared/storage/web-assets';
 
 export interface SpeciesCatalogEntry {
   name: string;

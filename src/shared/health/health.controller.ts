@@ -84,26 +84,11 @@ export class HealthController {
   }
 
   private checkStorageConfig(): Promise<void> {
-    if (this.configService.get<string>('files.provider') === 's3') {
-      const bucket = this.configService.get<string>('files.s3.bucket');
-      const region = this.configService.get<string>('files.s3.region');
-      const publicBaseUrl = this.configService.get<string>('files.s3.publicBaseUrl');
-      if (!bucket || !region || !publicBaseUrl) {
-        return Promise.reject(new Error('Chưa cấu hình S3'));
-      }
-      return Promise.resolve();
-    }
-    return this.checkCloudinaryConfig();
-  }
-
-  private checkCloudinaryConfig(): Promise<void> {
-    const cloudinaryUrl = this.configService.get<string>('CLOUDINARY_URL');
-    const cloudName = this.configService.get<string>('files.cloudinary.cloudName');
-    const apiKey = this.configService.get<string>('files.cloudinary.apiKey');
-    const apiSecret = this.configService.get<string>('files.cloudinary.apiSecret');
-
-    if (!cloudinaryUrl && (!cloudName || !apiKey || !apiSecret)) {
-      return Promise.reject(new Error('Chưa cấu hình Cloudinary'));
+    const bucket = this.configService.get<string>('files.s3.bucket');
+    const region = this.configService.get<string>('files.s3.region');
+    const publicBaseUrl = this.configService.get<string>('files.s3.publicBaseUrl');
+    if (!bucket || !region || !publicBaseUrl) {
+      return Promise.reject(new Error('Chưa cấu hình S3'));
     }
     return Promise.resolve();
   }

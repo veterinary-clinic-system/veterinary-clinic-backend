@@ -1,6 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
-import { DEFAULT_DOCTOR_IMAGE } from '@/shared/storage/cloudinary-web-assets';
+import { DEFAULT_DOCTOR_IMAGE } from '@/shared/storage/web-assets';
 import { User } from './user.entity';
 import { Branch } from '@/modules/organization/domain/entities/branch.entity';
 import { Specialization } from '@/shared/common/enums/specialization.enum';

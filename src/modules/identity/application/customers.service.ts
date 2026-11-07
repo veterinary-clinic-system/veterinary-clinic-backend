@@ -18,7 +18,7 @@ import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import { Role } from '@/shared/common/enums/role.enum';
 import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
 import { CreateCustomerDto } from '@/modules/identity/presentation/dto/create-customer.dto';
-import { DEFAULT_USER_IMAGE } from '@/shared/storage/cloudinary-web-assets';
+import { DEFAULT_USER_IMAGE } from '@/shared/storage/web-assets';
 import { UpdateCustomerDto } from '@/modules/identity/presentation/dto/update-customer.dto';
 import { QueryCustomersDto } from '@/modules/identity/presentation/dto/query-customers.dto';
 

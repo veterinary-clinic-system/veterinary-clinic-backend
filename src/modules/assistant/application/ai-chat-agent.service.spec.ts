@@ -391,12 +391,12 @@ describe('AiChatAgentService', () => {
     });
 
     const triage = await say('Bé cún nhà em bị nôn mửa và bỏ ăn 2 ngày nay', undefined, null, {
-      images: ['https://res.cloudinary.com/demo/image/upload/a.jpg'],
+      images: ['https://cdn.example.net/media/chat-images/a.jpg'],
     });
     expect(aiProvider.triage).toHaveBeenCalledWith(
       expect.objectContaining({
         petSpecies: 'Chó',
-        photoUrls: ['https://res.cloudinary.com/demo/image/upload/a.jpg'],
+        photoUrls: ['https://cdn.example.net/media/chat-images/a.jpg'],
       }),
     );
     expect(triage.intent).toBe('TRIAGE');
@@ -421,7 +421,7 @@ describe('AiChatAgentService', () => {
   it('chỉ gửi ảnh mà AI không đọc được: xin mô tả triệu chứng, không báo gián đoạn', async () => {
     aiProvider.triage.mockRejectedValue(new Error('401 API key expired'));
     const reply = await say('', undefined, null, {
-      images: ['https://res.cloudinary.com/demo/image/upload/a.jpg'],
+      images: ['https://cdn.example.net/media/chat-images/a.jpg'],
     });
     expect(reply.triage).toBeUndefined();
     expect(reply.reply).toContain('mô tả giúp em');

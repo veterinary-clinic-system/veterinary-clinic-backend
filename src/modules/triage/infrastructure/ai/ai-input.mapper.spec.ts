@@ -42,12 +42,7 @@ describe('AI input mapping', () => {
         'not-a-url',
       ]),
     ).toEqual(['https://example.test/valid.jpg']);
-    expect(
-      validAiVideoUrls([
-        'https://res.cloudinary.com/demo/video/upload/sample.mp4',
-        'https://evil.example/video.mp4',
-      ]),
-    ).toEqual(['https://res.cloudinary.com/demo/video/upload/sample.mp4']);
+    expect(validAiVideoUrls(['https://evil.example/video.mp4'])).toEqual([]);
   });
 
   it('accepts videos from the configured S3/CloudFront base URL only', () => {

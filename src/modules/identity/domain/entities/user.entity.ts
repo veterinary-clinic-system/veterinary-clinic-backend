@@ -1,6 +1,6 @@
 import { Column, Entity, Index, OneToMany, OneToOne } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
-import { DEFAULT_USER_IMAGE } from '@/shared/storage/cloudinary-web-assets';
+import { DEFAULT_USER_IMAGE } from '@/shared/storage/web-assets';
 import { Role } from '@/shared/common/enums/role.enum';
 import { Doctor } from './doctor.entity';
 import { Pet } from '@/modules/pets/domain/entities/pet.entity';

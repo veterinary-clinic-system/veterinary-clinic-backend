@@ -5,7 +5,7 @@ import { FileCategory } from '@/shared/storage/file-category.enum';
 import { S3StorageAdapter } from './s3-storage.adapter';
 
 function config(s3: Record<string, string | undefined>): ConfigService {
-  return new ConfigService({ files: { provider: 's3', s3 } });
+  return new ConfigService({ files: { s3 } });
 }
 
 const pdf = {
@@ -18,10 +18,15 @@ const pdf = {
 describe('S3StorageAdapter', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  it('refuses to start without bucket, region and public URL', () => {
-    expect(() => new S3StorageAdapter(config({ bucket: 'b', region: 'ap-southeast-1' }))).toThrow(
-      /S3_PUBLIC_BASE_URL/,
+  it('starts without full config but rejects uploads with 503', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const send = jest.spyOn(S3Client.prototype, 'send');
+    const adapter = new S3StorageAdapter(config({ bucket: 'b', region: 'ap-southeast-1' }));
+
+    await expect(adapter.save(FileCategory.LAB_RESULT, pdf)).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
     );
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('uploads under the key prefix and returns the CloudFront URL', async () => {

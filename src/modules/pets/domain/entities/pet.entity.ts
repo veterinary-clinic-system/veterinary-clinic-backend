@@ -1,6 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
-import { DEFAULT_PET_IMAGE } from '@/shared/storage/cloudinary-web-assets';
+import { DEFAULT_PET_IMAGE } from '@/shared/storage/web-assets';
 import { Breed } from './breed.entity';
 import { User } from '@/modules/identity/domain/entities/user.entity';
 import { Gender } from '@/shared/common/enums/gender.enum';

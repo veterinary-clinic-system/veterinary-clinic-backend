@@ -1,6 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
-import { DEFAULT_ITEM_IMAGE } from '@/shared/storage/cloudinary-web-assets';
+import { DEFAULT_ITEM_IMAGE } from '@/shared/storage/web-assets';
 import { moneyTransformer } from '@/shared/database/transformers/money.transformer';
 import { ItemType } from '@/shared/common/enums/item-type.enum';
 import { InvoiceItem } from '@/modules/billing/domain/entities/invoice-item.entity';
