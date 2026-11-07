@@ -32,7 +32,7 @@ import {
   DEFAULT_DOCTOR_IMAGE,
   DEFAULT_STAFF_IMAGE,
   DEFAULT_USER_IMAGE,
-} from '@/shared/storage/cloudinary-web-assets';
+} from '@/shared/storage/web-assets';
 import { CreateUserDto } from '@/modules/identity/presentation/dto/create-user.dto';
 import { UpdateUserDto } from '@/modules/identity/presentation/dto/update-user.dto';
 import { UpdatePasswordDto } from '@/modules/identity/presentation/dto/update-password.dto';

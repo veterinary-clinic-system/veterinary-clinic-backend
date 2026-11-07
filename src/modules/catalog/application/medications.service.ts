@@ -8,7 +8,7 @@ import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
 import { CreateMedicationDto } from '@/modules/catalog/presentation/dto/create-medication.dto';
 import { UpdateMedicationDto } from '@/modules/catalog/presentation/dto/update-medication.dto';
 import { QueryCatalogEntryDto } from '@/modules/catalog/presentation/dto/query-catalog-entry.dto';
-import { DEFAULT_ITEM_IMAGE } from '@/shared/storage/cloudinary-web-assets';
+import { DEFAULT_ITEM_IMAGE } from '@/shared/storage/web-assets';
 
 const ITEM_SORT_COLUMNS = new Set(['itemName', 'unitPrice']);
 const MEDICATION_SORT_COLUMNS = new Set(['unit', 'createdAt', 'updatedAt']);

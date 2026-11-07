@@ -8,7 +8,7 @@ import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
 import { CreateServiceDto } from '@/modules/catalog/presentation/dto/create-service.dto';
 import { UpdateServiceDto } from '@/modules/catalog/presentation/dto/update-service.dto';
 import { QueryCatalogEntryDto } from '@/modules/catalog/presentation/dto/query-catalog-entry.dto';
-import { DEFAULT_ITEM_IMAGE } from '@/shared/storage/cloudinary-web-assets';
+import { DEFAULT_ITEM_IMAGE } from '@/shared/storage/web-assets';
 
 const ITEM_SORT_COLUMNS = new Set(['itemName', 'unitPrice']);
 const SERVICE_SORT_COLUMNS = new Set(['durationMinutes', 'createdAt', 'updatedAt']);

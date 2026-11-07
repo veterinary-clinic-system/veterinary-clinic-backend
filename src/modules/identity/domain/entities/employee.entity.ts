@@ -1,6 +1,6 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 import { BaseEntity } from '@/shared/database/base.entity';
-import { DEFAULT_STAFF_IMAGE } from '@/shared/storage/cloudinary-web-assets';
+import { DEFAULT_STAFF_IMAGE } from '@/shared/storage/web-assets';
 import { Branch } from '@/modules/organization/domain/entities/branch.entity';
 import { EmployeeStatus } from '@/shared/common/enums/employee-status.enum';
 import { User } from './user.entity';

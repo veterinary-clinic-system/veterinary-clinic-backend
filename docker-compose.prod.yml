@@ -15,6 +15,10 @@ name: vcms-prod
 # Ba repo phai nam canh nhau: ../worker, ../veterinary-clinic-ai.
 # Bien moi truong lay tu prod.env (xem prod.env.example):
 #   docker compose --env-file prod.env -f docker-compose.prod.yml up -d --build
+#
+# CD: GitHub Actions build image api/worker/ai, day len GHCR roi SSH vao may chu chay
+# deploy/deploy.sh <service> (keo image moi, khong build tren may chu). Ghim mot ban cu
+# de rollback: dat API_IMAGE / WORKER_IMAGE / AI_IMAGE = ghcr.io/...:<sha> trong prod.env.
 services:
   postgres:
     image: postgres:16-alpine
@@ -44,6 +48,7 @@ services:
       retries: 10
 
   api:
+    image: ${API_IMAGE:-ghcr.io/veterinary-clinic-system/veterinary-clinic-backend:latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -71,6 +76,7 @@ services:
       retries: 3
 
   worker:
+    image: ${WORKER_IMAGE:-ghcr.io/veterinary-clinic-system/worker:latest}
     build:
       context: ../worker
       dockerfile: Dockerfile
@@ -88,6 +94,7 @@ services:
         condition: service_healthy
 
   ai:
+    image: ${AI_IMAGE:-ghcr.io/veterinary-clinic-system/veterinary-clinic-ai:latest}
     build:
       context: ../veterinary-clinic-ai
       dockerfile: Dockerfile
@@ -115,7 +122,7 @@ services:
       OPENROUTER_JEV_MODEL: ${OPENROUTER_JEV_MODEL:-}
       OPENROUTER_DECISIONS_URL: ${OPENROUTER_DECISIONS_URL:-}
       CORS_ALLOW_ORIGINS: ${AI_CORS_ALLOW_ORIGINS}
-      # Goc URL anh/video S3 (qua CloudFront) ma AI duoc phep tai ve, ngoai Cloudinary.
+      # Goc URL anh/video S3 (qua CloudFront) ma AI duoc phep tai ve.
       MEDIA_BASE_URLS: ${S3_PUBLIC_BASE_URL:-}
     volumes:
       - ai-state:/app/state

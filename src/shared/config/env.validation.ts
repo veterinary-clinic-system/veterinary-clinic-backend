@@ -77,34 +77,6 @@ class EnvironmentVariables {
   @IsOptional()
   AI_PROVIDER: string;
 
-  @IsIn(['cloudinary', 's3'])
-  @IsOptional()
-  @Transform(({ value }) => {
-    if (typeof value !== 'string') return value;
-    return value.trim().toLowerCase() || undefined;
-  })
-  STORAGE_PROVIDER: string;
-
-  @IsString()
-  @IsOptional()
-  CLOUDINARY_URL: string;
-
-  @IsString()
-  @IsOptional()
-  CLOUDINARY_CLOUD_NAME: string;
-
-  @IsString()
-  @IsOptional()
-  CLOUDINARY_API_KEY: string;
-
-  @IsString()
-  @IsOptional()
-  CLOUDINARY_API_SECRET: string;
-
-  @IsString()
-  @IsOptional()
-  CLOUDINARY_FOLDER: string;
-
   @IsString()
   @IsOptional()
   S3_BUCKET: string;
@@ -115,6 +87,10 @@ class EnvironmentVariables {
 
   @IsUrl({ require_tld: false, protocols: ['https', 'http'], require_protocol: true })
   @IsOptional()
+  // Để trống (máy dev, CI) = chưa cấu hình S3, không phải URL sai.
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  )
   S3_PUBLIC_BASE_URL: string;
 
   @IsString()

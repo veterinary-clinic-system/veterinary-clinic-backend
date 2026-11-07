@@ -8,7 +8,7 @@ import { PaginatedResultDto } from '@/shared/common/dto/paginated-result.dto';
 import { CreateProductDto } from '@/modules/catalog/presentation/dto/create-product.dto';
 import { UpdateProductDto } from '@/modules/catalog/presentation/dto/update-product.dto';
 import { QueryProductsDto } from '@/modules/catalog/presentation/dto/query-products.dto';
-import { DEFAULT_ITEM_IMAGE } from '@/shared/storage/cloudinary-web-assets';
+import { DEFAULT_ITEM_IMAGE } from '@/shared/storage/web-assets';
 
 const ITEM_SORT_COLUMNS = new Set(['itemName', 'unitPrice', 'code']);
 const PRODUCT_SORT_COLUMNS = new Set(['sku', 'brand', 'costPrice', 'createdAt', 'updatedAt']);
