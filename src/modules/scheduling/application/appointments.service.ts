@@ -161,8 +161,10 @@ export class AppointmentsService {
     const appointment = await mapAppointmentOverlapError(() =>
       this.dataSource.transaction(async (manager) => {
         await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [doctor.id]);
+        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`pet:${pet.id}`]);
 
         await this.assertSlotIsFree(doctor.id, branch.id, startAt, endAt);
+        await this.assertPetIsFree(pet.id, pet.name, startAt, endAt);
 
         const entity = manager.create(Appointment, {
           doctorId: doctor.id,
@@ -514,7 +516,17 @@ export class AppointmentsService {
 
       await this.dataSource.transaction(async (manager) => {
         await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [doctorId]);
+        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+          `pet:${appointment.petId}`,
+        ]);
         await this.assertSlotIsFree(doctorId, appointment.branchId, startAt, endAt, appointment.id);
+        await this.assertPetIsFree(
+          appointment.petId,
+          appointment.pet?.name ?? 'Thú cưng',
+          startAt,
+          endAt,
+          appointment.id,
+        );
         await manager.update(Appointment, id, {
           doctorId,
           startAt,
@@ -851,6 +863,49 @@ export class AppointmentsService {
     });
 
     return created;
+  }
+
+  /**
+   * Lịch còn hiệu lực của MỘT bé giao với khoảng [startAt, endAt) - dù với bác sĩ nào. Trợ lý AI
+   * dùng để không đề xuất giờ bé đã có hẹn; đặt lịch dùng để chặn hẳn.
+   */
+  async findPetConflicts(
+    petId: string,
+    startAt: Date,
+    endAt: Date,
+    excludeAppointmentId?: string,
+  ): Promise<Appointment[]> {
+    const qb = this.appointmentsRepository
+      .createQueryBuilder('appointment')
+      .leftJoinAndSelect('appointment.service', 'service')
+      .leftJoinAndSelect('service.item', 'item')
+      .where('appointment.petId = :petId', { petId })
+      .andWhere('appointment.status IN (:...statuses)', { statuses: SLOT_BLOCKING_STATUSES })
+      .andWhere('appointment.startAt < :endAt AND appointment.endAt > :startAt', { startAt, endAt })
+      .orderBy('appointment.startAt', 'ASC');
+    if (excludeAppointmentId) {
+      qb.andWhere('appointment.id != :excludeId', { excludeId: excludeAppointmentId });
+    }
+    return qb.getMany();
+  }
+
+  /** Một bé không thể có mặt ở hai lịch khám cùng lúc (kể cả với hai bác sĩ khác nhau). */
+  private async assertPetIsFree(
+    petId: string,
+    petName: string,
+    startAt: Date,
+    endAt: Date,
+    excludeAppointmentId?: string,
+  ): Promise<void> {
+    const [conflict] = await this.findPetConflicts(petId, startAt, endAt, excludeAppointmentId);
+    if (conflict) {
+      const service = conflict.service?.item?.itemName;
+      throw new ConflictException(
+        `${petName} đã có lịch hẹn${service ? ` ${service}` : ''} lúc ` +
+          `${format(conflict.startAt, 'HH:mm dd/MM/yyyy')} - không thể đặt trùng giờ. ` +
+          'Vui lòng chọn khung giờ khác.',
+      );
+    }
   }
 
   private async assertSlotIsFree(

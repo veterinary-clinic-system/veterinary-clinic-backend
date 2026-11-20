@@ -20,6 +20,7 @@ import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
 
 export const MAX_CHAT_IMAGES = 5;
 export const MAX_CHAT_VIDEOS = 2;
+export const MAX_CHAT_MESSAGE_LENGTH = 2000;
 
 /**
  * Trạng thái hội thoại đặt lịch - máy chủ KHÔNG lưu phiên, client gửi lại nguyên bản
@@ -117,6 +118,11 @@ export class BookingDraftDto {
   @IsString({ each: true })
   awaiting?: string[];
 
+  /** Khung giờ trợ lý vừa tóm tắt và chờ khách bấm "Xác nhận đặt lịch". */
+  @IsOptional()
+  @IsDateString()
+  confirmStartAt?: string;
+
   /** Các giờ trống trợ lý vừa đề xuất, để khách trả lời "1", "2"... */
   @IsOptional()
   @IsArray()
@@ -131,8 +137,10 @@ export class SendChatMessageDto {
   @MaxLength(64)
   sessionId?: string;
 
-  @IsString()
-  @MaxLength(2000)
+  @IsString({ message: 'Tin nhắn không hợp lệ.' })
+  @MaxLength(MAX_CHAT_MESSAGE_LENGTH, {
+    message: 'Tin nhắn quá dài - bạn vui lòng rút gọn dưới 2.000 ký tự.',
+  })
   message: string;
 
   @IsOptional()

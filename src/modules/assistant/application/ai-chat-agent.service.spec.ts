@@ -10,28 +10,54 @@ import { SendChatMessageDto } from '@/modules/assistant/presentation/dto/send-ch
 // Thứ 5, 15/10/2026 10:00 - "mai" là thứ 6 16/10.
 const NOW = new Date(2026, 9, 15, 10, 0, 0);
 
+const weekdayHours = [1, 2, 3, 4, 5].flatMap((dayOfWeek) => [
+  { dayOfWeek, openTime: '07:00', closeTime: '11:00' },
+  { dayOfWeek, openTime: '13:30', closeTime: '17:30' },
+]);
 const branches = [
-  { id: 'b-q1', branchName: 'Phòng khám thú y Quận 1', address: '12 Nguyễn Huệ', active: true },
+  {
+    id: 'b-q1',
+    branchName: 'Phòng khám thú y Quận 1',
+    address: '12 Nguyễn Huệ',
+    phone: '028 3822 1111',
+    active: true,
+    openingHours: weekdayHours,
+  },
   {
     id: 'b-q7',
     branchName: 'Phòng khám thú y Quận 7',
     address: '456 Nguyễn Thị Thập',
+    phone: '028 3775 2222',
     active: true,
+    openingHours: weekdayHours,
   },
 ];
 const services = [
-  { id: 's-tiem', durationMinutes: 30, active: true, item: { itemName: 'Tiêm phòng dại' } },
-  { id: 's-kham', durationMinutes: 30, active: true, item: { itemName: 'Khám tổng quát' } },
+  {
+    id: 's-tiem',
+    durationMinutes: 30,
+    active: true,
+    item: { itemName: 'Tiêm phòng dại', unitPrice: 120000 },
+  },
+  {
+    id: 's-kham',
+    durationMinutes: 30,
+    active: true,
+    item: { itemName: 'Khám tổng quát', unitPrice: 150000 },
+  },
 ];
 const species = [
   { id: 'sp-dog', speciesName: 'Chó' },
   { id: 'sp-cat', speciesName: 'Mèo' },
+  { id: 'sp-reptile', speciesName: 'Bò sát & lưỡng cư' },
 ];
 const breeds = [
   { id: 'br-poodle', breedName: 'Poodle', speciesId: 'sp-dog' },
   { id: 'br-dog-other', breedName: 'Giống khác / chưa xác định', speciesId: 'sp-dog' },
   { id: 'br-cat-ta', breedName: 'Mèo ta (mèo cỏ)', speciesId: 'sp-cat' },
   { id: 'br-cat-other', breedName: 'Giống khác / chưa xác định', speciesId: 'sp-cat' },
+  { id: 'br-turtle', breedName: 'Rùa tai đỏ', speciesId: 'sp-reptile' },
+  { id: 'br-reptile-other', breedName: 'Giống khác / chưa xác định', speciesId: 'sp-reptile' },
 ];
 
 function daySlots(date: Date, busy: string[] = []) {
@@ -80,7 +106,10 @@ describe('AiChatAgentService', () => {
     answerPetCareQuestion: jest.fn(),
     learn: jest.fn(),
   };
-  const appointmentsService = { createBookingWithReport: jest.fn() };
+  const appointmentsService = {
+    createBookingWithReport: jest.fn(),
+    findPetConflicts: jest.fn(),
+  };
   const availabilityService = {
     getDoctorDayAvailability: jest.fn((_doctorId: string, _branchId: string, date: Date) =>
       Promise.resolve(daySlots(date, busy)),
@@ -95,6 +124,7 @@ describe('AiChatAgentService', () => {
     busy = [];
     usersRepository.findOne.mockResolvedValue(null);
     petsRepository.find.mockResolvedValue([]);
+    appointmentsService.findPetConflicts.mockResolvedValue([]);
     appointmentsService.createBookingWithReport.mockImplementation((dto) =>
       Promise.resolve({
         appointment: {
@@ -133,7 +163,7 @@ describe('AiChatAgentService', () => {
     );
   });
 
-  async function say(
+  function ask(
     message: string,
     previous?: AssistantChatResponse,
     actor: AuthenticatedUser | null = null,
@@ -145,6 +175,143 @@ describe('AiChatAgentService', () => {
       NOW,
     );
   }
+
+  /** Như `ask`, và tự bấm "Xác nhận đặt lịch" khi trợ lý tóm tắt lịch chờ xác nhận. */
+  async function say(
+    message: string,
+    previous?: AssistantChatResponse,
+    actor: AuthenticatedUser | null = null,
+    extra: Partial<SendChatMessageDto> = {},
+  ) {
+    const reply = await ask(message, previous, actor, extra);
+    return reply.missingFields.includes('bookingConfirm')
+      ? ask('Xác nhận đặt lịch', reply, actor)
+      : reply;
+  }
+
+  it('hỏi chi nhánh, thứ 7 và giá khám: trả lời bằng dữ liệu phòng khám, không gọi LLM', async () => {
+    const reply = await ask(
+      'Phòng khám có những chi nhánh nào, mở cửa thứ 7 không và giá khám tổng quát bao nhiêu?',
+    );
+    expect(aiProvider.answerPetCareQuestion).not.toHaveBeenCalled();
+    expect(reply.reply).toContain('**2 chi nhánh**');
+    expect(reply.reply).toContain('12 Nguyễn Huệ');
+    expect(reply.reply).toContain('028 3822 1111');
+    expect(reply.reply).toContain('**Thứ 7** **nghỉ**');
+    expect(reply.reply).toContain('Khám tổng quát: **150.000 đ**');
+    expect(reply.reply).not.toContain('Tiêm phòng dại');
+  });
+
+  it('đổi từ chó sang rùa: không gộp triệu chứng cũ, không gợi ý bệnh của chó, trả lời có khám bò sát', async () => {
+    aiProvider.triage.mockResolvedValue({
+      priorityColor: PriorityColor.YELLOW,
+      suspectedGroups: [{ name: 'Bệnh Parvovirus', confidence: 0.84 }],
+      extractedKeywords: [],
+      nlpConfidence: 0.8,
+      cvConfidence: null,
+      overallConfidence: 0.84,
+      raw: { triage_result: { reasoning: 'Phân loại Vàng.' } },
+      modelVersion: 'jev',
+    });
+    const dog = await ask('Chó nhà em bị tiêu chảy nhẹ');
+    expect(dog.draft.symptoms).toContain('tiêu chảy');
+
+    const turtle = await ask(
+      'Rùa tai đỏ nhà em bị mềm mai và bỏ ăn 3 ngày, phòng khám có khám bò sát không?',
+      dog,
+    );
+    const [input] = aiProvider.triage.mock.calls[1];
+    expect(input.symptomText).not.toContain('tiêu chảy');
+    expect(input.petSpecies).toBe('Bò sát & lưỡng cư');
+    expect(turtle.draft.symptoms).not.toContain('tiêu chảy');
+    expect(turtle.triage?.suspectedDiseases).toEqual([]);
+    expect(turtle.reply).not.toContain('Parvovirus');
+    expect(turtle.reply).toContain('bé khác');
+    expect(turtle.reply).toContain('có tiếp nhận khám bò sát');
+  });
+
+  it('AI bỏ sót "đi khập khiễng" (BLUE): lưới an toàn nâng mức và nói rõ dấu hiệu', async () => {
+    aiProvider.triage.mockResolvedValue({
+      priorityColor: PriorityColor.BLUE,
+      suspectedGroups: [],
+      extractedKeywords: [],
+      nlpConfidence: 0.39,
+      cvConfidence: null,
+      overallConfidence: 0.39,
+      raw: {
+        triage_result: { reasoning: 'Không ghi nhận triệu chứng nào trong danh mục.' },
+        analysis: {
+          media: { findings: 'Video 1: khung hình màu xanh đồng nhất, không thấy thú cưng.' },
+        },
+      },
+      modelVersion: 'jev',
+    });
+    const reply = await ask('Xem giúp em video này bé đi khập khiễng chân sau', undefined, null, {
+      videos: ['https://cdn.example.com/media/v.mp4'],
+    });
+    expect(reply.triage?.priorityColor).toBe(PriorityColor.YELLOW);
+    expect(reply.reply).toContain('đi khập khiễng');
+    expect(reply.triage?.mediaUnusable).toBe(true);
+    expect(reply.reply).toContain('không thấy rõ thú cưng');
+    expect(reply.reply).toContain('🎥');
+  });
+
+  it('"chó đực tên Mực": nhận tên bé ngay lượt đầu, không hỏi lại', async () => {
+    const reply = await ask(
+      'Đặt lịch khám tổng quát cho chó đực tên Mực vào mai lúc 9h ở chi nhánh Quận 1, tên chủ là Nguyễn Văn Test, SĐT 0988777666',
+    );
+    expect(reply.draft.petName).toBe('Mực');
+    expect(reply.missingFields).not.toContain('petName');
+  });
+
+  it('đủ thông tin: tóm tắt và chờ xác nhận, chưa ghi lịch cho tới khi khách bấm Xác nhận', async () => {
+    const summary = await ask('đặt lịch bé Milu mèo đực quận 1 mai 9h, tôi tên Lan 0912345678');
+    expect(summary.missingFields).toEqual(['bookingConfirm']);
+    expect(summary.quickReplies).toContain('Xác nhận đặt lịch');
+    expect(summary.reply).toContain('09:00 Thứ 6 16/10/2026');
+    expect(appointmentsService.createBookingWithReport).not.toHaveBeenCalled();
+
+    const changed = await ask('Đổi giờ khác', summary);
+    expect(changed.booking).toBeUndefined();
+    expect(changed.missingFields).toContain('time');
+    expect(appointmentsService.createBookingWithReport).not.toHaveBeenCalled();
+
+    const again = await ask('10h', changed);
+    expect(again.missingFields).toEqual(['bookingConfirm']);
+    const done = await ask('Xác nhận đặt lịch', again);
+    expect(done.booking).toBeDefined();
+    expect(new Date(done.booking!.startAt)).toEqual(new Date(2026, 9, 16, 10, 0));
+  });
+
+  it('bé đã có lịch trùng giờ: không đặt trùng, nói rõ lịch cũ và đề xuất giờ khác', async () => {
+    petsRepository.find.mockResolvedValue([
+      { id: 'pet-milo', name: 'Milo', breedId: 'br-poodle', breed: breeds[0], gender: Gender.MALE },
+    ]);
+    usersRepository.findOne.mockResolvedValue({
+      id: 'owner-1',
+      fullName: 'Chủ Milo',
+      phone: '0911111111',
+    });
+    appointmentsService.findPetConflicts.mockImplementation(
+      (_petId: string, from: Date, to: Date) => {
+        const start = new Date(2026, 9, 16, 9, 0);
+        const end = new Date(2026, 9, 16, 9, 30);
+        return Promise.resolve(
+          start < to && end > from
+            ? [{ startAt: start, endAt: end, service: { item: { itemName: 'Tiêm phòng dại' } } }]
+            : [],
+        );
+      },
+    );
+    const owner = { userId: 'owner-1', role: Role.PET_OWNER } as AuthenticatedUser;
+    const reply = await ask('Đặt lịch khám tổng quát cho Milo quận 1 mai lúc 9h', undefined, owner);
+    expect(reply.booking).toBeUndefined();
+    expect(reply.reply).toContain('đã có lịch hẹn **Tiêm phòng dại**');
+    expect(reply.missingFields).toEqual(['slotChoice']);
+    expect(
+      reply.draft.offeredSlots?.map((s) => new Date(s).getHours() * 60 + new Date(s).getMinutes()),
+    ).not.toContain(9 * 60);
+  });
 
   it('khách vãng lai: hỏi đủ thông tin rồi tự đặt lịch, báo đúng kênh đã gửi', async () => {
     const first = await say('Tôi muốn đặt lịch khám cho bé');
@@ -297,7 +464,9 @@ describe('AiChatAgentService', () => {
     ]);
     const actor = { userId: 'u-owner', phone: owner.phone, role: Role.PET_OWNER, branchId: null };
 
-    const reply = await say('đặt lịch chiều mai ở chi nhánh quận 1', undefined, actor);
+    const summary = await ask('đặt lịch chiều mai ở chi nhánh quận 1', undefined, actor);
+    expect(summary.reply).toContain('bé duy nhất');
+    await say('Xác nhận đặt lịch', summary, actor);
     const [dto] = appointmentsService.createBookingWithReport.mock.calls[0];
     expect(dto).toMatchObject({
       phone: '0911111111',
@@ -306,7 +475,6 @@ describe('AiChatAgentService', () => {
       petId: 'pet-1',
     });
     expect(new Date(dto.startAt)).toEqual(new Date(2026, 9, 16, 13, 30));
-    expect(reply.reply).toContain('bé duy nhất');
   });
 
   it('chủ nuôi gửi petId của người khác trong draft: bị bỏ, không đặt cho bé đó', async () => {

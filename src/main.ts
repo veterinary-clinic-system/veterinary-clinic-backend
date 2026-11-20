@@ -1,3 +1,7 @@
+// Mọi phép tính ngày giờ "cục bộ" (khung giờ khám, ca bác sĩ, nhắc lịch) giả định giờ Việt Nam.
+// Container Node mặc định chạy UTC: khung "07:00" bị lưu thành 07:00Z = 14:00 giờ VN. Đặt TRƯỚC
+// mọi import để không đoạn code nào kịp đọc múi giờ cũ.
+process.env.TZ = process.env.TZ?.trim() || 'Asia/Ho_Chi_Minh';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';

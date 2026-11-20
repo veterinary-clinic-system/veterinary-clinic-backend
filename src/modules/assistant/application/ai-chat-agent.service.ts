@@ -25,9 +25,10 @@ import {
   AiPredictionProvider,
   AiTriageResult,
   KEYWORD_TRIAGE_MODEL_VERSION,
+  keywordTriage,
 } from '@/modules/triage/application';
 import { Gender } from '@/shared/common/enums/gender.enum';
-import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
+import { PRIORITY_COLOR_SEVERITY, PriorityColor } from '@/shared/common/enums/priority-color.enum';
 import { Role } from '@/shared/common/enums/role.enum';
 import { AuthenticatedUser } from '@/shared/common/interfaces/authenticated-user.interface';
 import {
@@ -48,6 +49,11 @@ import {
   parseTime,
   stripDiacritics,
 } from '@/modules/assistant/domain/chat-language';
+import {
+  buildClinicInfoReply,
+  detectClinicInfoTopics,
+  serviceNamesMentioned,
+} from '@/modules/assistant/domain/clinic-info';
 import {
   BookingDraftDto,
   MAX_CHAT_IMAGES,
@@ -73,6 +79,12 @@ export interface ChatTriage {
   suspectedDiseases: Array<{ name: string; confidence: number }>;
   analyzedImages: number;
   analyzedVideos: number;
+  /** Ghi nhận khách quan của mô hình thị giác về ảnh/video (nếu có). */
+  mediaFindings?: string | null;
+  /** Mô hình thị giác báo ảnh/video không thấy thú cưng hoặc không xem được. */
+  mediaUnusable?: boolean;
+  /** Loài nằm ngoài ma trận bệnh của AI (rùa, chim, cá...) - chỉ đánh giá mức khẩn cấp. */
+  unsupportedSpecies?: string | null;
 }
 
 export interface ChatBooking {
@@ -178,6 +190,9 @@ const FIELD_QUESTIONS: Record<string, string> = {
   ownerName: 'Cho em xin **họ tên** của bạn',
 };
 
+/** Loài có trong ma trận triệu chứng-bệnh của dịch vụ AI (tiền tố tên loài, bỏ dấu). */
+const MATRIX_SPECIES_PREFIXES = ['cho', 'meo', 'tho', 'hamster'];
+
 const SEARCH_DAYS_AHEAD = 7;
 const MAX_ALTERNATIVES = 3;
 const NOON = '12:00';
@@ -238,14 +253,28 @@ export class AiChatAgentService {
       });
     }
 
+    const before = { petId: draft.petId, petName: draft.petName, speciesId: draft.speciesId };
+    this.mergePetFacts(message, draft, ctx, awaiting);
+
+    // Khách chuyển sang hỏi về một bé KHÁC (khác tên, khác hồ sơ hoặc khác loài): bỏ triệu
+    // chứng, ảnh và mức ưu tiên của bé trước. Trước đây "chó tiêu chảy" rồi "rùa mềm mai" bị
+    // gộp thành một ca và ra "rùa bị Parvovirus".
+    let contextNote = '';
+    if (this.switchedPet(before, draft, message, ctx) && hasTriageContext(draft)) {
+      draft.symptoms = undefined;
+      draft.priorityColor = undefined;
+      draft.photoUrls = undefined;
+      draft.videoUrls = undefined;
+      contextNote =
+        '_Em hiểu bạn đang hỏi về một bé khác nên em đánh giá riêng, không gộp triệu chứng của bé trước._';
+    }
+
     if (images.length > 0) {
       draft.photoUrls = [...(draft.photoUrls ?? []), ...images].slice(-MAX_CHAT_IMAGES);
     }
     if (videos.length > 0) {
       draft.videoUrls = [...(draft.videoUrls ?? []), ...videos].slice(-MAX_CHAT_VIDEOS);
     }
-
-    this.mergePetFacts(message, draft, ctx, awaiting);
 
     if (intents.scheduleLookup) {
       return respond(await this.handleScheduleLookup(ctx, now));
@@ -281,20 +310,40 @@ export class AiChatAgentService {
       if (result) {
         // Phân loại dự phòng theo từ khoá chỉ đọc chữ - không được nói là đã xem ảnh/video.
         const sawMedia = result.modelVersion !== KEYWORD_TRIAGE_MODEL_VERSION;
-        draft.priorityColor = result.priorityColor;
+        const safety = keywordSafetyNet(result, draft.symptoms);
+        const media = mediaAnalysis(result);
+        const unsupportedSpecies = this.unsupportedSpeciesName(draft, ctx, message);
+        draft.priorityColor = safety.priorityColor;
         triage = {
-          priorityColor: result.priorityColor,
-          reasoning: triageReasoning(result),
-          suspectedDiseases: result.suspectedGroups.slice(0, 3),
+          priorityColor: safety.priorityColor,
+          reasoning: [triageReasoning(result), safety.note].filter(Boolean).join(' ') || null,
+          // Ma trận bệnh của AI chỉ có chó/mèo/thỏ/hamster - không gợi ý bệnh cho loài khác.
+          suspectedDiseases: unsupportedSpecies ? [] : result.suspectedGroups.slice(0, 3),
           analyzedImages: sawMedia ? (draft.photoUrls?.length ?? 0) : 0,
           analyzedVideos: sawMedia ? (draft.videoUrls?.length ?? 0) : 0,
+          mediaFindings: sawMedia ? media.findings : null,
+          mediaUnusable: sawMedia && media.unusable,
+          unsupportedSpecies,
         };
       }
       assessment = buildAssessment(triage, hasMedia);
+      if (contextNote) assessment = `${contextNote}\n\n${assessment}`;
     }
 
+    // Chi nhánh, giờ mở cửa, bảng giá, hotline, loài nhận khám: trả lời bằng dữ liệu thật của
+    // phòng khám. Không chen vào lượt đặt lịch ("đặt ở chi nhánh Quận 1" không phải câu hỏi).
+    const clinicTopics = bookingTurn ? null : detectClinicInfoTopics(message);
+    const clinicInfo = clinicTopics ? this.clinicInfoReply(clinicTopics, ctx, message) : '';
+
     if (bookingTurn) {
-      const outcome = await this.continueBooking(draft, ctx, now, message);
+      const outcome = await this.continueBooking(
+        draft,
+        ctx,
+        now,
+        message,
+        awaiting,
+        intents.affirm,
+      );
       return respond({
         intent: 'BOOKING',
         reply: assessment ? `${assessment}\n\n---\n\n${outcome.reply}` : outcome.reply,
@@ -314,12 +363,22 @@ export class AiChatAgentService {
         intent: 'TRIAGE',
         reply:
           `${assessment}\n\n` +
+          (clinicInfo ? `${clinicInfo}\n\n` : '') +
           (blue
             ? 'Nếu bạn vẫn muốn bác sĩ kiểm tra cho yên tâm, em có thể đặt lịch khám ngay.'
             : '👉 Bạn có muốn em **đặt lịch khám** cho bé luôn không ạ?'),
         quickReplies: ['Đặt lịch khám ngay'],
         suggestBooking: !blue,
         triage,
+      });
+    }
+
+    if (clinicInfo) {
+      return respond({
+        intent: 'HELP',
+        reply: `${clinicInfo}\n\nBạn cần em **đặt lịch khám** cho bé luôn không ạ?`,
+        quickReplies: ['Đặt lịch khám', 'Bảng giá dịch vụ', 'Giờ mở cửa'],
+        suggestBooking: true,
       });
     }
 
@@ -373,7 +432,11 @@ export class AiChatAgentService {
 
   private async loadContext(actor: AuthenticatedUser | null): Promise<ChatContext> {
     const [branches, services, species, breeds] = await Promise.all([
-      this.branchesRepository.find({ where: { active: true }, order: { branchName: 'ASC' } }),
+      this.branchesRepository.find({
+        where: { active: true },
+        relations: ['openingHours'],
+        order: { branchName: 'ASC' },
+      }),
       this.servicesRepository.find({ where: { active: true }, relations: ['item'] }),
       this.speciesRepository.find(),
       this.breedsRepository.find(),
@@ -457,7 +520,10 @@ export class AiChatAgentService {
       }
     }
 
-    const name = extractPetName(message, awaiting.has('petName') || awaiting.has('petChoice'));
+    const extracted = extractPetName(message, awaiting.has('petName') || awaiting.has('petChoice'));
+    // "chó Poodle", "mèo Ba Tư": chữ viết hoa sau tên loài có thể là GIỐNG, không phải tên bé.
+    const name =
+      extracted && !matchOption(extracted, this.breedOptions(ctx)) ? extracted : undefined;
     if (name && normalizeText(name) !== normalizeText(draft.petName ?? '')) {
       // Đổi sang bé KHÁC thì bỏ loài/giới tính của bé cũ; còn đặt tên lần đầu cho bé đã
       // được mô tả ("bé cún nhà em bị nôn" rồi mới nói "bé tên Mon") thì giữ nguyên.
@@ -587,6 +653,79 @@ export class AiChatAgentService {
       .map((breed) => ({ id: breed.id, aliases: nameAliases(breed.breedName) }));
   }
 
+  /** Lượt này nói về một bé khác bé đang được đánh giá (khác hồ sơ, khác tên hoặc khác loài). */
+  private switchedPet(
+    before: { petId?: string; petName?: string; speciesId?: string },
+    draft: BookingDraft,
+    message: string,
+    ctx: ChatContext,
+  ): boolean {
+    if (before.petId && draft.petId && before.petId !== draft.petId) return true;
+    if (
+      before.petName &&
+      draft.petName &&
+      normalizeText(before.petName) !== normalizeText(draft.petName)
+    ) {
+      return true;
+    }
+    if (before.speciesId && draft.speciesId && before.speciesId !== draft.speciesId) return true;
+    // Loài khách nhắc không có trong danh mục (draft.speciesId không đổi được) nhưng rõ ràng
+    // khác loài của bé trước.
+    const mentioned = detectSpeciesPrefix(message);
+    const previous = ctx.species.find((s) => s.id === before.speciesId);
+    return (
+      !!mentioned && !!previous && !stripDiacritics(previous.speciesName).startsWith(mentioned)
+    );
+  }
+
+  /** Tên loài khi bé thuộc loài AI không có trong ma trận bệnh; null nếu là chó/mèo/thỏ/hamster. */
+  private unsupportedSpeciesName(
+    draft: BookingDraft,
+    ctx: ChatContext,
+    message: string,
+  ): string | null {
+    const species = ctx.species.find((s) => s.id === draft.speciesId);
+    const prefix = species
+      ? stripDiacritics(species.speciesName)
+      : (detectSpeciesPrefix(message) ?? '');
+    if (!prefix) return null;
+    if (MATRIX_SPECIES_PREFIXES.some((p) => prefix.startsWith(p))) return null;
+    return species?.speciesName ?? prefix;
+  }
+
+  private clinicInfoReply(
+    topics: NonNullable<ReturnType<typeof detectClinicInfoTopics>>,
+    ctx: ChatContext,
+    message: string,
+  ): string {
+    const services = ctx.services
+      .filter((s) => s.item?.itemName)
+      .map((s) => ({ name: s.item.itemName, price: Number(s.item.unitPrice ?? 0) }))
+      .sort((a, b) => a.price - b.price);
+    return buildClinicInfoReply({
+      topics,
+      branches: ctx.branches.map((b) => ({
+        branchName: b.branchName,
+        address: b.address,
+        phone: b.phone,
+        openingHours: (b.openingHours ?? []).map((h) => ({
+          dayOfWeek: h.dayOfWeek,
+          openTime: h.openTime,
+          closeTime: h.closeTime,
+        })),
+      })),
+      services,
+      species: ctx.species.map((sp) => ({
+        speciesName: sp.speciesName,
+        breedNames: ctx.breeds.filter((b) => b.speciesId === sp.id).map((b) => b.breedName),
+      })),
+      mentionedServiceNames: serviceNamesMentioned(
+        message,
+        services.map((s) => s.name),
+      ),
+    });
+  }
+
   private speciesPrefixOf(draft: BookingDraft, ctx: ChatContext): string | undefined {
     const species = ctx.species.find((s) => s.id === draft.speciesId);
     return species ? stripDiacritics(species.speciesName).split(' ')[0] : undefined;
@@ -638,8 +777,20 @@ export class AiChatAgentService {
     ctx: ChatContext,
     now: Date,
     message: string,
+    awaiting: Set<string> = new Set(),
+    affirm = false,
   ): Promise<BookingOutcome> {
     const notes: string[] = [];
+    const plainMessage = stripDiacritics(message);
+    const confirming = awaiting.has('bookingConfirm');
+    const pendingStart = draft.confirmStartAt;
+    draft.confirmStartAt = undefined;
+    if (confirming && /\b(doi|gio khac|ngay khac|khong phai)\b/.test(plainMessage)) {
+      // "Đổi giờ khác": bỏ giờ đã chốt, hỏi lại.
+      draft.time = undefined;
+      draft.period = undefined;
+      draft.offeredSlots = undefined;
+    }
     if (hasInvalidDateText(message) && !parseDate(message, now)) {
       notes.push('Ngày bạn nhập không có trên lịch, bạn kiểm tra lại giúp em nhé.');
     }
@@ -696,7 +847,8 @@ export class AiChatAgentService {
       };
     }
 
-    const freeStarts = await this.findFreeStarts(
+    const freeStarts = await this.findBookableStarts(
+      draft.petId,
       branch.id,
       service.durationMinutes,
       draft.date!,
@@ -706,6 +858,15 @@ export class AiChatAgentService {
     if (draft.time) {
       const requested = new Date(`${draft.date}T${draft.time}:00`);
       startAt = freeStarts.find((s) => s.getTime() === requested.getTime());
+      if (!startAt && draft.petId) {
+        // Bé đã có lịch giao với giờ khách chọn: nói rõ thay vì chỉ "không còn bác sĩ trống".
+        const conflict = await this.petConflictNote(
+          draft,
+          requested,
+          addMinutes(requested, service.durationMinutes),
+        );
+        if (conflict) notes.push(conflict);
+      }
     } else {
       startAt = freeStarts.find((s) =>
         draft.period === 'afternoon' ? format(s, 'HH:mm') >= NOON : format(s, 'HH:mm') < NOON,
@@ -713,10 +874,91 @@ export class AiChatAgentService {
     }
 
     if (!startAt) {
-      return this.offerAlternatives(draft, branch, service, freeStarts, now);
+      return this.offerAlternatives(draft, branch, service, freeStarts, now, notes);
+    }
+
+    // Bước xác nhận cuối: chỉ ghi lịch khi khách đồng ý đúng khung giờ vừa tóm tắt. Trước
+    // đây trợ lý ghi thẳng vào CSDL ngay khi đủ thông tin.
+    const confirmed =
+      confirming &&
+      pendingStart === startAt.toISOString() &&
+      (affirm || /\b(xac nhan|dong y|chot|dat di|dat luon)\b/.test(plainMessage));
+    if (!confirmed) {
+      return this.askToConfirm(draft, ctx, branch, service, startAt, notes);
     }
 
     return this.book(draft, ctx, branch, service, startAt, notes);
+  }
+
+  private askToConfirm(
+    draft: BookingDraft,
+    ctx: ChatContext,
+    branch: Branch,
+    service: Service,
+    startAt: Date,
+    notes: string[],
+  ): BookingOutcome {
+    draft.date = format(startAt, 'yyyy-MM-dd');
+    draft.time = format(startAt, 'HH:mm');
+    draft.offeredSlots = undefined;
+    draft.confirmStartAt = startAt.toISOString();
+    draft.awaiting = ['bookingConfirm'];
+    const species = ctx.species.find((s) => s.id === draft.speciesId);
+    const petLabel = `${draft.petName ?? 'bé'}${species ? ` (${species.speciesName})` : ''}`;
+    const contact = ctx.owner
+      ? ''
+      : `- Người liên hệ: **${draft.ownerFullName ?? ''}** - ${draft.phone ?? ''}\n`;
+    return {
+      reply:
+        (notes.length > 0 ? `${notes.join(' ')}\n\n` : '') +
+        'Dạ em tóm tắt lịch hẹn, bạn kiểm tra giúp em nhé:\n' +
+        `- Bé: **${petLabel}**\n` +
+        `- Thời gian: **${formatSlot(startAt)}**\n` +
+        `- Chi nhánh: **${branch.branchName}** - ${branch.address}\n` +
+        `- Dịch vụ: **${service.item?.itemName ?? 'Khám tổng quát'}**\n` +
+        contact +
+        '\nBạn bấm **Xác nhận đặt lịch** để em ghi lịch, hoặc **Đổi giờ khác** nếu muốn chọn lại.',
+      missingFields: ['bookingConfirm'],
+      quickReplies: ['Xác nhận đặt lịch', 'Đổi giờ khác', 'Huỷ đặt lịch'],
+    };
+  }
+
+  /** Giờ trống của chi nhánh, bỏ các giờ giao với lịch còn hiệu lực của chính bé này. */
+  private async findBookableStarts(
+    petId: string | undefined,
+    branchId: string,
+    durationMinutes: number,
+    date: string,
+    now: Date,
+  ): Promise<Date[]> {
+    const starts = await this.findFreeStarts(branchId, durationMinutes, date, now);
+    if (!petId || starts.length === 0) return starts;
+    const dayStart = new Date(`${date}T00:00:00`);
+    const busy = await this.appointmentsService.findPetConflicts(
+      petId,
+      dayStart,
+      addMinutes(dayStart, 24 * 60),
+    );
+    if (busy.length === 0) return starts;
+    return starts.filter((s) => {
+      const end = addMinutes(s, durationMinutes);
+      return !busy.some((a) => a.startAt < end && a.endAt > s);
+    });
+  }
+
+  private async petConflictNote(
+    draft: BookingDraft,
+    startAt: Date,
+    endAt: Date,
+  ): Promise<string | null> {
+    if (!draft.petId) return null;
+    const [conflict] = await this.appointmentsService.findPetConflicts(draft.petId, startAt, endAt);
+    if (!conflict) return null;
+    const service = conflict.service?.item?.itemName;
+    return (
+      `Bé **${draft.petName ?? ''}** đã có lịch hẹn${service ? ` **${service}**` : ''} lúc ` +
+      `**${formatSlot(conflict.startAt)}** nên em không đặt trùng giờ được.`
+    );
   }
 
   private missingFields(draft: BookingDraft, ctx: ChatContext): string[] {
@@ -897,7 +1139,14 @@ export class AiChatAgentService {
     service: Service,
     sameDay: Date[],
     now: Date,
+    notes: string[] = [],
   ): Promise<BookingOutcome> {
+    const prefix =
+      notes.length > 0
+        ? `${notes.join(' ')}
+
+`
+        : '';
     const target = new Date(
       `${draft.date}T${draft.time ?? (draft.period === 'afternoon' ? '14:00' : '09:00')}:00`,
     );
@@ -917,7 +1166,8 @@ export class AiChatAgentService {
       ) {
         const next = new Date(`${draft.date}T00:00:00`);
         next.setDate(next.getDate() + offset);
-        const free = await this.findFreeStarts(
+        const free = await this.findBookableStarts(
+          draft.petId,
           branch.id,
           service.durationMinutes,
           format(next, 'yyyy-MM-dd'),
@@ -948,6 +1198,7 @@ export class AiChatAgentService {
       draft.awaiting = ['date'];
       return {
         reply:
+          prefix +
           `Dạ ${asked} và cả tuần sau đó tại **${branch.branchName}** đều đã kín lịch. ` +
           'Bạn thử chọn chi nhánh khác hoặc một ngày xa hơn giúp em nhé.',
         missingFields: ['date'],
@@ -961,6 +1212,7 @@ export class AiChatAgentService {
     const labels = options.map((o) => formatSlot(o));
     return {
       reply:
+        prefix +
         `Dạ ${asked} tại **${branch.branchName}** ` +
         (sameDay.length === 0
           ? 'đã kín lịch cả ngày. '
@@ -1010,7 +1262,7 @@ export class AiChatAgentService {
             },
           }),
       commonSymptoms: [],
-      otherSymptoms: draft.symptoms ? `[Trợ lý AI] ${draft.symptoms}` : undefined,
+      otherSymptoms: draft.symptoms || undefined,
       photoUrls: draft.photoUrls ?? [],
       videoUrls: draft.videoUrls ?? [],
     };
@@ -1256,6 +1508,62 @@ function triageReasoning(result: AiTriageResult): string | null {
     : null;
 }
 
+function hasTriageContext(draft: BookingDraft): boolean {
+  return !!(
+    draft.symptoms ||
+    draft.priorityColor ||
+    draft.photoUrls?.length ||
+    draft.videoUrls?.length
+  );
+}
+
+/**
+ * Lưới an toàn: mô hình đôi khi bỏ sót dấu hiệu khách đã viết rõ ("đi khập khiễng chân sau"
+ * ra BLUE - "không ghi nhận triệu chứng nào"). Nếu luật từ khoá thấy mức NẶNG hơn thì dùng mức
+ * đó và nói ra dấu hiệu bị bỏ sót. Không bao giờ hạ mức của mô hình.
+ */
+function keywordSafetyNet(
+  result: AiTriageResult,
+  symptomText: string | undefined,
+): { priorityColor: PriorityColor; note: string | null } {
+  if (result.modelVersion === KEYWORD_TRIAGE_MODEL_VERSION || !symptomText) {
+    return { priorityColor: result.priorityColor, note: null };
+  }
+  // Chỉ can thiệp khi mô hình cho là KHÔNG khẩn cấp (xanh lá/xanh dương) mà mô tả lại có dấu
+  // hiệu rõ - chênh lệch Vàng/Cam giữa hai bên thì tin mô hình.
+  const lenient =
+    result.priorityColor === PriorityColor.GREEN || result.priorityColor === PriorityColor.BLUE;
+  if (!lenient) return { priorityColor: result.priorityColor, note: null };
+  const rules = keywordTriage(symptomText);
+  if (
+    rules.extractedKeywords.length === 0 ||
+    PRIORITY_COLOR_SEVERITY[rules.priorityColor] >= PRIORITY_COLOR_SEVERITY[result.priorityColor]
+  ) {
+    return { priorityColor: result.priorityColor, note: null };
+  }
+  return {
+    priorityColor: rules.priorityColor,
+    note: `Mô tả của bạn có dấu hiệu cần lưu ý: ${rules.extractedKeywords.join(', ')} - em nâng mức ưu tiên cho an toàn.`,
+  };
+}
+
+/** Ghi nhận của mô hình thị giác trong `rawAiResponse.analysis.media` (nếu có). */
+function mediaAnalysis(result: AiTriageResult): { findings: string | null; unusable: boolean } {
+  const media = (result.raw as { analysis?: { media?: { findings?: unknown } } } | undefined)
+    ?.analysis?.media;
+  const findings =
+    typeof media?.findings === 'string' && media.findings.trim()
+      ? media.findings.trim().slice(0, 600)
+      : null;
+  if (!findings) return { findings: null, unusable: false };
+  const plain = stripDiacritics(findings);
+  const noPet =
+    /\bkhong (thay|co|nhin thay|xuat hien|phat hien)\b[^.\n]{0,40}\b(thu cung|con vat|dong vat|cho|meo|vat nuoi)\b/;
+  const unreadable =
+    /\b(qua mo|bi mo|khong xem duoc|khong ro|man hinh (trong|mot mau)|chi (co|la) (mau|nen))\b/;
+  return { findings, unusable: noPet.test(plain) || unreadable.test(plain) };
+}
+
 function buildAssessment(triage: ChatTriage | undefined, hasMedia: boolean): string {
   const danger =
     'Nếu bé có dấu hiệu nguy hiểm (khó thở, co giật, chảy máu, bỏ ăn uống hoàn toàn), bạn hãy đưa bé tới phòng khám ngay.';
@@ -1277,7 +1585,7 @@ function buildAssessment(triage: ChatTriage | undefined, hasMedia: boolean): str
   const parts = [`🩺 **Mức độ ưu tiên:** ${PRIORITY_TEXT[triage.priorityColor]}`];
   if (triage.analyzedImages + triage.analyzedVideos > 0) {
     parts.push(
-      `📷 Em đã phân tích kèm ${[
+      `${triage.analyzedVideos > 0 && !triage.analyzedImages ? '🎥' : '📷'} Em đã phân tích kèm ${[
         triage.analyzedImages ? `${triage.analyzedImages} ảnh` : '',
         triage.analyzedVideos ? `${triage.analyzedVideos} video` : '',
       ]
@@ -1290,7 +1598,20 @@ function buildAssessment(triage: ChatTriage | undefined, hasMedia: boolean): str
       '📷 Lúc này em chưa phân tích được ảnh/video tự động - ảnh vẫn được lưu để bác sĩ xem khi khám.',
     );
   }
+  if (triage.mediaFindings) parts.push(`👁 **Ghi nhận từ ảnh/video:** ${triage.mediaFindings}`);
+  if (triage.mediaUnusable) {
+    parts.push(
+      '⚠️ Ảnh/video bạn gửi **không thấy rõ thú cưng** (hoặc quá mờ) nên em chưa dựa vào được. ' +
+        'Bạn chụp/quay lại **cận cảnh vùng bị bệnh** của bé, đủ sáng, giúp em nhé.',
+    );
+  }
   if (triage.reasoning) parts.push(`📋 **Nhận định sơ bộ:** ${triage.reasoning}`);
+  if (triage.unsupportedSpecies) {
+    parts.push(
+      `ℹ️ Mô hình AI hiện chỉ gợi ý bệnh cho chó, mèo, thỏ và hamster. Với **${triage.unsupportedSpecies}**, ` +
+        'em chỉ đánh giá mức độ khẩn cấp - bác sĩ sẽ khám và chẩn đoán trực tiếp.',
+    );
+  }
   if (triage.suspectedDiseases.length > 0) {
     parts.push(
       '🔍 **Khả năng tham khảo:**\n' +

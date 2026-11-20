@@ -14,6 +14,7 @@ import { Item } from '@/modules/catalog/domain/entities/item.entity';
 import { MedicalRecord } from '@/modules/clinical/domain/entities/medical-record.entity';
 import { Appointment } from '@/modules/scheduling/domain/entities/appointment.entity';
 import { InventoryService } from '@/modules/catalog/application';
+import { AppointmentStatus } from '@/shared/common/enums/appointment-status.enum';
 import { InvoiceSource } from '@/shared/common/enums/invoice-source.enum';
 import { InvoiceStatus, LOCKED_INVOICE_STATUSES } from '@/shared/common/enums/invoice-status.enum';
 import {
@@ -76,6 +77,18 @@ export class BillingService {
       });
       if (!appointment) {
         throw new NotFoundException('Appointment not found');
+      }
+      // Lịch đã huỷ / khách không đến không còn dịch vụ nào để thu tiền - chặn cả nút
+      // "Tạo hóa đơn" của nhân viên lẫn mã VietQR khách tự tạo (POST /appointments/:id/checkout).
+      if (
+        appointment.status === AppointmentStatus.CANCELLED ||
+        appointment.status === AppointmentStatus.NO_SHOW
+      ) {
+        throw new ConflictException(
+          appointment.status === AppointmentStatus.CANCELLED
+            ? 'Không thể tạo hóa đơn cho lịch hẹn đã hủy.'
+            : 'Không thể tạo hóa đơn cho lịch hẹn khách không đến.',
+        );
       }
 
       const medicalRecord = await manager.findOne(MedicalRecord, {
