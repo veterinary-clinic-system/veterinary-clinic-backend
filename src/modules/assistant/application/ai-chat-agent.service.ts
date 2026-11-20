@@ -1630,18 +1630,30 @@ function describeDeliveries(report: DeliveryReport | null | undefined): string {
     return '⚠️ Em chưa gửi được tin xác nhận - lễ tân sẽ liên hệ lại với bạn.\n';
   }
   const label = (channel: string) =>
-    channel === 'EMAIL' ? 'Gmail' : channel === 'ZALO' ? 'Zalo' : channel;
+    channel === 'EMAIL'
+      ? 'Gmail'
+      : channel === 'ZALO'
+        ? 'Zalo'
+        : channel === 'PUSH'
+          ? 'thông báo trên app'
+          : channel;
+  // "A", "A và B", "A, B và C" - không lặp "và".
+  const joinVi = (items: string[]) =>
+    items.length <= 1
+      ? (items[0] ?? '')
+      : `${items.slice(0, -1).join(', ')} và ${items[items.length - 1]}`;
+  // Thông báo trên app gửi tới thiết bị, không có "người nhận" đáng hiện ra.
+  const target = (d: { channel: string; recipient: string }) =>
+    d.channel === 'PUSH' ? label(d.channel) : `${label(d.channel)} (${d.recipient})`;
   const sent = report.deliveries.filter((d) => d.status === 'SENT');
   const failed = report.deliveries.filter((d) => d.status !== 'SENT');
   const lines: string[] = [];
   if (sent.length > 0) {
-    lines.push(
-      `✅ Đã gửi tin xác nhận qua ${sent.map((d) => `${label(d.channel)} (${d.recipient})`).join(' và ')}.`,
-    );
+    lines.push(`✅ Đã gửi tin xác nhận qua ${joinVi(sent.map(target))}.`);
   }
   if (failed.length > 0) {
     lines.push(
-      `⚠️ Chưa gửi được qua ${failed.map((d) => label(d.channel)).join(', ')} - hệ thống sẽ tự thử lại.`,
+      `⚠️ Chưa gửi được qua ${joinVi(failed.map((d) => label(d.channel)))} - hệ thống sẽ tự thử lại.`,
     );
   }
   if (report.simulated) {

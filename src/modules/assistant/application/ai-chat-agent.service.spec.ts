@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common';
-import { AiChatAgentService, AssistantChatResponse } from './ai-chat-agent.service';
+import { AiChatAgentService, AssistantChatResponse, __testing } from './ai-chat-agent.service';
 import { SlotStatus } from '@/modules/scheduling/application';
 import { Gender } from '@/shared/common/enums/gender.enum';
 import { PriorityColor } from '@/shared/common/enums/priority-color.enum';
@@ -262,6 +262,19 @@ describe('AiChatAgentService', () => {
     );
     expect(reply.draft.petName).toBe('Mực');
     expect(reply.missingFields).not.toContain('petName');
+  });
+
+  it('báo kênh đã gửi: dịch PUSH, không lặp chữ "và"', () => {
+    const text = __testing.describeDeliveries({
+      simulated: false,
+      deliveries: [
+        { channel: 'ZALO', recipient: '0911111111', status: 'SENT', error: null },
+        { channel: 'EMAIL', recipient: 'a@b.vn', status: 'SENT', error: null },
+        { channel: 'PUSH', recipient: '0911111111', status: 'SENT', error: null },
+      ],
+    } as never);
+    expect(text).toContain('qua Zalo (0911111111), Gmail (a@b.vn) và thông báo trên app.');
+    expect(text).not.toContain('PUSH');
   });
 
   it('đủ thông tin: tóm tắt và chờ xác nhận, chưa ghi lịch cho tới khi khách bấm Xác nhận', async () => {
