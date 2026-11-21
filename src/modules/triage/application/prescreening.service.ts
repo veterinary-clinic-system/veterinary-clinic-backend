@@ -100,6 +100,13 @@ export class PrescreeningService {
     return result;
   }
 
+  async findByAppointmentOrNull(appointmentId: string): Promise<PreScreeningResult | null> {
+    return this.resultsRepository.findOne({
+      where: { appointmentId },
+      relations: ['aiSuspectedDiseaseGroups'],
+    });
+  }
+
   private async findOrCreateDisease(name: string): Promise<Disease> {
     const trimmed = name.trim();
     const existing = await this.diseasesRepository.findOne({ where: { diseaseName: trimmed } });

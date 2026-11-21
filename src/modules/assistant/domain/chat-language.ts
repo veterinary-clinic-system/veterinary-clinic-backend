@@ -308,6 +308,12 @@ const NAME_STOP_WORDS = new Set(
     'anh',
     'chị',
     'bạn',
+    'vào',
+    'tới',
+    'đến',
+    'để',
+    'trưa',
+    'tối',
   ].map((w) => w.normalize('NFC')),
 );
 
@@ -408,7 +414,9 @@ function namePattern(source: string, raw: string, flags: string): RegExp {
   return new RegExp(widened, flags);
 }
 
-const PET_NAMED_SOURCE = String.raw`(?:tên\s+(?:của\s+)?(?:bé|cún|mèo|con|chó)(?:\s+(?:nhà|của)\s+(?:em|mình|tôi))?\s*(?:là|:)?|(?:bé|cún|mèo|con|chó)(?:\s+(?:nhà|của)\s+(?:em|mình|tôi))?\s+tên(?:\s+là|\s*:)?)\s+([\p{L}][\p{L}'-]*(?:\s+\p{Lu}[\p{L}'-]*)?)`;
+// "chó đực tên Mực", "bé mèo cái tên Mướp": cho phép một từ chỉ giới tính/loài xen giữa "bé/chó"
+// và "tên" - trước đây câu đủ ý như vậy vẫn bị hỏi lại "Bé tên là gì?".
+const PET_NAMED_SOURCE = String.raw`(?:tên\s+(?:của\s+)?(?:bé|cún|mèo|con|chó)(?:\s+(?:nhà|của)\s+(?:em|mình|tôi))?\s*(?:là|:)?|(?:bé|cún|mèo|con|chó)(?:\s+(?:chó|mèo|cún|đực|cái|trai|gái|con))?(?:\s+(?:đực|cái))?(?:\s+(?:nhà|của)\s+(?:em|mình|tôi))?\s+tên(?:\s+là|\s*:)?)\s+([\p{L}][\p{L}'-]*(?:\s+\p{Lu}[\p{L}'-]*)?)`;
 
 export function extractPetName(raw: string, awaitingPetName = false): string | undefined {
   const text = removeContacts(raw);
@@ -421,7 +429,11 @@ export function extractPetName(raw: string, awaitingPetName = false): string | u
   }
 
   // "bé Milu bị nôn" - chỉ tin khi tên được viết hoa, vì "bé nhà em", "bé bị" rất phổ biến.
-  const capitalized = text.match(/(?:^|[\s,.])(?:[Bb]é|[Cc]ún|[Mm]èo)\s+(\p{Lu}[\p{L}'-]*)/u);
+  // "chó Bông", "con Mực" cũng vậy - tên giống viết hoa ("chó Poodle") do trợ lý lọc lại theo
+  // danh mục giống.
+  const capitalized = text.match(
+    /(?:^|[\s,.])(?:[Bb]é|[Cc]ún|[Mm]èo|[Cc]hó|[Cc]on)(?:\s+(?:đực|cái))?\s+(\p{Lu}[\p{L}'-]*)/u,
+  );
   if (capitalized) {
     const name = cleanNameCandidate(capitalized[1], 1);
     if (name) return name;
@@ -647,6 +659,13 @@ const SYMPTOM_WORDS = [
   'gãy',
   'què',
   'đi khập khiễng',
+  'khập khiễng',
+  'tập tễnh',
+  'đi cà nhắc',
+  'liệt',
+  'không đi được',
+  'mềm mai',
+  'mai mềm',
   'viêm',
   'chảy mủ',
   'đỏ mắt',
@@ -698,6 +717,8 @@ const PLAIN_SYMPTOM_WORDS = [
   'ngua',
   'trieu chung',
   'bi om',
+  'khap khieng',
+  'tap tenh',
 ];
 
 export function detectIntents(raw: string): MessageIntents {
@@ -776,9 +797,10 @@ export function detectIntents(raw: string): MessageIntents {
       ),
     thanks: short && /^(?:cam on|thanks|thank you|tks|camon)(?![\p{L}])/u.test(plain),
     booking,
-    affirm: /^(?:ok|oke|okay|co|dong y|vang|u|uh|duoc|dat di|chot|dung roi|yes)(?![\p{L}])/u.test(
-      plain,
-    ),
+    affirm:
+      /^(?:ok|oke|okay|co|dong y|vang|u|uh|duoc|dat di|chot|dung roi|yes|xac nhan)(?![\p{L}])/u.test(
+        plain,
+      ),
     reset: hasAnyWord(plain, [
       'huy dat lich',
       'bat dau lai',

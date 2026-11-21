@@ -80,6 +80,23 @@ export class SepayService {
     return `${prefix}${invoiceCode.replace(/[^a-zA-Z0-9]/g, '')}`.toUpperCase();
   }
 
+  /**
+   * Chủ nuôi tự tạo mã VietQR cho hoá đơn của CHÍNH mình (hoá đơn đứng tên họ, hoặc hoá đơn
+   * của lịch khám cho bé thuộc họ). Không cho chọn số tiền: luôn thu đúng số dư còn lại.
+   */
+  async createQrTicketForOwner(invoiceId: string, ownerId: string): Promise<SepayQrTicket> {
+    const invoice = await this.dataSource.manager.findOne(Invoice, {
+      where: { id: invoiceId },
+      relations: ['appointment', 'appointment.pet'],
+    });
+    const owns =
+      !!invoice &&
+      (invoice.customerId === ownerId || invoice.appointment?.pet?.ownerId === ownerId);
+    // Hoá đơn của người khác trả 404 như không tồn tại - không xác nhận mã hoá đơn có thật.
+    if (!owns) throw new NotFoundException('Không tìm thấy hóa đơn');
+    return this.createQrTicket(invoiceId);
+  }
+
   async createQrTicket(invoiceId: string, amount?: number): Promise<SepayQrTicket> {
     const { accountNumber, bankCode, qrEndpoint } = this.requireConfig();
     return this.dataSource.transaction(async (manager) => {

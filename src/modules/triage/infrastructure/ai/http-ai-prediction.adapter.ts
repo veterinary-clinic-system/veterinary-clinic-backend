@@ -40,8 +40,15 @@ export class HttpAiPredictionAdapter implements AiPredictionProvider {
 
   async triage(input: AiTriageInput): Promise<AiTriageResult> {
     const response = await this.client.diagnose(this.buildTriageRequest(input));
+    const result = this.toTriageResult(response, await this.loadSymptomLabels());
 
-    return this.toTriageResult(response, await this.loadSymptomLabels());
+    // Ma trận bệnh chỉ có 4 loài. Loài khác (rùa, chim, cá...) không lọc được theo loài nên
+    // từng ra "Rùa bị Parvovirus" - bệnh của chó. Giữ mức ưu tiên, bỏ danh sách bệnh.
+    if (input.petSpecies && !isMatrixSpecies(input.petSpecies, input.petBreed)) {
+      result.suspectedGroups = [];
+      result.overallConfidence = result.nlpConfidence;
+    }
+    return result;
   }
 
   async learn(input: AiTriageInput, confirmedDiseaseNames: string[]): Promise<void> {
@@ -129,6 +136,10 @@ export class HttpAiPredictionAdapter implements AiPredictionProvider {
   ): AiTriageResult {
     const priorityColor = response.triage_result.color_code as PriorityColor;
     const topConfidence = predictionRate(response.diseases[0]);
+    // Văn bản phân loại ghi "xác suất 81%" (độ chắc của mức ưu tiên) - nếu số hiển thị lại là tỷ
+    // lệ bệnh đứng đầu (0 khi không có bệnh nào) thì UI ra "0%" cạnh "81%". Độ tin cậy NLP là
+    // độ chắc của phân loại; độ tin cậy tổng lấy cái đó khi không có bệnh nào để so.
+    const triageConfidence = parseTriageProbability(response.triage_result.reasoning);
     return {
       priorityColor,
       suspectedGroups: response.diseases.map((item) => ({
@@ -139,9 +150,9 @@ export class HttpAiPredictionAdapter implements AiPredictionProvider {
         const label = symptomLabels.get(item.symptom);
         return `${label ? `${label} (${item.symptom})` : item.symptom} - mức ${item.intensity}/3`;
       }),
-      nlpConfidence: topConfidence,
+      nlpConfidence: triageConfidence ?? topConfidence,
       cvConfidence: null,
-      overallConfidence: topConfidence,
+      overallConfidence: response.diseases.length > 0 ? topConfidence : (triageConfidence ?? 0),
       raw: response as unknown as Record<string, unknown>,
       modelVersion: 'deepseek-v4.1-flash+symptom-matrix-v2',
     };
@@ -154,6 +165,21 @@ export class HttpAiPredictionAdapter implements AiPredictionProvider {
       return new Map();
     }
   }
+}
+
+const MATRIX_SPECIES = new Set(['Chó', 'Mèo', 'Thỏ', 'Hamster']);
+
+/** Loài có trong ma trận triệu chứng-bệnh của dịch vụ AI. */
+export function isMatrixSpecies(species?: string, breed?: string): boolean {
+  return MATRIX_SPECIES.has(normalizeSpeciesForAi(species, breed));
+}
+
+/** "Phân loại ... với xác suất 81%" -> 0.81; không có con số thì undefined. */
+export function parseTriageProbability(reasoning: string | undefined): number | undefined {
+  const match = reasoning?.match(/xác suất\s+(\d{1,3})\s*%/i);
+  if (!match) return undefined;
+  const value = Number(match[1]) / 100;
+  return value >= 0 && value <= 1 ? value : undefined;
 }
 
 function predictionRate(item: DiagnosisDetailedResponse['diseases'][number] | undefined): number {

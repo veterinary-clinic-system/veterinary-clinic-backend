@@ -254,8 +254,13 @@ export class ReportsService {
     }
 
     const totalEvaluated = rows.length;
-    const breakdownByColor: AiAccuracyByColor[] = Array.from(breakdown.entries())
-      .map(([aiPriorityColor, counts]) => ({ aiPriorityColor, ...counts }))
+    // Đủ cả 5 mức kể cả mức 0 ca - bảng thiếu hẳn một hàng (từng mất mức Cam) trông như
+    // hệ thống không có mức đó.
+    const breakdownByColor: AiAccuracyByColor[] = (Object.values(PriorityColor) as PriorityColor[])
+      .map((aiPriorityColor) => ({
+        aiPriorityColor,
+        ...(breakdown.get(aiPriorityColor) ?? { acceptedCount: 0, overriddenCount: 0 }),
+      }))
       .sort(
         (a, b) =>
           PRIORITY_COLOR_SEVERITY[a.aiPriorityColor] - PRIORITY_COLOR_SEVERITY[b.aiPriorityColor],

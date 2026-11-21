@@ -1,5 +1,6 @@
 import {
   Body,
+  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -64,6 +65,14 @@ export class AppointmentsController {
     const appointment = await this.appointmentsService.findOne(id);
     if (this.normalizePhone(appointment.pet.owner.phone) !== this.normalizePhone(dto.phone)) {
       throw new ForbiddenException('Số điện thoại không khớp với lịch hẹn');
+    }
+    if (
+      appointment.status === AppointmentStatus.CANCELLED ||
+      appointment.status === AppointmentStatus.NO_SHOW
+    ) {
+      throw new ConflictException(
+        'Lịch hẹn này đã hủy hoặc đã đóng - không thể thanh toán. Vui lòng đặt lịch mới.',
+      );
     }
 
     const invoice = await this.billingService.generateForAppointment(id);

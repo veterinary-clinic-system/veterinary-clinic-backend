@@ -60,7 +60,8 @@ const PRIORITY_RANK_SQL = `CASE queue.priority_color
   END`;
 
 const STALE_CANCEL_REASON = 'Tự đóng: lượt chờ không kết thúc trong ngày';
-const STALE_PENDING_REASON = 'Tự huỷ: lịch hẹn chưa được xác nhận trước ngày hẹn';
+const STALE_PENDING_REASON =
+  'Hệ thống tự huỷ: đã hết ngày hẹn mà lịch vẫn chưa được xác nhận (khách không tới khám)';
 const STALE_CONFIRMED_REASON = 'Tự đánh dấu: khách không đến';
 
 /** Việt Nam không có giờ mùa hè - UTC+7 quanh năm. */

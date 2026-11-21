@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RequirePermissions } from '@/shared/common/decorators/require-permissions.decorator';
 import { Permission } from '@/shared/common/enums/permission.enum';
@@ -59,6 +71,22 @@ export class PetsController {
   ) {
     await this.petsService.findOneForActor(id, actor);
     return this.petsService.update(id, dto);
+  }
+
+  /**
+   * Xoá hồ sơ chủ nuôi tạo nhầm. Chỉ cho xoá bé CHƯA có lịch sử (lịch hẹn, bệnh án, hoá
+   * đơn...) - hồ sơ đã có lịch sử là dữ liệu y tế của phòng khám, xoá mềm sẽ làm hỏng các màn
+   * hình nhân viên đang nối tới bé.
+   */
+  @Roles(Role.PET_OWNER)
+  @Audit({ action: AuditAction.DELETE, entity: 'Pet' })
+  @Delete('mine/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeMine(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ): Promise<void> {
+    await this.petsService.removeMine(id, actor);
   }
 
   @Roles(Role.PET_OWNER)

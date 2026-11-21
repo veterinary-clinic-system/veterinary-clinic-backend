@@ -16,6 +16,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { UseGuards } from '@nestjs/common';
 import { Public } from '@/shared/common/decorators/public.decorator';
+import { Roles } from '@/shared/common/decorators/roles.decorator';
+import { Role } from '@/shared/common/enums/role.enum';
 import { RequirePermissions } from '@/shared/common/decorators/require-permissions.decorator';
 import { Permission } from '@/shared/common/enums/permission.enum';
 import { Audit } from '@/shared/common/decorators/audit.decorator';
@@ -42,6 +44,18 @@ export class SepayController {
   @Post('invoices/:id/qr')
   createQr(@Param('id', ParseUUIDPipe) id: string, @Query('amount') amount?: string) {
     return this.sepayService.createQrTicket(id, amount ? Number(amount) : undefined);
+  }
+
+  @Roles(Role.PET_OWNER)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Audit({ action: AuditAction.PAYMENT, entity: 'Invoice' })
+  @Post('mine/invoices/:id/qr')
+  createQrForOwner(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.sepayService.createQrTicketForOwner(id, actor.userId);
   }
 
   @RequirePermissions(Permission.INVOICE_VIEW)

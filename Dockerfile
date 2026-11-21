@@ -10,6 +10,9 @@ RUN npm run build
 FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+# Khung giờ khám, ca bác sĩ, nhắc lịch đều tính theo giờ địa phương - phải là giờ Việt Nam.
+RUN apk add --no-cache tzdata
+ENV TZ=Asia/Ho_Chi_Minh
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev

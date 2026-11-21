@@ -79,7 +79,13 @@ const YELLOW_SIGNS: Sign[] = [
     pattern:
       /\b(ngua|hay gai|gai (nhieu|lien|suot|tai)|rung long|man do|noi man|bi ghe|nam da|bi ve|bo chet|bi ran|co ran)\b/,
   },
-  { label: 'đi khập khiễng', pattern: /\b(khap khieng|tap tenh|dau chan|que chan)\b/ },
+  {
+    label: 'đi khập khiễng / đau chân',
+    pattern:
+      /\b(khap khieng|tap tenh|ca nhac|dau chan|que chan|co chan|nhac chan|ne chan|lech chan|chan (sau|truoc) (bi |yeu|dau|sung))\b/,
+  },
+  // Bò sát: mai mềm là dấu hiệu thiếu canxi/UVB (MBD), cần bác sĩ thú y bò sát khám.
+  { label: 'mai mềm (bò sát)', pattern: /\b(mem mai|mai (bi )?mem|mai (bi )?bien dang)\b/ },
   {
     label: 'vấn đề về mắt, tai',
     pattern:

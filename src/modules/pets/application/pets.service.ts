@@ -115,6 +115,30 @@ export class PetsService {
     return pet;
   }
 
+  /**
+   * Chủ nuôi xoá hồ sơ tạo nhầm (xoá mềm). Bé đã có bất kỳ lịch sử nào ở phòng khám thì
+   * không xoá: các bảng đó tham chiếu tới bé và màn hình nhân viên sẽ mất dữ liệu.
+   */
+  async removeMine(id: string, actor: AuthenticatedUser): Promise<void> {
+    const pet = await this.findOneForActor(id, actor);
+    const [row] = await this.petsRepository.query(
+      `
+      SELECT EXISTS (SELECT 1 FROM "appointments" WHERE "pet_id" = $1)
+          OR EXISTS (SELECT 1 FROM "queue_entries" WHERE "pet_id" = $1)
+          OR EXISTS (SELECT 1 FROM "medical_records" WHERE "pet_id" = $1)
+          OR EXISTS (SELECT 1 FROM "vaccinations" WHERE "pet_id" = $1) AS "hasHistory"
+      `,
+      [id],
+    );
+    if (row?.hasHistory) {
+      throw new ConflictException(
+        `${pet.name || 'Bé'} đã có lịch hẹn hoặc hồ sơ khám tại phòng khám nên không thể xoá. ` +
+          'Bạn vui lòng liên hệ phòng khám nếu muốn lưu trữ hồ sơ này.',
+      );
+    }
+    await this.petsRepository.softDelete(id);
+  }
+
   async findMine(actor: AuthenticatedUser): Promise<Pet[]> {
     return this.petsRepository.find({
       where: { ownerId: actor.userId },
